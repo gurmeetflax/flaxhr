@@ -62,12 +62,12 @@ export function useMyRoles() {
     queryFn: async () => {
       if (!user) return []
       const { data, error } = await supabase
-        .schema('core' as never)
-        .from('user_roles')
+        .from('v_my_roles')
         .select('role, outlet_id')
-        .eq('user_id', user.id)
-        .is('deleted_at', null)
-      if (error) throw error
+      if (error) {
+        console.error('[auth] v_my_roles query failed', error)
+        throw error
+      }
       return (data as unknown as UserRole[]) ?? []
     },
     enabled: !!user,
@@ -100,15 +100,13 @@ export function useMyEmployee() {
     queryFn: async () => {
       if (!user) return null
       const { data, error } = await supabase
-        .schema('core' as never)
-        .from('employees')
-        .select(
-          'id, employee_code, user_id, full_name, work_email, phone, outlet_id, is_active, hired_on',
-        )
-        .eq('user_id', user.id)
-        .is('deleted_at', null)
+        .from('v_my_employee')
+        .select('id, employee_code, user_id, full_name, work_email, phone, outlet_id, is_active, hired_on')
         .maybeSingle()
-      if (error) throw error
+      if (error) {
+        console.error('[auth] v_my_employee query failed', error)
+        throw error
+      }
       return (data as unknown as EmployeeRow) ?? null
     },
     enabled: !!user,
