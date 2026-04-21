@@ -1,5 +1,5 @@
 import { Navigate, Route, Routes } from 'react-router-dom'
-import { Home, UserPlus } from 'lucide-react'
+import { Home, UserPlus, Store } from 'lucide-react'
 import ProtectedRoute from '@/components/ProtectedRoute'
 import AppShell from '@/components/layout/AppShell'
 import LoginPage from '@/pages/LoginPage'
@@ -7,10 +7,13 @@ import NotFoundPage from '@/pages/NotFoundPage'
 import ForbiddenPage from '@/pages/ForbiddenPage'
 import AdminDashboard from '@/pages/admin/AdminDashboard'
 import CreateEmployeePage from '@/pages/admin/CreateEmployeePage'
+import OutletsPage from '@/pages/admin/OutletsPage'
+import EditOutletPage from '@/pages/admin/EditOutletPage'
 import MyDashboard from '@/pages/me/MyDashboard'
 
 const adminNav = [
   { to: '/admin', label: 'Overview', icon: Home },
+  { to: '/admin/outlets', label: 'Outlets', icon: Store },
   { to: '/admin/employees/new', label: 'New employee', icon: UserPlus },
 ]
 
@@ -31,6 +34,8 @@ export default function App() {
         }
       >
         <Route path="/admin" element={<AdminDashboard />} />
+        <Route path="/admin/outlets" element={<OutletsPage />} />
+        <Route path="/admin/outlets/:id" element={<EditOutletPage />} />
         <Route path="/admin/employees/new" element={<CreateEmployeePage />} />
       </Route>
 
