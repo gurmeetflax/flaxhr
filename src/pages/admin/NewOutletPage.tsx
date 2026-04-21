@@ -8,6 +8,7 @@ import { Card, CardContent } from '@/components/ui/Card'
 import { Label } from '@/components/ui/Label'
 import { Input } from '@/components/ui/Input'
 import { Button } from '@/components/ui/Button'
+import { isValidEmail, parseEmails } from '@/lib/identity'
 
 const SLUG_REGEX = /^[a-z][a-z0-9_]{1,30}$/
 
@@ -30,6 +31,7 @@ export default function NewOutletPage() {
   const [idTouched, setIdTouched] = useState(false)
   const [city, setCity] = useState('Mumbai')
   const [timezone, setTimezone] = useState('Asia/Kolkata')
+  const [emails, setEmails] = useState('')
   const [active, setActive] = useState(true)
   const [err, setErr] = useState<string | null>(null)
 
@@ -47,12 +49,14 @@ export default function NewOutletPage() {
 
   const create = useMutation({
     mutationFn: async () => {
+      const parsedEmails = parseEmails(emails)
       const payload = {
         id: id.trim(),
         display_name: displayName.trim(),
         name: name.trim() || `Flax - ${displayName.trim()}`,
         city: city.trim() || null,
         timezone: timezone.trim() || 'Asia/Kolkata',
+        emails: parsedEmails,
         active,
       }
       const { error } = await supabase.from('flax_outlets').insert(payload)
@@ -85,6 +89,9 @@ export default function NewOutletPage() {
       )
     }
     if (!city.trim()) return setErr('City is required.')
+    const parsedEmails = parseEmails(emails)
+    const bad = parsedEmails.find((e) => !isValidEmail(e))
+    if (bad) return setErr(`"${bad}" is not a valid email address.`)
     create.mutate()
   }
 
@@ -162,6 +169,19 @@ export default function NewOutletPage() {
                 value={timezone}
                 onChange={(e) => setTimezone(e.target.value)}
               />
+            </div>
+
+            <div className="space-y-2 sm:col-span-2">
+              <Label htmlFor="emails">Contact emails</Label>
+              <Input
+                id="emails"
+                placeholder="manager@flaxitup.com, store.bandra@flaxitup.com"
+                value={emails}
+                onChange={(e) => setEmails(e.target.value)}
+              />
+              <p className="text-xs text-muted-foreground">
+                Comma-separated. These are the outlet mailboxes used by complaint / ops tools.
+              </p>
             </div>
 
             <div className="space-y-2 sm:col-span-2">

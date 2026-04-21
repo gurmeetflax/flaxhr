@@ -8,7 +8,7 @@ import { Card, CardContent } from '@/components/ui/Card'
 import { Label } from '@/components/ui/Label'
 import { Input } from '@/components/ui/Input'
 import { Button } from '@/components/ui/Button'
-import { employeeCodeToEmail, normaliseEmployeeCode } from '@/lib/identity'
+import { employeeCodeToEmail, isValidEmail, normaliseEmployeeCode } from '@/lib/identity'
 
 interface Outlet {
   id: string
@@ -36,6 +36,7 @@ export default function CreateEmployeePage() {
   const [code, setCode] = useState('')
   const [fullName, setFullName] = useState('')
   const [phone, setPhone] = useState('')
+  const [workEmail, setWorkEmail] = useState('')
   const [outletId, setOutletId] = useState('')
   const [pin, setPin] = useState('')
   const [err, setErr] = useState<string | null>(null)
@@ -63,21 +64,27 @@ export default function CreateEmployeePage() {
       return
     }
 
+    const cleanEmail = workEmail.trim().toLowerCase()
+    if (cleanEmail && !isValidEmail(cleanEmail)) {
+      setErr('Work email looks invalid.')
+      return
+    }
+
     setBusy(true)
     try {
       const cleanName = fullName.trim().replace(/\s+/g, ' ')
       const cleanPhone = phone.trim().replace(/\s+/g, '') || null
 
-      // Pre-submit dup check. Phone is also DB-unique as a backstop.
+      // Pre-submit dup check across name, phone, email.
+      const filters: string[] = [`full_name.ilike.${cleanName}`]
+      if (cleanPhone) filters.push(`phone.eq.${cleanPhone}`)
+      if (cleanEmail) filters.push(`work_email.ilike.${cleanEmail}`)
+
       const { data: existing, error: lookupErr } = await supabase
         .schema('core' as never)
         .from('employees')
-        .select('id, full_name, phone, employee_code')
-        .or(
-          cleanPhone
-            ? `full_name.ilike.${cleanName},phone.eq.${cleanPhone}`
-            : `full_name.ilike.${cleanName}`,
-        )
+        .select('id, full_name, phone, work_email, employee_code')
+        .or(filters.join(','))
         .is('deleted_at', null)
       if (lookupErr) throw lookupErr
 
@@ -92,6 +99,14 @@ export default function CreateEmployeePage() {
       const dupPhone = cleanPhone && existing?.find((e) => e.phone === cleanPhone)
       if (dupPhone) {
         setErr(`That phone number is already in use by ${dupPhone.employee_code}.`)
+        setBusy(false)
+        return
+      }
+      const dupEmail =
+        cleanEmail &&
+        existing?.find((e) => (e.work_email ?? '').toLowerCase() === cleanEmail)
+      if (dupEmail) {
+        setErr(`That work email is already in use by ${dupEmail.employee_code}.`)
         setBusy(false)
         return
       }
@@ -116,11 +131,17 @@ export default function CreateEmployeePage() {
           user_id: userId,
           full_name: cleanName,
           phone: cleanPhone,
+          work_email: cleanEmail || null,
           outlet_id: outletId,
         })
       if (empErr) {
-        if (empErr.code === '23505' && empErr.message.includes('phone')) {
-          throw new Error('That phone number is already in use.')
+        if (empErr.code === '23505') {
+          if (empErr.message.includes('phone')) {
+            throw new Error('That phone number is already in use.')
+          }
+          if (empErr.message.includes('work_email')) {
+            throw new Error('That work email is already in use.')
+          }
         }
         throw empErr
       }
@@ -171,6 +192,14 @@ export default function CreateEmployeePage() {
                 value={phone}
                 onChange={(e) => setPhone(e.target.value)}
                 placeholder="+91…"
+              />
+            </Field>
+            <Field label="Work email">
+              <Input
+                type="email"
+                value={workEmail}
+                onChange={(e) => setWorkEmail(e.target.value)}
+                placeholder="firstname@flaxitup.com"
               />
             </Field>
             <Field label="Outlet" required>

@@ -9,6 +9,7 @@ import { Card, CardContent } from '@/components/ui/Card'
 import { Label } from '@/components/ui/Label'
 import { Input } from '@/components/ui/Input'
 import { Button } from '@/components/ui/Button'
+import { isValidEmail, joinEmails, parseEmails } from '@/lib/identity'
 
 interface Outlet {
   id: string
@@ -20,6 +21,7 @@ interface Outlet {
   lat: number | null
   lng: number | null
   geofence_radius_m: number | null
+  emails: string[] | null
 }
 
 export default function EditOutletPage() {
@@ -34,7 +36,7 @@ export default function EditOutletPage() {
       const { data, error } = await supabase
         .from('flax_outlets')
         .select(
-          'id, name, display_name, city, active, address, lat, lng, geofence_radius_m',
+          'id, name, display_name, city, active, address, lat, lng, geofence_radius_m, emails',
         )
         .eq('id', id)
         .maybeSingle()
@@ -48,6 +50,7 @@ export default function EditOutletPage() {
   const [lat, setLat] = useState('')
   const [lng, setLng] = useState('')
   const [radius, setRadius] = useState('200')
+  const [emails, setEmails] = useState('')
   const [active, setActive] = useState(true)
   const [err, setErr] = useState<string | null>(null)
   const [locating, setLocating] = useState(false)
@@ -59,6 +62,7 @@ export default function EditOutletPage() {
     setLat(o.lat != null ? String(o.lat) : '')
     setLng(o.lng != null ? String(o.lng) : '')
     setRadius(String(o.geofence_radius_m ?? 200))
+    setEmails(joinEmails(o.emails))
     setActive(!!o.active)
   }, [outletQ.data])
 
@@ -70,6 +74,7 @@ export default function EditOutletPage() {
         lat: lat.trim() ? Number(lat) : null,
         lng: lng.trim() ? Number(lng) : null,
         geofence_radius_m: radius.trim() ? Number(radius) : 200,
+        emails: parseEmails(emails),
         active,
       }
       const { error } = await supabase.from('flax_outlets').update(patch).eq('id', id)
@@ -97,6 +102,9 @@ export default function EditOutletPage() {
     if (!Number.isFinite(r) || r < 25 || r > 5000)
       return setErr('Geofence radius must be between 25 and 5000 metres.')
     if ((lat && !lng) || (!lat && lng)) return setErr('Set both latitude and longitude, or leave both empty.')
+    const parsedEmails = parseEmails(emails)
+    const bad = parsedEmails.find((e) => !isValidEmail(e))
+    if (bad) return setErr(`"${bad}" is not a valid email address.`)
     save.mutate()
   }
 
@@ -205,6 +213,19 @@ export default function EditOutletPage() {
               <span className="text-xs text-muted-foreground">
                 Tip: stand at the outlet, tap "Use my current location" on your phone.
               </span>
+            </div>
+
+            <div className="space-y-2 sm:col-span-2">
+              <Label htmlFor="emails">Contact emails</Label>
+              <Input
+                id="emails"
+                placeholder="manager@flaxitup.com, store.bandra@flaxitup.com"
+                value={emails}
+                onChange={(e) => setEmails(e.target.value)}
+              />
+              <p className="text-xs text-muted-foreground">
+                Comma-separated. Shared with complaint / ops tools across Flax.
+              </p>
             </div>
 
             <div className="space-y-2">
