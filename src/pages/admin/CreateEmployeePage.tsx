@@ -1,6 +1,7 @@
 import { useState, type FormEvent } from 'react'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { useNavigate } from 'react-router-dom'
+import { toast } from 'sonner'
 import { createEphemeralClient, supabase } from '@/lib/supabase'
 import { PageHeader } from '@/components/layout/AppShell'
 import { Card, CardContent } from '@/components/ui/Card'
@@ -64,9 +65,39 @@ export default function CreateEmployeePage() {
 
     setBusy(true)
     try {
-      // 1. Create auth user on an ephemeral client so the ADMIN's current
-      //    session is untouched. supabase.auth.signUp would otherwise replace
-      //    the caller's session with the new employee's — knocking us to /me.
+      const cleanName = fullName.trim().replace(/\s+/g, ' ')
+      const cleanPhone = phone.trim().replace(/\s+/g, '') || null
+
+      // Pre-submit dup check. Phone is also DB-unique as a backstop.
+      const { data: existing, error: lookupErr } = await supabase
+        .schema('core' as never)
+        .from('employees')
+        .select('id, full_name, phone, employee_code')
+        .or(
+          cleanPhone
+            ? `full_name.ilike.${cleanName},phone.eq.${cleanPhone}`
+            : `full_name.ilike.${cleanName}`,
+        )
+        .is('deleted_at', null)
+      if (lookupErr) throw lookupErr
+
+      const dupName = existing?.find(
+        (e) => e.full_name?.trim().toLowerCase() === cleanName.toLowerCase(),
+      )
+      if (dupName) {
+        setErr(`An employee named "${cleanName}" already exists (${dupName.employee_code}).`)
+        setBusy(false)
+        return
+      }
+      const dupPhone = cleanPhone && existing?.find((e) => e.phone === cleanPhone)
+      if (dupPhone) {
+        setErr(`That phone number is already in use by ${dupPhone.employee_code}.`)
+        setBusy(false)
+        return
+      }
+
+      // 1. Create auth user on an ephemeral client so the ADMIN's session
+      //    isn't replaced with the new employee's.
       const tmp = createEphemeralClient()
       const { data: signUp, error: signUpErr } = await tmp.auth.signUp({
         email: employeeCodeToEmail(normalised),
@@ -83,11 +114,16 @@ export default function CreateEmployeePage() {
         .insert({
           employee_code: normalised,
           user_id: userId,
-          full_name: fullName.trim(),
-          phone: phone.trim() || null,
+          full_name: cleanName,
+          phone: cleanPhone,
           outlet_id: outletId,
         })
-      if (empErr) throw empErr
+      if (empErr) {
+        if (empErr.code === '23505' && empErr.message.includes('phone')) {
+          throw new Error('That phone number is already in use.')
+        }
+        throw empErr
+      }
 
       // 3. Grant the 'employee' role (scoped to outlet).
       const { error: roleErr } = await supabase
@@ -97,10 +133,12 @@ export default function CreateEmployeePage() {
       if (roleErr) throw roleErr
 
       qc.invalidateQueries({ queryKey: ['admin-dashboard-counts'] })
+      toast.success(`Employee created: ${cleanName} (${normalised})`)
       navigate('/admin', { replace: true })
     } catch (e) {
       const msg = e instanceof Error ? e.message : 'Could not create employee.'
       setErr(msg)
+      toast.error(msg)
     } finally {
       setBusy(false)
     }
