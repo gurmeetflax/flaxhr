@@ -1,7 +1,7 @@
 import { useState, type FormEvent } from 'react'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { useNavigate } from 'react-router-dom'
-import { supabase } from '@/lib/supabase'
+import { createEphemeralClient, supabase } from '@/lib/supabase'
 import { PageHeader } from '@/components/layout/AppShell'
 import { Card, CardContent } from '@/components/ui/Card'
 import { Label } from '@/components/ui/Label'
@@ -64,9 +64,11 @@ export default function CreateEmployeePage() {
 
     setBusy(true)
     try {
-      // 1. Create auth user with synthetic email. Supabase project must have
-      //    "Confirm email" disabled for this to become usable immediately.
-      const { data: signUp, error: signUpErr } = await supabase.auth.signUp({
+      // 1. Create auth user on an ephemeral client so the ADMIN's current
+      //    session is untouched. supabase.auth.signUp would otherwise replace
+      //    the caller's session with the new employee's — knocking us to /me.
+      const tmp = createEphemeralClient()
+      const { data: signUp, error: signUpErr } = await tmp.auth.signUp({
         email: employeeCodeToEmail(normalised),
         password: pin,
       })
