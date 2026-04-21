@@ -1,6 +1,6 @@
 import { useQuery } from '@tanstack/react-query'
 import { Link } from 'react-router-dom'
-import { MapPin, Pencil, CheckCircle2, AlertCircle } from 'lucide-react'
+import { MapPin, Pencil, CheckCircle2, AlertCircle, Plus } from 'lucide-react'
 import { supabase } from '@/lib/supabase'
 import { PageHeader } from '@/components/layout/AppShell'
 import { Card, CardContent } from '@/components/ui/Card'
@@ -43,6 +43,13 @@ export default function OutletsPage() {
       <PageHeader
         title="Outlets"
         description="Set address, coordinates and geofence for each outlet. Attendance uses these to validate punches."
+        actions={
+          <Link to="/admin/outlets/new">
+            <Button size="sm">
+              <Plus className="h-4 w-4" /> New outlet
+            </Button>
+          </Link>
+        }
       />
 
       <div className="mb-4 flex flex-wrap items-center gap-3 text-sm">

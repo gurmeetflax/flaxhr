@@ -8,6 +8,7 @@ import ForbiddenPage from '@/pages/ForbiddenPage'
 import AdminDashboard from '@/pages/admin/AdminDashboard'
 import CreateEmployeePage from '@/pages/admin/CreateEmployeePage'
 import OutletsPage from '@/pages/admin/OutletsPage'
+import NewOutletPage from '@/pages/admin/NewOutletPage'
 import EditOutletPage from '@/pages/admin/EditOutletPage'
 import MyDashboard from '@/pages/me/MyDashboard'
 
@@ -35,6 +36,7 @@ export default function App() {
       >
         <Route path="/admin" element={<AdminDashboard />} />
         <Route path="/admin/outlets" element={<OutletsPage />} />
+        <Route path="/admin/outlets/new" element={<NewOutletPage />} />
         <Route path="/admin/outlets/:id" element={<EditOutletPage />} />
         <Route path="/admin/employees/new" element={<CreateEmployeePage />} />
       </Route>
