@@ -1,5 +1,5 @@
 import { Navigate, Route, Routes } from 'react-router-dom'
-import { Home, Users, Store } from 'lucide-react'
+import { Clock, Home, Users, Store } from 'lucide-react'
 import ProtectedRoute from '@/components/ProtectedRoute'
 import AppShell from '@/components/layout/AppShell'
 import LoginPage from '@/pages/LoginPage'
@@ -13,6 +13,7 @@ import OutletsPage from '@/pages/admin/OutletsPage'
 import NewOutletPage from '@/pages/admin/NewOutletPage'
 import EditOutletPage from '@/pages/admin/EditOutletPage'
 import MyDashboard from '@/pages/me/MyDashboard'
+import PunchPage from '@/pages/me/PunchPage'
 
 const adminNav = [
   { to: '/admin', label: 'Overview', icon: Home },
@@ -20,7 +21,10 @@ const adminNav = [
   { to: '/admin/employees', label: 'Employees', icon: Users },
 ]
 
-const employeeNav = [{ to: '/me', label: 'My space', icon: Home }]
+const employeeNav = [
+  { to: '/me', label: 'Punch', icon: Clock },
+  { to: '/me/overview', label: 'My space', icon: Home },
+]
 
 export default function App() {
   return (
@@ -52,7 +56,8 @@ export default function App() {
           </ProtectedRoute>
         }
       >
-        <Route path="/me" element={<MyDashboard />} />
+        <Route path="/me" element={<PunchPage />} />
+        <Route path="/me/overview" element={<MyDashboard />} />
       </Route>
 
       <Route path="*" element={<NotFoundPage />} />
