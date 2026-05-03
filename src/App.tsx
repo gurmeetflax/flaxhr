@@ -1,5 +1,17 @@
 import { Navigate, Route, Routes } from 'react-router-dom'
-import { Home, Users, Store } from 'lucide-react'
+import {
+  CalendarDays,
+  CalendarRange,
+  CheckSquare,
+  Clock,
+  ClipboardList,
+  History,
+  Home,
+  ListChecks,
+  Plane,
+  Store,
+  Users,
+} from 'lucide-react'
 import ProtectedRoute from '@/components/ProtectedRoute'
 import AppShell from '@/components/layout/AppShell'
 import LoginPage from '@/pages/LoginPage'
@@ -12,15 +24,39 @@ import EditEmployeePage from '@/pages/admin/EditEmployeePage'
 import OutletsPage from '@/pages/admin/OutletsPage'
 import NewOutletPage from '@/pages/admin/NewOutletPage'
 import EditOutletPage from '@/pages/admin/EditOutletPage'
+import AttendancePage from '@/pages/admin/AttendancePage'
+import RegularisationsPage from '@/pages/admin/RegularisationsPage'
+import ShiftsPage from '@/pages/admin/ShiftsPage'
+import RosterPage from '@/pages/admin/RosterPage'
+import LeaveApprovalsPage from '@/pages/admin/LeaveApprovalsPage'
+import LeavePoliciesPage from '@/pages/admin/LeavePoliciesPage'
 import MyDashboard from '@/pages/me/MyDashboard'
+import PunchPage from '@/pages/me/PunchPage'
+import MyAttendancePage from '@/pages/me/MyAttendancePage'
+import RegularisePage from '@/pages/me/RegularisePage'
+import MyRosterPage from '@/pages/me/MyRosterPage'
+import LeavePage from '@/pages/me/LeavePage'
 
 const adminNav = [
   { to: '/admin', label: 'Overview', icon: Home },
   { to: '/admin/outlets', label: 'Outlets', icon: Store },
   { to: '/admin/employees', label: 'Employees', icon: Users },
+  { to: '/admin/attendance', label: 'Attendance', icon: ClipboardList },
+  { to: '/admin/regularisations', label: 'Regularisations', icon: CheckSquare },
+  { to: '/admin/shifts', label: 'Shifts', icon: Clock },
+  { to: '/admin/roster', label: 'Roster', icon: CalendarRange },
+  { to: '/admin/leave/approvals', label: 'Leave approvals', icon: Plane },
+  { to: '/admin/leave/policies', label: 'Leave policies', icon: ListChecks },
 ]
 
-const employeeNav = [{ to: '/me', label: 'My space', icon: Home }]
+const employeeNav = [
+  { to: '/me', label: 'Punch', icon: Clock },
+  { to: '/me/history', label: 'My attendance', icon: History },
+  { to: '/me/regularise', label: 'Regularise', icon: CheckSquare },
+  { to: '/me/roster', label: 'My roster', icon: CalendarDays },
+  { to: '/me/leave', label: 'Leave', icon: Plane },
+  { to: '/me/overview', label: 'My space', icon: Home },
+]
 
 export default function App() {
   return (
@@ -43,6 +79,12 @@ export default function App() {
         <Route path="/admin/employees" element={<EmployeesListPage />} />
         <Route path="/admin/employees/new" element={<CreateEmployeePage />} />
         <Route path="/admin/employees/:id" element={<EditEmployeePage />} />
+        <Route path="/admin/attendance" element={<AttendancePage />} />
+        <Route path="/admin/regularisations" element={<RegularisationsPage />} />
+        <Route path="/admin/shifts" element={<ShiftsPage />} />
+        <Route path="/admin/roster" element={<RosterPage />} />
+        <Route path="/admin/leave/approvals" element={<LeaveApprovalsPage />} />
+        <Route path="/admin/leave/policies" element={<LeavePoliciesPage />} />
       </Route>
 
       <Route
@@ -52,7 +94,12 @@ export default function App() {
           </ProtectedRoute>
         }
       >
-        <Route path="/me" element={<MyDashboard />} />
+        <Route path="/me" element={<PunchPage />} />
+        <Route path="/me/history" element={<MyAttendancePage />} />
+        <Route path="/me/regularise" element={<RegularisePage />} />
+        <Route path="/me/roster" element={<MyRosterPage />} />
+        <Route path="/me/leave" element={<LeavePage />} />
+        <Route path="/me/overview" element={<MyDashboard />} />
       </Route>
 
       <Route path="*" element={<NotFoundPage />} />
