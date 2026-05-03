@@ -24,6 +24,86 @@ export interface PunchResult {
   outlet_id: string
 }
 
+export interface AttendanceRow {
+  id: string
+  type: 'in' | 'out'
+  punched_at: string
+  selfie_path: string | null
+  is_within_geofence: boolean | null
+  distance_m: number | null
+  lat: number | null
+  lng: number | null
+  source: 'self' | 'regularised'
+  outlet_id: string | null
+  outlet_name: string | null
+  outlet_timezone: string | null
+  geofence_radius_m: number | null
+  employee_id: string
+  employee_code: string
+  employee_name: string
+}
+
+export interface AttendanceFilters {
+  outletId?: string | null
+  employeeId?: string | null
+  fromDate?: string | null
+  toDate?: string | null
+  source?: 'self' | 'regularised' | null
+  type?: 'in' | 'out' | null
+  limit?: number
+}
+
+export function useAttendance(filters: AttendanceFilters = {}) {
+  return useQuery<AttendanceRow[]>({
+    queryKey: ['attendance', filters],
+    staleTime: 15_000,
+    queryFn: async () => {
+      let q = supabase
+        .from('v_attendance')
+        .select(
+          'id, type, punched_at, selfie_path, is_within_geofence, distance_m, lat, lng, source, outlet_id, outlet_name, outlet_timezone, geofence_radius_m, employee_id, employee_code, employee_name',
+        )
+        .order('punched_at', { ascending: false })
+        .limit(filters.limit ?? 500)
+      if (filters.outletId) q = q.eq('outlet_id', filters.outletId)
+      if (filters.employeeId) q = q.eq('employee_id', filters.employeeId)
+      if (filters.source) q = q.eq('source', filters.source)
+      if (filters.type) q = q.eq('type', filters.type)
+      if (filters.fromDate) q = q.gte('punched_at', filters.fromDate)
+      if (filters.toDate) q = q.lte('punched_at', filters.toDate)
+      const { data, error } = await q
+      if (error) throw error
+      return (data ?? []) as AttendanceRow[]
+    },
+  })
+}
+
+export function useMyAttendance(filters: Omit<AttendanceFilters, 'employeeId'> = {}) {
+  const { user } = useAuth()
+  return useQuery<AttendanceRow[]>({
+    queryKey: ['my-attendance', user?.id, filters],
+    enabled: !!user,
+    staleTime: 15_000,
+    queryFn: async () => {
+      let q = supabase
+        .from('v_attendance')
+        .select(
+          'id, type, punched_at, selfie_path, is_within_geofence, distance_m, lat, lng, source, outlet_id, outlet_name, outlet_timezone, geofence_radius_m, employee_id, employee_code, employee_name',
+        )
+        .order('punched_at', { ascending: false })
+        .limit(filters.limit ?? 200)
+      if (filters.outletId) q = q.eq('outlet_id', filters.outletId)
+      if (filters.source) q = q.eq('source', filters.source)
+      if (filters.type) q = q.eq('type', filters.type)
+      if (filters.fromDate) q = q.gte('punched_at', filters.fromDate)
+      if (filters.toDate) q = q.lte('punched_at', filters.toDate)
+      const { data, error } = await q
+      if (error) throw error
+      return (data ?? []) as AttendanceRow[]
+    },
+  })
+}
+
 export interface MyOutlet {
   id: string
   display_name: string | null
