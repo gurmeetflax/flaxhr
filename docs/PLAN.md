@@ -56,7 +56,47 @@ Conventions:
 
 ## Pending
 
-### Phase 8 — Holidays & company calendar
+### Phase 8 — HR & Employee dashboards (with roster/attendance cross-check, manpower-cost %, sales input, attrition %, apply-for-leave)
+- [x] DB: `core.employees.monthly_salary`, `exit_date`, `exit_reason` (+
+  trigger that auto-deactivates on exit_date set);
+  `core.outlet_monthly_sales(outlet_id, period_month, amount)` with RLS;
+  `public.v_outlet_monthly_sales`;
+  `public.upsert_outlet_sales(outlet_id, period_month, amount)` RPC;
+  `public.admin_dashboard_summary(period_month, outlet_id)` RPC;
+  `public.roster_vs_attendance(date, outlet_id)` RPC;
+  `public.v_my_dashboard_summary` (security_invoker);
+  refreshed `public.v_employees` exposing the new columns.
+- [x] Hooks: `src/lib/dashboards.ts`
+  (`useAdminDashboardSummary`, `useRosterVsAttendance`,
+  `useOutletMonthlySales`, `useUpsertOutletSales`,
+  `useMyDashboardSummary`).
+- [x] Admin UI: `src/pages/admin/AdminDashboard.tsx` rewritten with
+  outlet pills + month picker, KPI strip (Headcount, Manpower cost,
+  Sales, Manpower cost %, Attrition %, Present/Late/On-leave today),
+  Sales input card, Roster-vs-attendance table.
+- [x] Employee UI: `src/pages/me/MyDashboard.tsx` rewritten with Today,
+  This-month, Leave (with **Apply for leave** button →
+  `/me/leave?apply=1`), Upcoming roster cards.
+- [x] `src/pages/me/LeavePage.tsx` reads `?apply=1` and scrolls/focuses
+  the apply form.
+- [x] `src/pages/admin/EditEmployeePage.tsx` adds `monthly_salary`,
+  `exit_date`, `exit_reason` inputs.
+- Migration: `supabase/migrations/20260504000006_dashboards_and_sales.sql`.
+- Verification:
+  - `npm run lint && npm run typecheck && npm run build` must pass.
+  - As admin/HR: set `monthly_salary` for a few employees; enter sales
+    for the active outlet; KPIs show non-zero manpower-cost and
+    manpower-cost %.
+  - Set `exit_date=today-15d` on one employee; attrition % > 0.
+  - Create a published roster for today; missing punch shows `missed`,
+    late punch (after grace) shows `late` with `+N min`.
+  - As employee: open `/me/overview`; today/this-month/leave/upcoming
+    cards render; **Apply for leave** lands on `/me/leave` with the
+    apply form focused.
+  - RLS: as employee, RPC `admin_dashboard_summary` returns FORBIDDEN;
+    `v_my_dashboard_summary` returns the calling user's row only.
+
+### Phase 9 — Holidays & company calendar
 Public/optional/restricted holiday calendar, per-outlet (or global) lists.
 Roster + leave should read from this; punch should treat a published holiday
 as a "non-working day" rather than absent.
@@ -80,7 +120,7 @@ as a "non-working day" rather than absent.
   - RLS: as employee, `select * from core.holidays` is denied; via
     `public.v_holidays` it's allowed.
 
-### Phase 9 — Payroll (cycle 1: monthly run, slips, statutory)
+### Phase 10 — Payroll (cycle 1: monthly run, slips, statutory)
 `core.statutory_config` exists from foundations — wire it.
 
 - DB:
@@ -108,7 +148,7 @@ as a "non-working day" rather than absent.
   - LOP: mark a working day as absent, recompute, confirm net drops.
   - Statutory: confirm PF/ESI line items match `statutory_config` rates.
 
-### Phase 10 — Notifications (in-app + email)
+### Phase 11 — Notifications (in-app + email)
 Today everything is silent — approvers don't know a request exists, employees
 don't know decisions.
 
@@ -128,7 +168,7 @@ don't know decisions.
     receives email within ~30s.
   - Approve/reject; employee sees notification; bell badge clears on click.
 
-### Phase 11 — Reports & exports
+### Phase 12 — Reports & exports
 Beyond the existing attendance CSV.
 
 - Reports: monthly attendance summary, leave ledger, headcount by outlet,
@@ -142,7 +182,7 @@ Beyond the existing attendance CSV.
   - Each report renders with realistic data; CSV byte-identical to table.
   - As HR (non-admin), only own outlets visible.
 
-### Phase 12 — Documents
+### Phase 13 — Documents
 Storage of offer letters, ID proofs, contracts; signed URL access.
 
 - Supabase Storage bucket `employee-documents` (private).
@@ -158,7 +198,7 @@ Storage of offer letters, ID proofs, contracts; signed URL access.
     another employee.
   - Storage policies: direct path access without signed URL is denied.
 
-### Phase 13 — Onboarding / offboarding
+### Phase 14 — Onboarding / offboarding
 Checklist-driven workflows tied to employees.
 
 - DB: `core.onboarding_templates(id, name, items jsonb[])`,
@@ -181,7 +221,7 @@ Checklist-driven workflows tied to employees.
   - Set employee inactive → offboarding run appears; final item disables
     auth user (login fails afterwards).
 
-### Phase 14 — Performance & appraisals
+### Phase 15 — Performance & appraisals
 Lightweight v1 — quarterly self + manager review.
 
 - DB: `core.review_cycles(id, name, period_start, period_end, status)`,
@@ -196,7 +236,7 @@ Lightweight v1 — quarterly self + manager review.
   - Open a cycle; employee submits self review; manager submits with
     rating; cycle close locks editing.
 
-### Phase 15 — Audit log UI & settings
+### Phase 16 — Audit log UI & settings
 The `audit.*` schema exists from foundations — surface it.
 
 - View: `public.v_audit_log` (admin only).

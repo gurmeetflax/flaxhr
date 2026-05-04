@@ -1,4 +1,5 @@
-import { useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
+import { useSearchParams } from 'react-router-dom'
 import { format } from 'date-fns'
 import { toast } from 'sonner'
 import { PageHeader } from '@/components/layout/AppShell'
@@ -18,6 +19,16 @@ export default function LeavePage() {
   const [end, setEnd] = useState(format(new Date(), 'yyyy-MM-dd'))
   const [halfDay, setHalfDay] = useState<'none' | 'first' | 'second'>('none')
   const [reason, setReason] = useState('')
+
+  const [params] = useSearchParams()
+  const formRef = useRef<HTMLFormElement | null>(null)
+  useEffect(() => {
+    if (params.get('apply') === '1' && formRef.current) {
+      formRef.current.scrollIntoView({ behavior: 'smooth', block: 'start' })
+      const select = formRef.current.querySelector('select') as HTMLSelectElement | null
+      select?.focus()
+    }
+  }, [params])
 
   const onSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -66,7 +77,7 @@ export default function LeavePage() {
         <Card>
           <CardContent className="flex flex-col gap-3 p-6">
             <CardTitle>Request leave</CardTitle>
-            <form className="flex flex-col gap-3" onSubmit={onSubmit}>
+            <form ref={formRef} className="flex flex-col gap-3" onSubmit={onSubmit}>
               <select
                 className="h-10 rounded-lg border border-border bg-surface px-3 text-sm"
                 value={typeId}

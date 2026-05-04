@@ -19,6 +19,9 @@ interface Employee {
   outlet_id: string | null
   is_active: boolean
   hired_on: string | null
+  monthly_salary: number | null
+  exit_date: string | null
+  exit_reason: string | null
 }
 
 interface OutletOption {
@@ -38,7 +41,7 @@ export default function EditEmployeePage() {
       const { data, error } = await supabase
         .from('v_employees')
         .select(
-          'id, employee_code, full_name, phone, work_email, outlet_id, is_active, hired_on',
+          'id, employee_code, full_name, phone, work_email, outlet_id, is_active, hired_on, monthly_salary, exit_date, exit_reason',
         )
         .eq('id', id)
         .maybeSingle()
@@ -66,6 +69,9 @@ export default function EditEmployeePage() {
   const [workEmail, setWorkEmail] = useState('')
   const [outletId, setOutletId] = useState('')
   const [isActive, setIsActive] = useState(true)
+  const [monthlySalary, setMonthlySalary] = useState('')
+  const [exitDate, setExitDate] = useState('')
+  const [exitReason, setExitReason] = useState('')
   const [err, setErr] = useState<string | null>(null)
 
   useEffect(() => {
@@ -76,6 +82,9 @@ export default function EditEmployeePage() {
     setWorkEmail(e.work_email ?? '')
     setOutletId(e.outlet_id ?? '')
     setIsActive(e.is_active)
+    setMonthlySalary(e.monthly_salary != null ? String(e.monthly_salary) : '')
+    setExitDate(e.exit_date ?? '')
+    setExitReason(e.exit_reason ?? '')
   }, [employeeQ.data])
 
   const save = useMutation({
@@ -85,12 +94,19 @@ export default function EditEmployeePage() {
       const cleanPhone = phone.trim().replace(/\s+/g, '') || null
       const cleanEmail = workEmail.trim().toLowerCase() || null
 
+      const salaryNum = monthlySalary.trim() === '' ? null : Number(monthlySalary)
+      if (salaryNum != null && (Number.isNaN(salaryNum) || salaryNum < 0)) {
+        throw new Error('Monthly salary must be a non-negative number.')
+      }
       const patch = {
         full_name: cleanName,
         phone: cleanPhone,
         work_email: cleanEmail,
         outlet_id: outletId || null,
         is_active: isActive,
+        monthly_salary: salaryNum,
+        exit_date: exitDate || null,
+        exit_reason: exitReason.trim() || null,
       }
       const { error } = await supabase
         .schema('core' as never)
@@ -203,6 +219,32 @@ export default function EditEmployeePage() {
                 ))}
               </select>
             </Field>
+            <Field label="Monthly salary (₹)">
+              <Input
+                type="number"
+                inputMode="decimal"
+                min={0}
+                step="0.01"
+                value={monthlySalary}
+                onChange={(ev) => setMonthlySalary(ev.target.value)}
+                placeholder="e.g. 25000"
+              />
+            </Field>
+            <Field label="Exit date">
+              <Input
+                type="date"
+                value={exitDate}
+                onChange={(ev) => setExitDate(ev.target.value)}
+              />
+            </Field>
+            <Field label="Exit reason">
+              <Input
+                value={exitReason}
+                onChange={(ev) => setExitReason(ev.target.value)}
+                placeholder="Resignation, terminated, …"
+              />
+            </Field>
+
             <div className="space-y-2 sm:col-span-2">
               <Label>Status</Label>
               <label className="flex items-center gap-2 text-sm">
