@@ -4,7 +4,8 @@ import { useAuth } from '@/lib/auth'
 
 export interface Shift {
   id: string
-  outlet_id: string
+  /** null = universal (applies to all outlets) */
+  outlet_id: string | null
   name: string
   start_time: string
   end_time: string
@@ -13,6 +14,9 @@ export interface Shift {
   days_of_week: number[]
   is_active: boolean
 }
+
+export const UNIVERSAL_OUTLET = '__universal' as const
+export type ShiftOutletFilter = string | typeof UNIVERSAL_OUTLET | null
 
 export interface EmployeeShift {
   employee_id: string
@@ -28,13 +32,23 @@ export interface EmployeeShift {
   outlet_name: string | null
 }
 
-export function useShifts(outletId?: string | null) {
+/**
+ * Lists shifts.
+ *  - null              → all shifts (universal + per-outlet)
+ *  - UNIVERSAL_OUTLET  → only universal shifts (outlet_id is null)
+ *  - otherwise         → shifts at that outlet PLUS universal shifts
+ */
+export function useShifts(filter: ShiftOutletFilter = null) {
   return useQuery<Shift[]>({
-    queryKey: ['shifts', outletId ?? 'all'],
+    queryKey: ['shifts', filter ?? 'all'],
     staleTime: 60_000,
     queryFn: async () => {
-      let q = supabase.schema('core').from('shifts').select('*').order('outlet_id').order('start_time')
-      if (outletId) q = q.eq('outlet_id', outletId)
+      let q = supabase.schema('core').from('shifts').select('*').order('outlet_id', { nullsFirst: true }).order('start_time')
+      if (filter === UNIVERSAL_OUTLET) {
+        q = q.is('outlet_id', null)
+      } else if (filter) {
+        q = q.or(`outlet_id.eq.${filter},outlet_id.is.null`)
+      }
       const { data, error } = await q
       if (error) throw error
       return (data ?? []) as Shift[]
@@ -45,8 +59,21 @@ export function useShifts(outletId?: string | null) {
 export function useUpsertShift() {
   const qc = useQueryClient()
   return useMutation({
-    mutationFn: async (s: Partial<Shift> & { outlet_id: string; name: string; start_time: string; end_time: string }) => {
-      const { error } = await supabase.schema('core').from('shifts').upsert(s, { onConflict: 'outlet_id,name' })
+    mutationFn: async (
+      s: Partial<Shift> & {
+        outlet_id: string | null
+        name: string
+        start_time: string
+        end_time: string
+      },
+    ) => {
+      // No onConflict — universal shifts have outlet_id IS NULL, which the
+      // partial unique indexes (shifts_universal_name_uq, shifts_outlet_name_uq)
+      // enforce, but PostgREST onConflict can't address partial indexes by
+      // column tuple alone. Caller updates by id when editing.
+      const { error } = s.id
+        ? await supabase.schema('core').from('shifts').update(s).eq('id', s.id)
+        : await supabase.schema('core').from('shifts').insert(s)
       if (error) throw error
     },
     onSuccess: () => qc.invalidateQueries({ queryKey: ['shifts'] }),
