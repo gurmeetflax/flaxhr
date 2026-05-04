@@ -1,6 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { supabase } from '@/lib/supabase'
 import { useAuth } from '@/lib/auth'
+import { compressImage } from '@/lib/imageCompression'
 
 export interface PunchLog {
   id: string
@@ -168,13 +169,18 @@ export function usePunch() {
   return useMutation<PunchResult, Error, PunchInput>({
     mutationFn: async ({ selfie, lat, lng }) => {
       if (!user) throw new Error('Not signed in')
-      const ext = mimeToExt(selfie.type) ?? 'jpg'
+      // Downsample + JPEG re-encode in the browser before upload.
+      // Phone cameras produce 2–4 MB selfies; we only need ~720 px to
+      // verify identity. Keeps storage and bandwidth bounded.
+      const compressed = await compressImage(selfie)
+      const contentType = compressed.type || 'image/jpeg'
+      const ext = mimeToExt(contentType) ?? 'jpg'
       const path = `${user.id}/${Date.now()}.${ext}`
 
       const { error: upErr } = await supabase.storage
         .from('attendance-selfies')
-        .upload(path, selfie, {
-          contentType: selfie.type || 'image/jpeg',
+        .upload(path, compressed, {
+          contentType,
           cacheControl: '3600',
           upsert: false,
         })
