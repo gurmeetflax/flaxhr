@@ -33,7 +33,7 @@ export function useShifts(outletId?: string | null) {
     queryKey: ['shifts', outletId ?? 'all'],
     staleTime: 60_000,
     queryFn: async () => {
-      let q = supabase.from('shifts').select('*').order('outlet_id').order('start_time')
+      let q = supabase.schema('core').from('shifts').select('*').order('outlet_id').order('start_time')
       if (outletId) q = q.eq('outlet_id', outletId)
       const { data, error } = await q
       if (error) throw error
@@ -46,7 +46,7 @@ export function useUpsertShift() {
   const qc = useQueryClient()
   return useMutation({
     mutationFn: async (s: Partial<Shift> & { outlet_id: string; name: string; start_time: string; end_time: string }) => {
-      const { error } = await supabase.from('shifts').upsert(s, { onConflict: 'outlet_id,name' })
+      const { error } = await supabase.schema('core').from('shifts').upsert(s, { onConflict: 'outlet_id,name' })
       if (error) throw error
     },
     onSuccess: () => qc.invalidateQueries({ queryKey: ['shifts'] }),
@@ -57,7 +57,7 @@ export function useDeleteShift() {
   const qc = useQueryClient()
   return useMutation({
     mutationFn: async (id: string) => {
-      const { error } = await supabase.from('shifts').delete().eq('id', id)
+      const { error } = await supabase.schema('core').from('shifts').delete().eq('id', id)
       if (error) throw error
     },
     onSuccess: () => qc.invalidateQueries({ queryKey: ['shifts'] }),
@@ -82,7 +82,7 @@ export function useAssignShift() {
   const qc = useQueryClient()
   return useMutation({
     mutationFn: async (input: { employee_id: string; shift_id: string; effective_from: string; effective_to?: string | null }) => {
-      const { error } = await supabase.from('employee_shifts').upsert(input, {
+      const { error } = await supabase.schema('core').from('employee_shifts').upsert(input, {
         onConflict: 'employee_id,effective_from',
       })
       if (error) throw error
