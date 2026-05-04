@@ -12,7 +12,7 @@ export default defineConfig({
     tailwindcss(),
     cloudflare(),
     VitePWA({
-      registerType: 'autoUpdate',
+      registerType: 'prompt',
       includeAssets: ['favicon.svg'],
       manifest: {
         name: 'Flax HR',

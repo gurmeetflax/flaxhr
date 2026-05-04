@@ -1,0 +1,72 @@
+name: Supabase migrations
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'supabase/migrations/**'
+  workflow_dispatch:
+
+concurrency:
+  group: supabase-migrations
+  cancel-in-progress: false
+
+jobs:
+  push:
+    name: Push migrations + smoke test
+    runs-on: ubuntu-latest
+    env:
+      SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+      SUPABASE_PROJECT_REF: ${{ vars.SUPABASE_PROJECT_REF || 'fcrwxuyyixozudwyhkcz' }}
+      SUPABASE_DB_PASSWORD: ${{ secrets.SUPABASE_DB_PASSWORD }}
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Supabase CLI
+        uses: supabase/setup-cli@v1
+        with:
+          version: latest
+
+      - name: Link to project
+        run: |
+          supabase link --project-ref "$SUPABASE_PROJECT_REF" --password "$SUPABASE_DB_PASSWORD"
+
+      - name: Diff (plan)
+        run: |
+          echo "=== migrations on disk ==="
+          ls supabase/migrations | sort
+          echo ""
+          echo "=== migration list (remote vs local) ==="
+          supabase migration list || true
+
+      - name: Push (apply pending)
+        run: |
+          # --include-all so out-of-order timestamps still apply
+          supabase db push --include-all --yes
+
+      - name: Smoke test — every new table & view exists
+        env:
+          SUPABASE_DB_URL: postgres://postgres.${{ env.SUPABASE_PROJECT_REF }}:${{ env.SUPABASE_DB_PASSWORD }}@aws-0-ap-south-1.pooler.supabase.com:6543/postgres
+        run: |
+          # Anything in supabase/tests/*.sql is run as a smoke test against
+          # the live DB. Each file should be self-contained and use
+          # raise exception on failure so non-zero exit propagates.
+          if [ -d supabase/tests ]; then
+            for f in supabase/tests/*.sql; do
+              echo "::group::$(basename "$f")"
+              psql "$SUPABASE_DB_URL" -v ON_ERROR_STOP=1 -f "$f"
+              echo "::endgroup::"
+            done
+          else
+            echo "no smoke tests"
+          fi
+
+      - name: Reload PostgREST schema
+        run: |
+          curl -fsSL -X POST \
+            "https://${SUPABASE_PROJECT_REF}.supabase.co/rest/v1/rpc/notify_pgrst_reload" \
+            -H "apikey: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}" \
+            -H "Authorization: Bearer ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}" \
+            -H "Content-Type: application/json" \
+            -d '{}' || echo "notify_pgrst_reload RPC missing — non-fatal; reload happens on next request anyway"

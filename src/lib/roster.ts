@@ -80,6 +80,7 @@ export function usePublishWeek() {
   return useMutation({
     mutationFn: async (input: { outletId: string; fromDate: string; toDate: string }) => {
       const { error } = await supabase
+        .schema('core')
         .from('roster_entries')
         .update({ status: 'published' })
         .eq('outlet_id', input.outletId)

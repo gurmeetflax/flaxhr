@@ -6,6 +6,7 @@ import { Toaster } from 'sonner'
 import { queryClient } from '@/lib/query-client'
 import { AuthProvider } from '@/lib/auth'
 import App from '@/App'
+import SwUpdateBanner from '@/components/SwUpdateBanner'
 import '@/index.css'
 
 createRoot(document.getElementById('root')!).render(
@@ -14,6 +15,7 @@ createRoot(document.getElementById('root')!).render(
       <BrowserRouter>
         <AuthProvider>
           <App />
+          <SwUpdateBanner />
           <Toaster richColors position="top-right" />
         </AuthProvider>
       </BrowserRouter>
