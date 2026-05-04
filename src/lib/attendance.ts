@@ -157,7 +157,8 @@ export function useNextPunchType(): 'in' | 'out' {
 }
 
 interface PunchInput {
-  selfie: Blob
+  /** Omit when the selfie_required setting is off. */
+  selfie?: Blob
   lat: number
   lng: number
 }
@@ -169,22 +170,27 @@ export function usePunch() {
   return useMutation<PunchResult, Error, PunchInput>({
     mutationFn: async ({ selfie, lat, lng }) => {
       if (!user) throw new Error('Not signed in')
-      // Downsample + JPEG re-encode in the browser before upload.
-      // Phone cameras produce 2–4 MB selfies; we only need ~720 px to
-      // verify identity. Keeps storage and bandwidth bounded.
-      const compressed = await compressImage(selfie)
-      const contentType = compressed.type || 'image/jpeg'
-      const ext = mimeToExt(contentType) ?? 'jpg'
-      const path = `${user.id}/${Date.now()}.${ext}`
 
-      const { error: upErr } = await supabase.storage
-        .from('attendance-selfies')
-        .upload(path, compressed, {
-          contentType,
-          cacheControl: '3600',
-          upsert: false,
-        })
-      if (upErr) throw new Error(`Selfie upload failed: ${upErr.message}`)
+      // When the selfie_required setting is off, the client may omit the
+      // selfie blob entirely; otherwise we downsample + JPEG re-encode in
+      // the browser before upload. Phone cameras produce 2–4 MB selfies
+      // and we only need ~720 px to verify identity, so this keeps
+      // storage and bandwidth bounded.
+      let path: string | null = null
+      if (selfie) {
+        const compressed = await compressImage(selfie)
+        const contentType = compressed.type || 'image/jpeg'
+        const ext = mimeToExt(contentType) ?? 'jpg'
+        path = `${user.id}/${Date.now()}.${ext}`
+        const { error: upErr } = await supabase.storage
+          .from('attendance-selfies')
+          .upload(path, compressed, {
+            contentType,
+            cacheControl: '3600',
+            upsert: false,
+          })
+        if (upErr) throw new Error(`Selfie upload failed: ${upErr.message}`)
+      }
 
       const { data, error } = await supabase.rpc('punch', {
         p_type: 'auto',
