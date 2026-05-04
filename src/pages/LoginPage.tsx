@@ -23,7 +23,7 @@ export default function LoginPage() {
   }, [user, roles, navigate, location.state])
 
   return (
-    <div className="grid min-h-screen place-items-center bg-background p-6">
+    <div className="grid min-h-screen min-h-[100svh] place-items-center bg-background p-6">
       <div className="w-full max-w-md">
         <div className="mb-6 flex items-center gap-2">
           <span className="grid h-9 w-9 place-items-center rounded-lg bg-primary/15 text-primary">

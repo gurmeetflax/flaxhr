@@ -311,7 +311,7 @@ function RosterAttendanceCard({
         ) : rows.length === 0 ? (
           <CardDescription>No published roster for today.</CardDescription>
         ) : (
-          <div className="overflow-x-auto">
+          <div className="overflow-x-auto overscroll-x-contain">
             <table className="w-full text-sm">
               <thead>
                 <tr className="text-left text-xs uppercase text-muted-foreground">

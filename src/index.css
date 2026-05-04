@@ -35,16 +35,31 @@
 }
 
 @layer base {
+  :root {
+    color-scheme: light;
+  }
+
   html {
     font-family: var(--font-sans);
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
   }
 
+  /* Use small viewport height so the page never grows when iOS Safari hides
+     the address bar — eliminates the "shaky scroll" that comes from layout
+     reflowing on every address-bar toggle. */
+  html,
+  body {
+    min-height: 100svh;
+  }
+
   body {
     margin: 0;
     background: var(--color-background);
     color: var(--color-foreground);
+    /* Stop the document rubber-band on iOS — combined with svh, scroll
+       feels stable rather than elastic. */
+    overscroll-behavior-y: none;
   }
 
   *,

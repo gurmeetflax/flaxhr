@@ -30,7 +30,7 @@ export default function ProtectedRoute({
 
 function FullScreenLoader() {
   return (
-    <div className="grid min-h-screen place-items-center bg-background text-muted-foreground">
+    <div className="grid min-h-screen min-h-[100svh] place-items-center bg-background text-muted-foreground">
       <div className="flex items-center gap-3 text-sm">
         <svg className="h-4 w-4 animate-spin" viewBox="0 0 24 24" fill="none">
           <circle cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="3" opacity="0.25" />

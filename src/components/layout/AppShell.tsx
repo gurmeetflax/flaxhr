@@ -27,7 +27,7 @@ export default function AppShell({ nav, title }: { nav: NavItem[]; title: string
   }
 
   return (
-    <div className="min-h-screen bg-background">
+    <div className="min-h-screen min-h-[100svh] bg-background">
       {drawerOpen ? (
         <button
           aria-label="Close menu"
@@ -48,7 +48,14 @@ export default function AppShell({ nav, title }: { nav: NavItem[]; title: string
           onSignOut={handleSignOut}
           onOpenDrawer={() => setDrawerOpen(true)}
         />
-        <main className="mx-auto w-full max-w-6xl px-4 py-6 md:px-6 md:py-8">
+        <main
+          className="mx-auto w-full max-w-6xl px-4 py-6 md:px-6 md:py-8"
+          style={{
+            paddingTop: 'max(1.5rem, env(safe-area-inset-top))',
+            paddingBottom: 'max(1.5rem, env(safe-area-inset-bottom))',
+            paddingLeft: 'max(1rem, env(safe-area-inset-left))',
+            paddingRight: 'max(1rem, env(safe-area-inset-right))',
+          }}>
           <Outlet />
         </main>
       </div>
