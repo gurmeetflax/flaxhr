@@ -8,7 +8,7 @@ import { Card, CardContent } from '@/components/ui/Card'
 import { Label } from '@/components/ui/Label'
 import { Input } from '@/components/ui/Input'
 import { Button } from '@/components/ui/Button'
-import { employeeCodeToEmail, isValidEmail, normaliseEmployeeCode } from '@/lib/identity'
+import { employeeCodeToEmail, isValidEmail } from '@/lib/identity'
 
 interface Outlet {
   id: string
@@ -33,7 +33,6 @@ export default function CreateEmployeePage() {
     },
   })
 
-  const [code, setCode] = useState('')
   const [fullName, setFullName] = useState('')
   const [phone, setPhone] = useState('')
   const [workEmail, setWorkEmail] = useState('')
@@ -46,11 +45,6 @@ export default function CreateEmployeePage() {
     e.preventDefault()
     setErr(null)
 
-    const normalised = normaliseEmployeeCode(code)
-    if (!/^FLX-[A-Z0-9]{2,6}-[0-9]{4}$/.test(normalised)) {
-      setErr('Code must be FLX-<OUTLET>-<NNNN> (e.g. FLX-BND-0001).')
-      return
-    }
     if (!/^[0-9]{6}$/.test(pin)) {
       setErr('PIN must be exactly 6 digits.')
       return
@@ -111,23 +105,28 @@ export default function CreateEmployeePage() {
         return
       }
 
-      // 1. Create auth user on an ephemeral client so the ADMIN's session
+      // 1. Reserve the next sequential employee code.
+      const { data: reserved, error: codeErr } = await supabase.rpc('next_employee_code')
+      if (codeErr) throw codeErr
+      const assignedCode = reserved as string
+
+      // 2. Create auth user on an ephemeral client so the ADMIN's session
       //    isn't replaced with the new employee's.
       const tmp = createEphemeralClient()
       const { data: signUp, error: signUpErr } = await tmp.auth.signUp({
-        email: employeeCodeToEmail(normalised),
+        email: employeeCodeToEmail(assignedCode),
         password: pin,
       })
       if (signUpErr) throw signUpErr
       const userId = signUp.user?.id
       if (!userId) throw new Error('Sign-up returned no user.')
 
-      // 2. Insert employees row linked to this auth user.
+      // 3. Insert employees row linked to this auth user.
       const { error: empErr } = await supabase
         .schema('core' as never)
         .from('employees')
         .insert({
-          employee_code: normalised,
+          employee_code: assignedCode,
           user_id: userId,
           full_name: cleanName,
           phone: cleanPhone,
@@ -146,7 +145,7 @@ export default function CreateEmployeePage() {
         throw empErr
       }
 
-      // 3. Grant the 'employee' role (scoped to outlet).
+      // 4. Grant the 'employee' role (scoped to outlet).
       const { error: roleErr } = await supabase
         .schema('core' as never)
         .from('user_roles')
@@ -154,7 +153,7 @@ export default function CreateEmployeePage() {
       if (roleErr) throw roleErr
 
       qc.invalidateQueries({ queryKey: ['admin-dashboard-counts'] })
-      toast.success(`Employee created: ${cleanName} (${normalised})`)
+      toast.success(`Employee created: ${cleanName} (${assignedCode})`)
       navigate('/admin', { replace: true })
     } catch (e) {
       const msg = e instanceof Error ? e.message : 'Could not create employee.'
@@ -174,15 +173,10 @@ export default function CreateEmployeePage() {
       <Card>
         <CardContent className="p-6">
           <form onSubmit={onSubmit} className="grid gap-5 sm:grid-cols-2">
-            <Field label="Employee code" required>
-              <Input
-                placeholder="FLX-BND-0001"
-                value={code}
-                autoCapitalize="characters"
-                onChange={(e) => setCode(e.target.value)}
-                required
-              />
-            </Field>
+            <p className="sm:col-span-2 text-xs text-muted-foreground">
+              Employee code (FLAX0001, FLAX0002, …) is assigned automatically
+              when you submit.
+            </p>
             <Field label="Full name" required>
               <Input value={fullName} onChange={(e) => setFullName(e.target.value)} required />
             </Field>
