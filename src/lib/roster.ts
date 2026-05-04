@@ -55,7 +55,7 @@ export function useUpsertRosterEntry() {
       starts_at?: string | null
       ends_at?: string | null
     }) => {
-      const { error } = await supabase.from('roster_entries').upsert(e, {
+      const { error } = await supabase.schema('core').from('roster_entries').upsert(e, {
         onConflict: 'employee_id,work_date',
       })
       if (error) throw error
@@ -68,7 +68,7 @@ export function useDeleteRosterEntry() {
   const qc = useQueryClient()
   return useMutation({
     mutationFn: async (id: string) => {
-      const { error } = await supabase.from('roster_entries').delete().eq('id', id)
+      const { error } = await supabase.schema('core').from('roster_entries').delete().eq('id', id)
       if (error) throw error
     },
     onSuccess: () => qc.invalidateQueries({ queryKey: ['roster'] }),

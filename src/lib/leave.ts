@@ -53,7 +53,7 @@ export function useLeaveTypes() {
     queryKey: ['leave-types'],
     staleTime: 300_000,
     queryFn: async () => {
-      const { data, error } = await supabase.from('leave_types').select('*').eq('is_active', true).order('name')
+      const { data, error } = await supabase.schema('core').from('leave_types').select('*').eq('is_active', true).order('name')
       if (error) throw error
       return (data ?? []) as LeaveType[]
     },
@@ -64,7 +64,7 @@ export function useUpsertLeaveType() {
   const qc = useQueryClient()
   return useMutation({
     mutationFn: async (lt: Partial<LeaveType> & { code: string; name: string }) => {
-      const { error } = await supabase.from('leave_types').upsert(lt, { onConflict: 'code' })
+      const { error } = await supabase.schema('core').from('leave_types').upsert(lt, { onConflict: 'code' })
       if (error) throw error
     },
     onSuccess: () => qc.invalidateQueries({ queryKey: ['leave-types'] }),
