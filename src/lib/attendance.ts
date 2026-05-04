@@ -1,6 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { supabase } from '@/lib/supabase'
 import { useAuth } from '@/lib/auth'
+import { compressImage } from '@/lib/imageCompression'
 
 export interface PunchLog {
   id: string
@@ -170,14 +171,21 @@ export function usePunch() {
     mutationFn: async ({ selfie, lat, lng }) => {
       if (!user) throw new Error('Not signed in')
 
+      // When the selfie_required setting is off, the client may omit the
+      // selfie blob entirely; otherwise we downsample + JPEG re-encode in
+      // the browser before upload. Phone cameras produce 2–4 MB selfies
+      // and we only need ~720 px to verify identity, so this keeps
+      // storage and bandwidth bounded.
       let path: string | null = null
       if (selfie) {
-        const ext = mimeToExt(selfie.type) ?? 'jpg'
+        const compressed = await compressImage(selfie)
+        const contentType = compressed.type || 'image/jpeg'
+        const ext = mimeToExt(contentType) ?? 'jpg'
         path = `${user.id}/${Date.now()}.${ext}`
         const { error: upErr } = await supabase.storage
           .from('attendance-selfies')
-          .upload(path, selfie, {
-            contentType: selfie.type || 'image/jpeg',
+          .upload(path, compressed, {
+            contentType,
             cacheControl: '3600',
             upsert: false,
           })
