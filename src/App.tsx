@@ -10,6 +10,7 @@ import {
   Home,
   ListChecks,
   Plane,
+  Settings as SettingsIcon,
   Store,
   Users,
 } from 'lucide-react'
@@ -34,6 +35,7 @@ import LeavePoliciesPage from '@/pages/admin/LeavePoliciesPage'
 import EvaluationsPage from '@/pages/admin/EvaluationsPage'
 import EvaluationBuilderPage from '@/pages/admin/EvaluationBuilderPage'
 import EvaluationRunPage from '@/pages/admin/EvaluationRunPage'
+import SettingsPage from '@/pages/admin/SettingsPage'
 import MyDashboard from '@/pages/me/MyDashboard'
 import PunchPage from '@/pages/me/PunchPage'
 import MyAttendancePage from '@/pages/me/MyAttendancePage'
@@ -52,6 +54,7 @@ const adminNav = [
   { to: '/admin/leave/approvals', label: 'Leave approvals', icon: Plane },
   { to: '/admin/leave/policies', label: 'Leave policies', icon: ListChecks },
   { to: '/admin/evaluations', label: 'Evaluations', icon: ClipboardCheck },
+  { to: '/admin/settings', label: 'Settings', icon: SettingsIcon },
 ]
 
 const employeeNav = [
@@ -99,6 +102,7 @@ export default function App() {
           path="/admin/evaluations/runs/:id"
           element={<EvaluationRunPage />}
         />
+        <Route path="/admin/settings" element={<SettingsPage />} />
       </Route>
 
       <Route
