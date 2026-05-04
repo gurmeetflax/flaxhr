@@ -15,6 +15,7 @@ import {
   usePunch,
 } from '@/lib/attendance'
 import { GeoError, haversineMeters, watchPosition } from '@/lib/geo'
+import { useAppSetting } from '@/lib/appSettings'
 
 type Step = 'idle' | 'selfie' | 'review'
 
@@ -24,6 +25,7 @@ export default function PunchPage() {
   const { data: todayPunches = [] } = useMyTodayPunches()
   const nextType = useNextPunchType()
   const punch = usePunch()
+  const { data: selfieRequired = true } = useAppSetting<boolean>('selfie_required', true)
 
   const [coords, setCoords] = useState<{ lat: number; lng: number; accuracy: number } | null>(null)
   const [geoError, setGeoError] = useState<string | null>(null)
@@ -57,7 +59,7 @@ export default function PunchPage() {
   const inside = distance !== null && distance <= radius
   const tz = outlet?.timezone ?? 'Asia/Kolkata'
 
-  const submitWith = async (selfieBlob: Blob, lat: number, lng: number) => {
+  const submitWith = async (selfieBlob: Blob | undefined, lat: number, lng: number) => {
     try {
       const result = await punch.mutateAsync({ selfie: selfieBlob, lat, lng })
       toast.success(
@@ -175,7 +177,7 @@ export default function PunchPage() {
                 </p>
               )}
 
-              {step === 'idle' ? (
+              {step === 'idle' && selfieRequired ? (
                 <Button
                   size="lg"
                   className="w-full"
@@ -186,6 +188,37 @@ export default function PunchPage() {
                   {hasGeo
                     ? inside
                       ? `Take selfie to ${nextType === 'in' ? 'punch in' : 'punch out'}`
+                      : 'Move closer to the outlet'
+                    : 'Waiting for location…'}
+                </Button>
+              ) : null}
+
+              {step === 'idle' && !selfieRequired ? (
+                <Button
+                  size="lg"
+                  className="w-full"
+                  onClick={() => {
+                    if (!coords) {
+                      toast.error('Waiting for your location.')
+                      return
+                    }
+                    if (!inside) {
+                      toast.error(
+                        `Outside geofence — you're ${distance} m away (allowed: ${radius} m).`,
+                      )
+                      return
+                    }
+                    void submitWith(undefined, coords.lat, coords.lng)
+                  }}
+                  loading={punch.isPending}
+                  disabled={!hasGeo || !inside}
+                >
+                  <Send className="h-4 w-4" />
+                  {hasGeo
+                    ? inside
+                      ? nextType === 'in'
+                        ? 'Punch in'
+                        : 'Punch out'
                       : 'Move closer to the outlet'
                     : 'Waiting for location…'}
                 </Button>
