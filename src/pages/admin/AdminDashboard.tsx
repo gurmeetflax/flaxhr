@@ -1,6 +1,7 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useMemo, useState } from 'react'
+import { Link } from 'react-router-dom'
 import { useQuery } from '@tanstack/react-query'
-import { format, startOfMonth } from 'date-fns'
+import { differenceInDays, format, startOfMonth } from 'date-fns'
 import {
   AlertTriangle,
   Banknote,
@@ -8,22 +9,19 @@ import {
   Clock4,
   Globe2,
   Plane,
+  Sparkles,
   TrendingDown,
   Users,
   XCircle,
 } from 'lucide-react'
-import { toast } from 'sonner'
 import { supabase } from '@/lib/supabase'
 import { PageHeader } from '@/components/layout/AppShell'
 import { Card, CardContent, CardDescription, CardTitle } from '@/components/ui/Card'
-import { Input } from '@/components/ui/Input'
 import { Button } from '@/components/ui/Button'
 import { cn } from '@/lib/utils'
 import {
   useAdminDashboardSummary,
-  useOutletMonthlySales,
   useRosterVsAttendance,
-  useUpsertOutletSales,
   type RosterAttendanceFlag,
   type RosterAttendanceRow,
 } from '@/lib/dashboards'
@@ -143,7 +141,7 @@ export default function AdminDashboard() {
       </div>
 
       <div className="mt-6 grid gap-4 lg:grid-cols-2">
-        <SalesCard periodMonth={periodMonth} outlets={outletsQ.data ?? []} />
+        <TeamCard outletId={outletId} />
         <RosterAttendanceCard
           rows={rosterCheck.data ?? []}
           loading={rosterCheck.isLoading}
@@ -184,94 +182,106 @@ function Kpi({
   )
 }
 
-function SalesCard({
-  periodMonth,
-  outlets,
-}: {
-  periodMonth: string
-  outlets: OutletOption[]
-}) {
-  const sales = useOutletMonthlySales(periodMonth)
-  const upsert = useUpsertOutletSales()
-  const [drafts, setDrafts] = useState<Record<string, string>>({})
+interface TeamRow {
+  id: string
+  full_name: string
+  employee_code: string
+  outlet_id: string | null
+  outlet_name: string | null
+  designation_name: string | null
+  hired_on: string | null
+  is_active: boolean
+}
 
-  // Hydrate drafts when sales data or period changes.
-  useEffect(() => {
-    const next: Record<string, string> = {}
-    for (const o of outlets) {
-      const row = sales.data?.find((s) => s.outlet_id === o.id)
-      next[o.id] = row ? String(row.amount) : ''
-    }
-    setDrafts(next)
-  }, [sales.data, outlets, periodMonth])
+const RECENT_DAYS = 60 // ~2 months — flagged with the "New" tag
 
-  const onSave = async (outletId: string) => {
-    const raw = drafts[outletId]?.trim() ?? ''
-    if (raw === '') return
-    const amount = Number(raw)
-    if (Number.isNaN(amount) || amount < 0) {
-      toast.error('Enter a non-negative number')
-      return
-    }
-    try {
-      await upsert.mutateAsync({
-        outlet_id: outletId,
-        period_month: periodMonth,
-        amount,
-      })
-      toast.success('Sales saved')
-    } catch (e) {
-      toast.error(e instanceof Error ? e.message : 'Save failed')
-    }
-  }
+function TeamCard({ outletId }: { outletId: string | null }) {
+  const teamQ = useQuery<TeamRow[]>({
+    queryKey: ['admin-dashboard-team', outletId],
+    staleTime: 60_000,
+    queryFn: async () => {
+      let q = supabase
+        .from('v_employees')
+        .select(
+          'id, full_name, employee_code, outlet_id, outlet_name, designation_name, hired_on, is_active',
+        )
+        .eq('is_active', true)
+        .order('hired_on', { ascending: false, nullsFirst: false })
+      if (outletId) q = q.eq('outlet_id', outletId)
+      const { data, error } = await q
+      if (error) throw error
+      return (data as unknown as TeamRow[]) ?? []
+    },
+  })
+
+  const team = teamQ.data ?? []
+  const today = new Date()
+  const recent = team.filter(
+    (e) => e.hired_on && differenceInDays(today, new Date(e.hired_on)) <= RECENT_DAYS,
+  )
+  const others = team.filter(
+    (e) => !e.hired_on || differenceInDays(today, new Date(e.hired_on)) > RECENT_DAYS,
+  )
 
   return (
     <Card>
       <CardContent className="flex flex-col gap-3 p-6">
-        <div>
-          <CardTitle>Sales (input)</CardTitle>
-          <CardDescription>
-            One amount per outlet for {format(new Date(periodMonth), 'MMM yyyy')}.
-            Used to compute manpower-cost % above.
-          </CardDescription>
+        <div className="flex items-start justify-between gap-3">
+          <div>
+            <CardTitle>Team</CardTitle>
+            <CardDescription>
+              {team.length} active{' '}
+              {team.length === 1 ? 'employee' : 'employees'}
+              {recent.length > 0 ? ` · ${recent.length} onboarded in the last ${RECENT_DAYS} days` : ''}
+            </CardDescription>
+          </div>
+          <Link to="/admin/employees">
+            <Button size="sm" variant="ghost">
+              See all
+            </Button>
+          </Link>
         </div>
-        {outlets.length === 0 ? (
-          <CardDescription>No outlets yet.</CardDescription>
+
+        {teamQ.isLoading ? (
+          <CardDescription>Loading…</CardDescription>
+        ) : team.length === 0 ? (
+          <CardDescription>No employees yet.</CardDescription>
         ) : (
-          <ul className="flex flex-col divide-y divide-border">
-            {outlets.map((o) => (
-              <li
-                key={o.id}
-                className="flex items-center gap-3 py-2 text-sm"
-              >
-                <span className="flex-1 truncate font-medium">
-                  {o.display_name ?? o.id}
-                </span>
-                <Input
-                  type="number"
-                  inputMode="decimal"
-                  min={0}
-                  className="h-9 w-36"
-                  placeholder="₹ amount"
-                  value={drafts[o.id] ?? ''}
-                  onChange={(e) =>
-                    setDrafts((d) => ({ ...d, [o.id]: e.target.value }))
-                  }
-                />
-                <Button
-                  size="sm"
-                  variant="secondary"
-                  onClick={() => onSave(o.id)}
-                  loading={upsert.isPending}
-                >
-                  Save
-                </Button>
-              </li>
+          <ul className="flex max-h-96 flex-col divide-y divide-border overflow-y-auto">
+            {recent.map((e) => (
+              <TeamRowItem key={e.id} row={e} isNew />
+            ))}
+            {others.map((e) => (
+              <TeamRowItem key={e.id} row={e} />
             ))}
           </ul>
         )}
       </CardContent>
     </Card>
+  )
+}
+
+function TeamRowItem({ row, isNew }: { row: TeamRow; isNew?: boolean }) {
+  return (
+    <li className="flex items-center gap-3 py-2 text-sm">
+      <Link
+        to={`/admin/employees/${row.id}`}
+        className="flex flex-1 items-center gap-2 hover:underline"
+      >
+        <span className="font-medium">{row.full_name}</span>
+        {isNew ? (
+          <span className="inline-flex items-center gap-1 rounded-full bg-primary/10 px-2 py-0.5 text-[10px] font-medium uppercase tracking-wide text-primary">
+            <Sparkles className="h-3 w-3" /> New
+          </span>
+        ) : null}
+      </Link>
+      <span className="hidden text-xs text-muted-foreground sm:inline">
+        {row.designation_name ?? '—'}
+      </span>
+      <span className="text-xs text-muted-foreground">
+        {row.outlet_name ?? '—'}
+      </span>
+    </li>
   )
 }
 

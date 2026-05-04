@@ -6,6 +6,7 @@ import {
   Clock,
   ClipboardCheck,
   ClipboardList,
+  CircleDollarSign,
   History,
   Home,
   ListChecks,
@@ -22,6 +23,7 @@ import ForbiddenPage from '@/pages/ForbiddenPage'
 import AdminDashboard from '@/pages/admin/AdminDashboard'
 import EmployeesListPage from '@/pages/admin/EmployeesListPage'
 import CreateEmployeePage from '@/pages/admin/CreateEmployeePage'
+import BulkEmployeesPage from '@/pages/admin/BulkEmployeesPage'
 import EditEmployeePage from '@/pages/admin/EditEmployeePage'
 import OutletsPage from '@/pages/admin/OutletsPage'
 import NewOutletPage from '@/pages/admin/NewOutletPage'
@@ -36,6 +38,7 @@ import EvaluationsPage from '@/pages/admin/EvaluationsPage'
 import EvaluationBuilderPage from '@/pages/admin/EvaluationBuilderPage'
 import EvaluationRunPage from '@/pages/admin/EvaluationRunPage'
 import SettingsPage from '@/pages/admin/SettingsPage'
+import SalesPage from '@/pages/admin/SalesPage'
 import MyDashboard from '@/pages/me/MyDashboard'
 import PunchPage from '@/pages/me/PunchPage'
 import MyAttendancePage from '@/pages/me/MyAttendancePage'
@@ -53,6 +56,7 @@ const adminNav = [
   { to: '/admin/roster', label: 'Roster', icon: CalendarRange },
   { to: '/admin/leave/approvals', label: 'Leave approvals', icon: Plane },
   { to: '/admin/leave/policies', label: 'Leave policies', icon: ListChecks },
+  { to: '/admin/sales', label: 'Sales', icon: CircleDollarSign },
   { to: '/admin/evaluations', label: 'Evaluations', icon: ClipboardCheck },
   { to: '/admin/settings', label: 'Settings', icon: SettingsIcon },
 ]
@@ -86,6 +90,7 @@ export default function App() {
         <Route path="/admin/outlets/:id" element={<EditOutletPage />} />
         <Route path="/admin/employees" element={<EmployeesListPage />} />
         <Route path="/admin/employees/new" element={<CreateEmployeePage />} />
+        <Route path="/admin/employees/bulk" element={<BulkEmployeesPage />} />
         <Route path="/admin/employees/:id" element={<EditEmployeePage />} />
         <Route path="/admin/attendance" element={<AttendancePage />} />
         <Route path="/admin/regularisations" element={<RegularisationsPage />} />
@@ -93,6 +98,7 @@ export default function App() {
         <Route path="/admin/roster" element={<RosterPage />} />
         <Route path="/admin/leave/approvals" element={<LeaveApprovalsPage />} />
         <Route path="/admin/leave/policies" element={<LeavePoliciesPage />} />
+        <Route path="/admin/sales" element={<SalesPage />} />
         <Route path="/admin/evaluations" element={<EvaluationsPage />} />
         <Route
           path="/admin/evaluations/questionnaires/:id"
