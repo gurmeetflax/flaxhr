@@ -31,6 +31,8 @@ const CORE_TABLES = new Set([
   'eval_questions',
   'evaluations',
   'eval_answers',
+  'outlet_sc_runs',
+  'outlet_sc_run_lines',
 ])
 
 // Tables in `attendance.` schema (frontend writes go through RPCs, but if

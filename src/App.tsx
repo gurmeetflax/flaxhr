@@ -38,6 +38,8 @@ import EvaluationsPage from '@/pages/admin/EvaluationsPage'
 import EvaluationBuilderPage from '@/pages/admin/EvaluationBuilderPage'
 import EvaluationRunPage from '@/pages/admin/EvaluationRunPage'
 import SettingsPage from '@/pages/admin/SettingsPage'
+import ServiceChargePage from '@/pages/admin/ServiceChargePage'
+import ServiceChargeRunPage from '@/pages/admin/ServiceChargeRunPage'
 import SalesPage from '@/pages/admin/SalesPage'
 import MyDashboard from '@/pages/me/MyDashboard'
 import PunchPage from '@/pages/me/PunchPage'
@@ -57,6 +59,7 @@ const adminNav = [
   { to: '/admin/leave/approvals', label: 'Leave approvals', icon: Plane },
   { to: '/admin/leave/policies', label: 'Leave policies', icon: ListChecks },
   { to: '/admin/sales', label: 'Sales', icon: CircleDollarSign },
+  { to: '/admin/service-charge', label: 'Service charge', icon: CircleDollarSign },
   { to: '/admin/evaluations', label: 'Evaluations', icon: ClipboardCheck },
   { to: '/admin/settings', label: 'Settings', icon: SettingsIcon },
 ]
@@ -99,6 +102,8 @@ export default function App() {
         <Route path="/admin/leave/approvals" element={<LeaveApprovalsPage />} />
         <Route path="/admin/leave/policies" element={<LeavePoliciesPage />} />
         <Route path="/admin/sales" element={<SalesPage />} />
+        <Route path="/admin/service-charge" element={<ServiceChargePage />} />
+        <Route path="/admin/service-charge/runs/:id" element={<ServiceChargeRunPage />} />
         <Route path="/admin/evaluations" element={<EvaluationsPage />} />
         <Route
           path="/admin/evaluations/questionnaires/:id"

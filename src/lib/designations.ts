@@ -6,6 +6,8 @@ export interface Designation {
   name: string
   is_active: boolean
   display_order: number
+  /** Service-charge weight per day worked. Default 1.00. */
+  sc_points_per_day: number
 }
 
 export function useDesignations(opts: { activeOnly?: boolean } = {}) {
@@ -16,7 +18,7 @@ export function useDesignations(opts: { activeOnly?: boolean } = {}) {
     queryFn: async () => {
       let q = supabase
         .from('v_designations')
-        .select('code, name, is_active, display_order')
+        .select('code, name, is_active, display_order, sc_points_per_day')
         .order('display_order')
         .order('name')
       if (activeOnly) q = q.eq('is_active', true)
@@ -31,12 +33,13 @@ export function useUpsertDesignation() {
   const qc = useQueryClient()
   return useMutation({
     mutationFn: async (input: Partial<Designation> & { code: string; name: string }) => {
-      const row = {
+      const row: Record<string, unknown> = {
         code: input.code.trim().toLowerCase(),
         name: input.name.trim(),
         is_active: input.is_active ?? true,
         display_order: input.display_order ?? 0,
       }
+      if (input.sc_points_per_day != null) row.sc_points_per_day = input.sc_points_per_day
       const { error } = await supabase
         .schema('core' as never)
         .from('designations')
