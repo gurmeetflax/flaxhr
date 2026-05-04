@@ -6,7 +6,8 @@
   "scripts": {
     "dev": "vite",
     "build": "tsc -b && vite build",
-    "lint": "eslint .",
+    "lint": "eslint . && node scripts/check-supabase-schemas.mjs",
+    "lint:schemas": "node scripts/check-supabase-schemas.mjs",
     "typecheck": "tsc -b --noEmit",
     "preview": "npm run build && wrangler dev",
     "deploy": "npm run build && wrangler deploy"
