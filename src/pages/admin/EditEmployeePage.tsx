@@ -276,7 +276,104 @@ export default function EditEmployeePage() {
           </form>
         </CardContent>
       </Card>
+
+      <ResetPinCard employeeId={e.id} />
     </>
+  )
+}
+
+function ResetPinCard({ employeeId }: { employeeId: string }) {
+  const [pin, setPin] = useState('')
+  const [confirm, setConfirm] = useState('')
+  const [err, setErr] = useState<string | null>(null)
+
+  const reset = useMutation({
+    mutationFn: async (newPin: string) => {
+      const { error } = await supabase.rpc('reset_employee_pin', {
+        p_employee_id: employeeId,
+        p_new_pin: newPin,
+      })
+      if (error) throw error
+    },
+    onSuccess: () => {
+      toast.success('PIN reset')
+      setPin('')
+      setConfirm('')
+    },
+    onError: (e: Error) => {
+      const msg = e.message.includes('INVALID_PIN')
+        ? 'PIN must be exactly 6 digits.'
+        : e.message.includes('FORBIDDEN')
+          ? 'You do not have permission to reset PINs.'
+          : e.message.includes('NO_AUTH_USER')
+            ? 'This employee has no linked login.'
+            : e.message
+      setErr(msg)
+      toast.error(msg)
+    },
+  })
+
+  function onReset() {
+    setErr(null)
+    if (!/^[0-9]{6}$/.test(pin)) {
+      setErr('PIN must be exactly 6 digits.')
+      return
+    }
+    if (pin !== confirm) {
+      setErr('PINs do not match.')
+      return
+    }
+    reset.mutate(pin)
+  }
+
+  return (
+    <Card className="mt-4">
+      <CardContent className="p-6">
+        <div className="mb-3">
+          <Label className="text-base font-semibold">Reset login PIN</Label>
+          <p className="mt-1 text-xs text-muted-foreground">
+            Issues a new 6-digit PIN. Existing sessions remain valid until the
+            user next logs in.
+          </p>
+        </div>
+        <div className="grid gap-3 sm:grid-cols-2">
+          <Field label="New PIN">
+            <Input
+              type="password"
+              inputMode="numeric"
+              autoComplete="new-password"
+              maxLength={6}
+              value={pin}
+              onChange={(ev) => setPin(ev.target.value.replace(/\D/g, ''))}
+              placeholder="6 digits"
+            />
+          </Field>
+          <Field label="Confirm">
+            <Input
+              type="password"
+              inputMode="numeric"
+              autoComplete="new-password"
+              maxLength={6}
+              value={confirm}
+              onChange={(ev) => setConfirm(ev.target.value.replace(/\D/g, ''))}
+              placeholder="6 digits"
+            />
+          </Field>
+        </div>
+        {err ? <p className="mt-3 text-sm text-destructive">{err}</p> : null}
+        <div className="mt-4 flex items-center gap-2">
+          <Button
+            type="button"
+            variant="secondary"
+            onClick={onReset}
+            loading={reset.isPending}
+            disabled={!pin || !confirm}
+          >
+            Reset PIN
+          </Button>
+        </div>
+      </CardContent>
+    </Card>
   )
 }
 
