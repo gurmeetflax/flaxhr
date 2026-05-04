@@ -420,8 +420,11 @@ grant select on public.v_my_dashboard_summary to authenticated;
 
 -- ==========================================================================
 -- 6. Refresh v_employees to expose new compensation + exit columns.
+-- (Drop+recreate because CREATE OR REPLACE VIEW cannot reorder/insert
+-- columns in the middle of the existing column list.)
 -- ==========================================================================
-create or replace view public.v_employees
+drop view if exists public.v_employees;
+create view public.v_employees
 with (security_invoker = true) as
   select e.id, e.employee_code, e.user_id, e.full_name,
          e.work_email, e.phone, e.outlet_id, e.is_active,
