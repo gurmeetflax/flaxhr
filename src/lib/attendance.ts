@@ -156,7 +156,8 @@ export function useNextPunchType(): 'in' | 'out' {
 }
 
 interface PunchInput {
-  selfie: Blob
+  /** Omit when the selfie_required setting is off. */
+  selfie?: Blob
   lat: number
   lng: number
 }
@@ -168,17 +169,20 @@ export function usePunch() {
   return useMutation<PunchResult, Error, PunchInput>({
     mutationFn: async ({ selfie, lat, lng }) => {
       if (!user) throw new Error('Not signed in')
-      const ext = mimeToExt(selfie.type) ?? 'jpg'
-      const path = `${user.id}/${Date.now()}.${ext}`
 
-      const { error: upErr } = await supabase.storage
-        .from('attendance-selfies')
-        .upload(path, selfie, {
-          contentType: selfie.type || 'image/jpeg',
-          cacheControl: '3600',
-          upsert: false,
-        })
-      if (upErr) throw new Error(`Selfie upload failed: ${upErr.message}`)
+      let path: string | null = null
+      if (selfie) {
+        const ext = mimeToExt(selfie.type) ?? 'jpg'
+        path = `${user.id}/${Date.now()}.${ext}`
+        const { error: upErr } = await supabase.storage
+          .from('attendance-selfies')
+          .upload(path, selfie, {
+            contentType: selfie.type || 'image/jpeg',
+            cacheControl: '3600',
+            upsert: false,
+          })
+        if (upErr) throw new Error(`Selfie upload failed: ${upErr.message}`)
+      }
 
       const { data, error } = await supabase.rpc('punch', {
         p_type: 'auto',
