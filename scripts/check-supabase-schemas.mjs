@@ -24,6 +24,9 @@ const CORE_TABLES = new Set([
   'leave_requests',
   'user_roles',
   'audit_log',
+  'app_settings',
+  'designations',
+  'outlet_monthly_sales',
 ])
 
 // Tables in `attendance.` schema (frontend writes go through RPCs, but if

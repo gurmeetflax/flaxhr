@@ -9,6 +9,7 @@ import { Label } from '@/components/ui/Label'
 import { Input } from '@/components/ui/Input'
 import { Button } from '@/components/ui/Button'
 import { isValidEmail } from '@/lib/identity'
+import { useDesignations } from '@/lib/designations'
 
 interface Employee {
   id: string
@@ -22,6 +23,7 @@ interface Employee {
   monthly_salary: number | null
   exit_date: string | null
   exit_reason: string | null
+  designation_code: string | null
 }
 
 interface OutletOption {
@@ -41,7 +43,7 @@ export default function EditEmployeePage() {
       const { data, error } = await supabase
         .from('v_employees')
         .select(
-          'id, employee_code, full_name, phone, work_email, outlet_id, is_active, hired_on, monthly_salary, exit_date, exit_reason',
+          'id, employee_code, full_name, phone, work_email, outlet_id, is_active, hired_on, monthly_salary, exit_date, exit_reason, designation_code',
         )
         .eq('id', id)
         .maybeSingle()
@@ -63,6 +65,7 @@ export default function EditEmployeePage() {
       return data ?? []
     },
   })
+  const designationsQ = useDesignations({ activeOnly: true })
 
   const [fullName, setFullName] = useState('')
   const [phone, setPhone] = useState('')
@@ -72,6 +75,7 @@ export default function EditEmployeePage() {
   const [monthlySalary, setMonthlySalary] = useState('')
   const [exitDate, setExitDate] = useState('')
   const [exitReason, setExitReason] = useState('')
+  const [designationCode, setDesignationCode] = useState('')
   const [err, setErr] = useState<string | null>(null)
 
   useEffect(() => {
@@ -85,6 +89,7 @@ export default function EditEmployeePage() {
     setMonthlySalary(e.monthly_salary != null ? String(e.monthly_salary) : '')
     setExitDate(e.exit_date ?? '')
     setExitReason(e.exit_reason ?? '')
+    setDesignationCode(e.designation_code ?? '')
   }, [employeeQ.data])
 
   const save = useMutation({
@@ -105,6 +110,7 @@ export default function EditEmployeePage() {
         outlet_id: outletId || null,
         is_active: isActive,
         monthly_salary: salaryNum,
+        designation_code: designationCode || null,
         exit_date: exitDate || null,
         exit_reason: exitReason.trim() || null,
       }
@@ -215,6 +221,20 @@ export default function EditEmployeePage() {
                 {(outletsQ.data ?? []).map((o) => (
                   <option key={o.id} value={o.id}>
                     {o.display_name ?? o.id}
+                  </option>
+                ))}
+              </select>
+            </Field>
+            <Field label="Designation">
+              <select
+                value={designationCode}
+                onChange={(ev) => setDesignationCode(ev.target.value)}
+                className="flex h-10 w-full rounded-lg border border-input bg-surface px-3 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+              >
+                <option value="">Unassigned</option>
+                {(designationsQ.data ?? []).map((d) => (
+                  <option key={d.code} value={d.code}>
+                    {d.name}
                   </option>
                 ))}
               </select>
