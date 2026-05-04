@@ -61,6 +61,7 @@ export default function RosterPage() {
         shift_id: shiftId === '__off' ? null : shiftId === '__clear' ? null : shiftId,
         status: shiftId === '__off' ? 'off' : 'planned',
       })
+      toast.success('Saved')
     } catch (err) {
       toast.error(err instanceof Error ? err.message : 'Failed')
     }
