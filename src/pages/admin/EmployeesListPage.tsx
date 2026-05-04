@@ -1,7 +1,7 @@
 import { useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { useQuery } from '@tanstack/react-query'
-import { Plus, Search, UserX } from 'lucide-react'
+import { Plus, Search, Upload, UserX } from 'lucide-react'
 import { supabase } from '@/lib/supabase'
 import { PageHeader } from '@/components/layout/AppShell'
 import { Card, CardContent } from '@/components/ui/Card'
@@ -83,11 +83,18 @@ export default function EmployeesListPage() {
             : 'Loading…'
         }
         actions={
-          <Link to="/admin/employees/new">
-            <Button size="sm">
-              <Plus className="h-4 w-4" /> New employee
-            </Button>
-          </Link>
+          <div className="flex items-center gap-2">
+            <Link to="/admin/employees/bulk">
+              <Button size="sm" variant="secondary">
+                <Upload className="h-4 w-4" /> Bulk upload
+              </Button>
+            </Link>
+            <Link to="/admin/employees/new">
+              <Button size="sm">
+                <Plus className="h-4 w-4" /> New employee
+              </Button>
+            </Link>
+          </div>
         }
       />
 

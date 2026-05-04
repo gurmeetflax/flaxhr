@@ -22,6 +22,7 @@ import ForbiddenPage from '@/pages/ForbiddenPage'
 import AdminDashboard from '@/pages/admin/AdminDashboard'
 import EmployeesListPage from '@/pages/admin/EmployeesListPage'
 import CreateEmployeePage from '@/pages/admin/CreateEmployeePage'
+import BulkEmployeesPage from '@/pages/admin/BulkEmployeesPage'
 import EditEmployeePage from '@/pages/admin/EditEmployeePage'
 import OutletsPage from '@/pages/admin/OutletsPage'
 import NewOutletPage from '@/pages/admin/NewOutletPage'
@@ -84,6 +85,7 @@ export default function App() {
         <Route path="/admin/outlets/:id" element={<EditOutletPage />} />
         <Route path="/admin/employees" element={<EmployeesListPage />} />
         <Route path="/admin/employees/new" element={<CreateEmployeePage />} />
+        <Route path="/admin/employees/bulk" element={<BulkEmployeesPage />} />
         <Route path="/admin/employees/:id" element={<EditEmployeePage />} />
         <Route path="/admin/attendance" element={<AttendancePage />} />
         <Route path="/admin/regularisations" element={<RegularisationsPage />} />
