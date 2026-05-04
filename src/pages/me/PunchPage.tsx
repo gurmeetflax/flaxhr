@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
-import { Camera, Check, MapPin, RotateCcw, Send } from 'lucide-react'
+import { Link } from 'react-router-dom'
+import { Camera, Check, CheckSquare, MapPin, Plane, RotateCcw, Send } from 'lucide-react'
 import { toast } from 'sonner'
 import { format } from 'date-fns'
 import { formatInTimeZone } from 'date-fns-tz'
@@ -56,28 +57,9 @@ export default function PunchPage() {
   const inside = distance !== null && distance <= radius
   const tz = outlet?.timezone ?? 'Asia/Kolkata'
 
-  const onChooseSelfie = (file: File) => {
-    if (selfie) URL.revokeObjectURL(selfie.preview)
-    setSelfie({ blob: file, preview: URL.createObjectURL(file) })
-    setStep('review')
-  }
-
-  const onSubmit = async () => {
-    if (!selfie) return
-    if (!coords) {
-      toast.error('Waiting for your location. Please allow location access.')
-      return
-    }
-    if (!inside) {
-      toast.error(`Outside geofence — you're ${distance} m away (allowed: ${radius} m).`)
-      return
-    }
+  const submitWith = async (selfieBlob: Blob, lat: number, lng: number) => {
     try {
-      const result = await punch.mutateAsync({
-        selfie: selfie.blob,
-        lat: coords.lat,
-        lng: coords.lng,
-      })
+      const result = await punch.mutateAsync({ selfie: selfieBlob, lat, lng })
       toast.success(
         `${result.type === 'in' ? 'Punched in' : 'Punched out'} at ${formatInTimeZone(
           result.punched_at,
@@ -89,6 +71,37 @@ export default function PunchPage() {
     } catch (err) {
       toast.error(err instanceof Error ? err.message : 'Punch failed')
     }
+  }
+
+  // One-shot capture → submit. No review screen, no extra tap. We still
+  // store the preview briefly so the user can see what was sent.
+  const onChooseSelfie = (file: File) => {
+    if (selfie) URL.revokeObjectURL(selfie.preview)
+    setSelfie({ blob: file, preview: URL.createObjectURL(file) })
+    if (!coords) {
+      toast.error('Waiting for your location. Try again in a moment.')
+      setStep('review')
+      return
+    }
+    if (!inside) {
+      toast.error(`Outside geofence — you're ${distance} m away (allowed: ${radius} m).`)
+      setStep('review')
+      return
+    }
+    setStep('review')
+    void submitWith(file, coords.lat, coords.lng)
+  }
+
+  const onSubmit = async () => {
+    if (!selfie || !coords) {
+      toast.error('Waiting for your location. Please allow location access.')
+      return
+    }
+    if (!inside) {
+      toast.error(`Outside geofence — you're ${distance} m away (allowed: ${radius} m).`)
+      return
+    }
+    await submitWith(selfie.blob, coords.lat, coords.lng)
   }
 
   const resetCapture = () => {
@@ -238,6 +251,21 @@ export default function PunchPage() {
               </p>
             </CardContent>
           </Card>
+
+          <div className="grid gap-2 sm:grid-cols-2">
+            <Link
+              to="/me/leave"
+              className="flex items-center justify-center gap-2 rounded-xl border border-border bg-surface p-4 text-sm font-medium text-foreground hover:bg-muted"
+            >
+              <Plane className="h-4 w-4" /> Apply for leave
+            </Link>
+            <Link
+              to="/me/regularise"
+              className="flex items-center justify-center gap-2 rounded-xl border border-border bg-surface p-4 text-sm font-medium text-foreground hover:bg-muted"
+            >
+              <CheckSquare className="h-4 w-4" /> Regularise punch
+            </Link>
+          </div>
         </div>
       ) : null}
     </>

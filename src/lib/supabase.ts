@@ -11,9 +11,15 @@ if (!url || !key) {
 
 export const supabase: SupabaseClient = createClient(url, key, {
   auth: {
+    // Long-lived session: localStorage persistence + auto-refresh.
+    // The actual lifetime ceiling is set in Supabase Dashboard -> Auth ->
+    // Sessions ("JWT expiry" and refresh-token TTL). Set both to 30 days
+    // for the "stay signed in" UX.
     persistSession: true,
     autoRefreshToken: true,
     detectSessionInUrl: true,
+    storage: typeof window !== 'undefined' ? window.localStorage : undefined,
+    storageKey: 'flax-hr-auth',
   },
 })
 

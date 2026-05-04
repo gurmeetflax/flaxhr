@@ -176,7 +176,7 @@ function EmployeeForm() {
     setErr(null)
     const normalised = normaliseEmployeeCode(code)
     if (!/^FLX-[A-Z0-9]{2,6}-[0-9]{4}$/.test(normalised)) {
-      setErr('Employee code must look like FLX-BND-0001.')
+      setErr('Employee code must look like FLXBND0001.')
       return
     }
     if (!/^[0-9]{6}$/.test(pin)) {
@@ -198,7 +198,7 @@ function EmployeeForm() {
         <Label htmlFor="emp-code">Employee code</Label>
         <Input
           id="emp-code"
-          placeholder="FLX-BND-0001"
+          placeholder="FLXBND0001"
           autoCapitalize="characters"
           value={code}
           onChange={(e) => setCode(e.target.value)}
