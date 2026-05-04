@@ -2,23 +2,19 @@ export const EMPLOYEE_EMAIL_DOMAIN = 'flax-hr.local'
 export const ADMIN_EMAIL_DOMAIN = 'flaxitup.com'
 
 /**
- * Normalises an employee code to canonical hyphenated form.
- *  FLXBND0001  -> FLX-BND-0001
- *  flx-bnd-1   -> FLX-BND-0001 (also pads numeric to 4)
- *  FLX-BND-001 -> FLX-BND-0001
- * Hyphens, spaces and case are forgiven; result always matches
- * /^FLX-[A-Z0-9]{2,6}-[0-9]{4}$/.
+ * Normalises an employee code to canonical FLAX#### form.
+ *  flax 1     -> FLAX0001
+ *  FLAX-0001  -> FLAX0001
+ *  flax0001   -> FLAX0001
+ * Hyphens, spaces and case are forgiven; the numeric tail is padded to 4.
+ * Result always matches /^FLAX[0-9]{4}$/ when the input has a numeric tail.
  */
 export function normaliseEmployeeCode(code: string) {
   const cleaned = code.trim().toUpperCase().replace(/[\s-]+/g, '')
-  if (!cleaned.startsWith('FLX')) return cleaned // let validators reject
-  const rest = cleaned.slice(3)
-  // Numeric tail
-  const m = /^([A-Z0-9]{2,6}?)([0-9]+)$/.exec(rest)
-  if (!m) return cleaned
-  const outlet = m[1]
-  const num = m[2].padStart(4, '0')
-  return `FLX-${outlet}-${num}`
+  if (!cleaned.startsWith('FLAX')) return cleaned // let validators reject
+  const rest = cleaned.slice(4)
+  if (!/^[0-9]+$/.test(rest)) return cleaned
+  return `FLAX${rest.padStart(4, '0')}`
 }
 
 export function employeeCodeToEmail(code: string) {
@@ -29,7 +25,8 @@ export function emailToEmployeeCode(email: string | null | undefined): string | 
   if (!email) return null
   const suffix = `@${EMPLOYEE_EMAIL_DOMAIN}`
   if (!email.endsWith(suffix)) return null
-  return email.slice(0, -suffix.length).toUpperCase()
+  const local = email.slice(0, -suffix.length).toUpperCase()
+  return /^FLAX[0-9]{4}$/.test(local) ? local : null
 }
 
 export function isFlaxitupEmail(email: string) {
