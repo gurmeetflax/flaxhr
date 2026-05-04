@@ -1,18 +1,29 @@
+import { useState } from 'react'
 import { toast } from 'sonner'
-import { Camera } from 'lucide-react'
+import { Briefcase, Camera, Pencil, Plus, Trash2 } from 'lucide-react'
 import { PageHeader } from '@/components/layout/AppShell'
 import { Card, CardContent, CardDescription, CardTitle } from '@/components/ui/Card'
+import { Input } from '@/components/ui/Input'
+import { Label } from '@/components/ui/Label'
+import { Button } from '@/components/ui/Button'
 import { useAppSetting, useSetAppSetting } from '@/lib/appSettings'
+import {
+  useDesignations,
+  useUpsertDesignation,
+  useDeleteDesignation,
+  type Designation,
+} from '@/lib/designations'
 
 export default function SettingsPage() {
   return (
     <>
       <PageHeader
         title="Settings"
-        description="App-wide toggles. Effective immediately for everyone."
+        description="App-wide toggles and master lists."
       />
       <div className="flex flex-col gap-4">
         <SelfieRequiredCard />
+        <DesignationsCard />
       </div>
     </>
   )
@@ -53,6 +64,172 @@ function SelfieRequiredCard() {
           onChange={onToggle}
           ariaLabel="Toggle selfie requirement"
         />
+      </CardContent>
+    </Card>
+  )
+}
+
+function DesignationsCard() {
+  const { data: designations = [], isLoading } = useDesignations()
+  const upsert = useUpsertDesignation()
+  const remove = useDeleteDesignation()
+
+  const [editing, setEditing] = useState<Designation | null>(null)
+  const [draftCode, setDraftCode] = useState('')
+  const [draftName, setDraftName] = useState('')
+  const [adding, setAdding] = useState(false)
+
+  function startAdd() {
+    setEditing(null)
+    setDraftCode('')
+    setDraftName('')
+    setAdding(true)
+  }
+  function startEdit(d: Designation) {
+    setAdding(false)
+    setEditing(d)
+    setDraftCode(d.code)
+    setDraftName(d.name)
+  }
+  function cancel() {
+    setAdding(false)
+    setEditing(null)
+    setDraftCode('')
+    setDraftName('')
+  }
+  async function save() {
+    const code = draftCode.trim().toLowerCase()
+    const name = draftName.trim()
+    if (!code || !name) {
+      toast.error('Code and name are required.')
+      return
+    }
+    if (!/^[a-z0-9_-]+$/.test(code)) {
+      toast.error('Code can only contain lowercase letters, digits, _ and -.')
+      return
+    }
+    try {
+      await upsert.mutateAsync({
+        code,
+        name,
+        is_active: editing?.is_active ?? true,
+        display_order: editing?.display_order ?? designations.length * 10 + 10,
+      })
+      toast.success(editing ? 'Designation updated' : 'Designation added')
+      cancel()
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : 'Could not save')
+    }
+  }
+  async function toggleActive(d: Designation) {
+    try {
+      await upsert.mutateAsync({
+        code: d.code,
+        name: d.name,
+        is_active: !d.is_active,
+        display_order: d.display_order,
+      })
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : 'Could not update')
+    }
+  }
+  async function onDelete(d: Designation) {
+    if (!confirm(`Delete "${d.name}"? Employees with this designation will have it cleared.`)) return
+    try {
+      await remove.mutateAsync(d.code)
+      toast.success('Designation deleted')
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : 'Could not delete')
+    }
+  }
+
+  return (
+    <Card>
+      <CardContent className="flex flex-col gap-4 p-6">
+        <div className="flex items-start gap-3">
+          <span className="grid h-10 w-10 place-items-center rounded-lg bg-primary/10 text-primary">
+            <Briefcase className="h-5 w-5" />
+          </span>
+          <div className="flex-1">
+            <CardTitle>Designations</CardTitle>
+            <CardDescription className="mt-1">
+              Job titles. Used for the dropdown on every employee. Deactivating
+              hides a designation from the dropdown without breaking existing
+              assignments.
+            </CardDescription>
+          </div>
+          <Button size="sm" onClick={startAdd}>
+            <Plus className="h-4 w-4" /> Add
+          </Button>
+        </div>
+
+        {isLoading ? (
+          <p className="text-sm text-muted-foreground">Loading…</p>
+        ) : designations.length === 0 ? (
+          <p className="text-sm text-muted-foreground">No designations yet.</p>
+        ) : (
+          <ul className="flex flex-col divide-y divide-border text-sm">
+            {designations.map((d) => (
+              <li key={d.code} className="flex items-center gap-3 py-2">
+                <div className="flex-1">
+                  <div className="font-medium">{d.name}</div>
+                  <div className="font-mono text-xs text-muted-foreground">{d.code}</div>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => toggleActive(d)}
+                  className={
+                    'rounded-full px-2 py-0.5 text-xs font-medium ' +
+                    (d.is_active
+                      ? 'bg-primary/10 text-primary'
+                      : 'bg-muted text-muted-foreground')
+                  }
+                >
+                  {d.is_active ? 'Active' : 'Inactive'}
+                </button>
+                <Button size="sm" variant="ghost" onClick={() => startEdit(d)}>
+                  <Pencil className="h-4 w-4" />
+                </Button>
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  onClick={() => onDelete(d)}
+                  className="text-destructive hover:text-destructive"
+                >
+                  <Trash2 className="h-4 w-4" />
+                </Button>
+              </li>
+            ))}
+          </ul>
+        )}
+
+        {(adding || editing) ? (
+          <div className="grid gap-3 rounded-lg border border-border bg-muted/30 p-4 sm:grid-cols-[1fr_2fr_auto_auto]">
+            <div>
+              <Label className="mb-1 block text-xs">Code</Label>
+              <Input
+                value={draftCode}
+                onChange={(e) => setDraftCode(e.target.value)}
+                placeholder="cashier"
+                disabled={!!editing}
+              />
+            </div>
+            <div>
+              <Label className="mb-1 block text-xs">Name</Label>
+              <Input
+                value={draftName}
+                onChange={(e) => setDraftName(e.target.value)}
+                placeholder="Cashier"
+              />
+            </div>
+            <Button onClick={save} loading={upsert.isPending} className="self-end">
+              {editing ? 'Save' : 'Add'}
+            </Button>
+            <Button variant="ghost" onClick={cancel} className="self-end">
+              Cancel
+            </Button>
+          </div>
+        ) : null}
       </CardContent>
     </Card>
   )

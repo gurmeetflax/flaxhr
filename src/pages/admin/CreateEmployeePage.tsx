@@ -9,6 +9,7 @@ import { Label } from '@/components/ui/Label'
 import { Input } from '@/components/ui/Input'
 import { Button } from '@/components/ui/Button'
 import { employeeCodeToEmail, isValidEmail } from '@/lib/identity'
+import { useDesignations } from '@/lib/designations'
 
 interface Outlet {
   id: string
@@ -33,10 +34,13 @@ export default function CreateEmployeePage() {
     },
   })
 
+  const designationsQ = useDesignations({ activeOnly: true })
+
   const [fullName, setFullName] = useState('')
   const [phone, setPhone] = useState('')
   const [workEmail, setWorkEmail] = useState('')
   const [outletId, setOutletId] = useState('')
+  const [designationCode, setDesignationCode] = useState('')
   const [pin, setPin] = useState('')
   const [err, setErr] = useState<string | null>(null)
   const [busy, setBusy] = useState(false)
@@ -132,6 +136,7 @@ export default function CreateEmployeePage() {
           phone: cleanPhone,
           work_email: cleanEmail || null,
           outlet_id: outletId,
+          designation_code: designationCode || null,
         })
       if (empErr) {
         if (empErr.code === '23505') {
@@ -207,6 +212,20 @@ export default function CreateEmployeePage() {
                 {(outletsQ.data ?? []).map((o) => (
                   <option key={o.id} value={o.id}>
                     {o.display_name ?? o.name}
+                  </option>
+                ))}
+              </select>
+            </Field>
+            <Field label="Designation">
+              <select
+                value={designationCode}
+                onChange={(e) => setDesignationCode(e.target.value)}
+                className="flex h-10 w-full rounded-lg border border-input bg-surface px-3 py-2 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+              >
+                <option value="">Unassigned</option>
+                {(designationsQ.data ?? []).map((d) => (
+                  <option key={d.code} value={d.code}>
+                    {d.name}
                   </option>
                 ))}
               </select>
