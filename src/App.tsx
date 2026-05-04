@@ -4,6 +4,7 @@ import {
   CalendarRange,
   CheckSquare,
   Clock,
+  ClipboardCheck,
   ClipboardList,
   History,
   Home,
@@ -30,6 +31,9 @@ import ShiftsPage from '@/pages/admin/ShiftsPage'
 import RosterPage from '@/pages/admin/RosterPage'
 import LeaveApprovalsPage from '@/pages/admin/LeaveApprovalsPage'
 import LeavePoliciesPage from '@/pages/admin/LeavePoliciesPage'
+import EvaluationsPage from '@/pages/admin/EvaluationsPage'
+import EvaluationBuilderPage from '@/pages/admin/EvaluationBuilderPage'
+import EvaluationRunPage from '@/pages/admin/EvaluationRunPage'
 import MyDashboard from '@/pages/me/MyDashboard'
 import PunchPage from '@/pages/me/PunchPage'
 import MyAttendancePage from '@/pages/me/MyAttendancePage'
@@ -47,6 +51,7 @@ const adminNav = [
   { to: '/admin/roster', label: 'Roster', icon: CalendarRange },
   { to: '/admin/leave/approvals', label: 'Leave approvals', icon: Plane },
   { to: '/admin/leave/policies', label: 'Leave policies', icon: ListChecks },
+  { to: '/admin/evaluations', label: 'Evaluations', icon: ClipboardCheck },
 ]
 
 const employeeNav = [
@@ -85,6 +90,15 @@ export default function App() {
         <Route path="/admin/roster" element={<RosterPage />} />
         <Route path="/admin/leave/approvals" element={<LeaveApprovalsPage />} />
         <Route path="/admin/leave/policies" element={<LeavePoliciesPage />} />
+        <Route path="/admin/evaluations" element={<EvaluationsPage />} />
+        <Route
+          path="/admin/evaluations/questionnaires/:id"
+          element={<EvaluationBuilderPage />}
+        />
+        <Route
+          path="/admin/evaluations/runs/:id"
+          element={<EvaluationRunPage />}
+        />
       </Route>
 
       <Route
