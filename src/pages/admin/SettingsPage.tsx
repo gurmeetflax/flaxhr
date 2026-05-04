@@ -77,12 +77,14 @@ function DesignationsCard() {
   const [editing, setEditing] = useState<Designation | null>(null)
   const [draftCode, setDraftCode] = useState('')
   const [draftName, setDraftName] = useState('')
+  const [draftPoints, setDraftPoints] = useState('1')
   const [adding, setAdding] = useState(false)
 
   function startAdd() {
     setEditing(null)
     setDraftCode('')
     setDraftName('')
+    setDraftPoints('1')
     setAdding(true)
   }
   function startEdit(d: Designation) {
@@ -90,12 +92,14 @@ function DesignationsCard() {
     setEditing(d)
     setDraftCode(d.code)
     setDraftName(d.name)
+    setDraftPoints(String(d.sc_points_per_day ?? 1))
   }
   function cancel() {
     setAdding(false)
     setEditing(null)
     setDraftCode('')
     setDraftName('')
+    setDraftPoints('1')
   }
   async function save() {
     const code = draftCode.trim().toLowerCase()
@@ -108,12 +112,18 @@ function DesignationsCard() {
       toast.error('Code can only contain lowercase letters, digits, _ and -.')
       return
     }
+    const points = Number(draftPoints)
+    if (Number.isNaN(points) || points < 0) {
+      toast.error('Points/day must be 0 or more.')
+      return
+    }
     try {
       await upsert.mutateAsync({
         code,
         name,
         is_active: editing?.is_active ?? true,
         display_order: editing?.display_order ?? designations.length * 10 + 10,
+        sc_points_per_day: points,
       })
       toast.success(editing ? 'Designation updated' : 'Designation added')
       cancel()
@@ -128,6 +138,7 @@ function DesignationsCard() {
         name: d.name,
         is_active: !d.is_active,
         display_order: d.display_order,
+        sc_points_per_day: d.sc_points_per_day,
       })
     } catch (e) {
       toast.error(e instanceof Error ? e.message : 'Could not update')
@@ -175,6 +186,10 @@ function DesignationsCard() {
                   <div className="font-medium">{d.name}</div>
                   <div className="font-mono text-xs text-muted-foreground">{d.code}</div>
                 </div>
+                <span className="hidden text-xs text-muted-foreground sm:inline">
+                  SC pts/day:{' '}
+                  <span className="font-mono">{Number(d.sc_points_per_day ?? 1).toFixed(2)}</span>
+                </span>
                 <button
                   type="button"
                   onClick={() => toggleActive(d)}
@@ -204,7 +219,7 @@ function DesignationsCard() {
         )}
 
         {(adding || editing) ? (
-          <div className="grid gap-3 rounded-lg border border-border bg-muted/30 p-4 sm:grid-cols-[1fr_2fr_auto_auto]">
+          <div className="grid gap-3 rounded-lg border border-border bg-muted/30 p-4 sm:grid-cols-[1fr_2fr_120px_auto_auto]">
             <div>
               <Label className="mb-1 block text-xs">Code</Label>
               <Input
@@ -220,6 +235,18 @@ function DesignationsCard() {
                 value={draftName}
                 onChange={(e) => setDraftName(e.target.value)}
                 placeholder="Cashier"
+              />
+            </div>
+            <div>
+              <Label className="mb-1 block text-xs">SC pts/day</Label>
+              <Input
+                type="number"
+                inputMode="decimal"
+                step="0.01"
+                min={0}
+                value={draftPoints}
+                onChange={(e) => setDraftPoints(e.target.value)}
+                placeholder="1.00"
               />
             </div>
             <Button onClick={save} loading={upsert.isPending} className="self-end">

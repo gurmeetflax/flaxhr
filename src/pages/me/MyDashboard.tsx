@@ -4,6 +4,7 @@ import {
   ArrowRight,
   CalendarClock,
   CheckCircle2,
+  CircleDollarSign,
   Clock,
   Clock4,
   Plane,
@@ -13,6 +14,7 @@ import { useMyEmployee } from '@/lib/auth'
 import { useMyLeaveBalances } from '@/lib/leave'
 import { useMyRoster } from '@/lib/roster'
 import { useMyDashboardSummary } from '@/lib/dashboards'
+import { useMySC } from '@/lib/serviceCharge'
 import { PageHeader } from '@/components/layout/AppShell'
 import {
   Card,
@@ -28,6 +30,8 @@ export default function MyDashboard() {
   const { data: summary } = useMyDashboardSummary()
   const { data: balances = [] } = useMyLeaveBalances()
   const { data: roster = [] } = useMyRoster()
+  const { data: mySc = [] } = useMySC(1)
+  const latestSc = mySc[0] ?? null
 
   const upcoming = roster.slice(0, 3)
   const totalPaidBalance =
@@ -168,6 +172,37 @@ export default function MyDashboard() {
             </Button>
           </CardContent>
         </Card>
+
+        <Card>
+          <CardContent className="flex flex-col gap-3 p-6">
+            <div className="flex items-start gap-3">
+              <span className="grid h-10 w-10 place-items-center rounded-lg bg-primary/10 text-primary">
+                <CircleDollarSign className="h-5 w-5" />
+              </span>
+              <div className="flex-1">
+                <CardTitle>Service charge</CardTitle>
+                <CardDescription className="mt-1">
+                  {latestSc
+                    ? `${format(new Date(latestSc.period_month), 'MMM yyyy')} · ${latestSc.outlet_name ?? latestSc.outlet_id}`
+                    : 'No finalized run yet'}
+                </CardDescription>
+              </div>
+            </div>
+            {latestSc ? (
+              <div className="grid grid-cols-3 gap-2 text-xs">
+                <SCStat label="Days" value={String(latestSc.days_present)} />
+                <SCStat label="Points" value={String(latestSc.total_points)} />
+                <SCStat
+                  label="Payable"
+                  value={`₹${Number(latestSc.sc_payable).toLocaleString('en-IN', {
+                    maximumFractionDigits: 0,
+                  })}`}
+                  accent
+                />
+              </div>
+            ) : null}
+          </CardContent>
+        </Card>
       </div>
 
       {isLoading ? null : employee ? null : (
@@ -182,6 +217,22 @@ export default function MyDashboard() {
         </Card>
       )}
     </>
+  )
+}
+
+function SCStat({ label, value, accent }: { label: string; value: string; accent?: boolean }) {
+  return (
+    <div
+      className={
+        'rounded-lg border p-2 ' +
+        (accent ? 'border-primary/30 bg-primary/5' : 'border-border bg-muted/20')
+      }
+    >
+      <div className="text-[10px] uppercase tracking-wide text-muted-foreground">
+        {label}
+      </div>
+      <div className="font-mono text-sm font-semibold">{value}</div>
+    </div>
   )
 }
 
