@@ -47,6 +47,7 @@ import MyAttendancePage from '@/pages/me/MyAttendancePage'
 import RegularisePage from '@/pages/me/RegularisePage'
 import MyRosterPage from '@/pages/me/MyRosterPage'
 import LeavePage from '@/pages/me/LeavePage'
+import NotificationsPage from '@/pages/me/NotificationsPage'
 
 const adminNav = [
   { to: '/admin', label: 'Overview', icon: Home },
@@ -114,6 +115,7 @@ export default function App() {
           element={<EvaluationRunPage />}
         />
         <Route path="/admin/settings" element={<SettingsPage />} />
+        <Route path="/admin/notifications" element={<NotificationsPage />} />
       </Route>
 
       <Route
@@ -129,6 +131,7 @@ export default function App() {
         <Route path="/me/roster" element={<MyRosterPage />} />
         <Route path="/me/leave" element={<LeavePage />} />
         <Route path="/me/overview" element={<MyDashboard />} />
+        <Route path="/me/notifications" element={<NotificationsPage />} />
       </Route>
 
       <Route path="*" element={<NotFoundPage />} />

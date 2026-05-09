@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { toast } from 'sonner'
-import { Briefcase, Camera, Pencil, Plus, Trash2 } from 'lucide-react'
+import { Bell, Briefcase, Camera, Pencil, Plus, Trash2 } from 'lucide-react'
 import { PageHeader } from '@/components/layout/AppShell'
 import { Card, CardContent, CardDescription, CardTitle } from '@/components/ui/Card'
 import { Input } from '@/components/ui/Input'
@@ -23,6 +23,7 @@ export default function SettingsPage() {
       />
       <div className="flex flex-col gap-4">
         <SelfieRequiredCard />
+        <NotificationEmailCard />
         <DesignationsCard />
       </div>
     </>
@@ -63,6 +64,46 @@ function SelfieRequiredCard() {
           disabled={isLoading || setting.isPending}
           onChange={onToggle}
           ariaLabel="Toggle selfie requirement"
+        />
+      </CardContent>
+    </Card>
+  )
+}
+
+function NotificationEmailCard() {
+  const { data: enabled = true, isLoading } = useAppSetting<boolean>(
+    'notif_email_enabled',
+    true,
+  )
+  const setting = useSetAppSetting()
+
+  const onToggle = async (next: boolean) => {
+    try {
+      await setting.mutateAsync({ key: 'notif_email_enabled', value: next })
+      toast.success(next ? 'Email notifications enabled' : 'Email notifications paused')
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : 'Could not save')
+    }
+  }
+
+  return (
+    <Card>
+      <CardContent className="flex items-start gap-4 p-6">
+        <span className="grid h-10 w-10 place-items-center rounded-lg bg-primary/10 text-primary">
+          <Bell className="h-5 w-5" />
+        </span>
+        <div className="flex-1">
+          <CardTitle>Send notification emails</CardTitle>
+          <CardDescription className="mt-1">
+            Global kill-switch. Off = no outbound emails (in-app bell still
+            works). Each employee can also opt out individually.
+          </CardDescription>
+        </div>
+        <Toggle
+          checked={!!enabled}
+          disabled={isLoading || setting.isPending}
+          onChange={onToggle}
+          ariaLabel="Toggle notification emails"
         />
       </CardContent>
     </Card>
