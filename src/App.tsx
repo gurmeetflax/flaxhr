@@ -16,6 +16,7 @@ import {
   Receipt,
   Settings as SettingsIcon,
   Store,
+  ShieldAlert,
   Sparkles,
   TrendingDown,
   Users,
@@ -55,6 +56,8 @@ import EmployeeSnapshotPage from '@/pages/admin/EmployeeSnapshotPage'
 import MyPipPage from '@/pages/me/MyPipPage'
 import MyIncentivesPage from '@/pages/me/MyIncentivesPage'
 import MyPerformancePage from '@/pages/me/MyPerformancePage'
+import MyGrievancesPage from '@/pages/me/MyGrievancesPage'
+import GrievancesPage from '@/pages/admin/GrievancesPage'
 import ServiceChargePage from '@/pages/admin/ServiceChargePage'
 import ServiceChargeRunPage from '@/pages/admin/ServiceChargeRunPage'
 import SalesPage from '@/pages/admin/SalesPage'
@@ -81,6 +84,7 @@ const adminNav = [
   { to: '/admin/payroll', label: 'Payroll', icon: Wallet },
   { to: '/admin/evaluations', label: 'Evaluations', icon: ClipboardCheck },
   { to: '/admin/pips', label: 'PIPs', icon: TrendingDown },
+  { to: '/admin/grievances', label: 'Grievances', icon: ShieldAlert },
   { to: '/admin/fnf', label: 'FnF & clearance', icon: LogOut },
   { to: '/admin/gift-codes', label: 'Birthday vouchers', icon: Gift },
   { to: '/admin/settings', label: 'Settings', icon: SettingsIcon },
@@ -96,6 +100,7 @@ const employeeNav = [
   { to: '/me/incentives', label: 'My incentives', icon: CircleDollarSign },
   { to: '/me/performance', label: 'My performance', icon: Sparkles },
   { to: '/me/pip', label: 'Performance plan', icon: TrendingDown },
+  { to: '/me/grievances', label: 'Grievances', icon: ShieldAlert },
   { to: '/me/overview', label: 'My space', icon: Home },
 ]
 
@@ -146,6 +151,7 @@ export default function App() {
         <Route path="/admin/fnf" element={<FnfListPage />} />
         <Route path="/admin/fnf/:id" element={<FnfDetailPage />} />
         <Route path="/admin/pips" element={<PipsPage />} />
+        <Route path="/admin/grievances" element={<GrievancesPage />} />
         <Route path="/admin/employees/:id/snapshot" element={<EmployeeSnapshotPage />} />
         <Route path="/admin/notifications" element={<NotificationsPage />} />
       </Route>
@@ -167,6 +173,7 @@ export default function App() {
         <Route path="/me/incentives" element={<MyIncentivesPage />} />
         <Route path="/me/performance" element={<MyPerformancePage />} />
         <Route path="/me/pip" element={<MyPipPage />} />
+        <Route path="/me/grievances" element={<MyGrievancesPage />} />
         <Route path="/me/notifications" element={<NotificationsPage />} />
       </Route>
 
