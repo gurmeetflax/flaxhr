@@ -41,6 +41,10 @@ export default function LeavePage() {
       toast.error('End date must be on or after the start date.')
       return
     }
+    if (!reason.trim()) {
+      toast.error('Please enter a reason.')
+      return
+    }
     try {
       await submit.mutateAsync({
         leave_type_id: typeId,
@@ -124,11 +128,12 @@ export default function LeavePage() {
               </select>
               <textarea
                 className="min-h-[60px] rounded-lg border border-border bg-surface p-3 text-sm"
-                placeholder="Reason (optional)"
+                placeholder="Reason (required)"
                 value={reason}
                 onChange={(e) => setReason(e.target.value)}
+                required
               />
-              <Button type="submit" loading={submit.isPending} disabled={!typeId}>Submit request</Button>
+              <Button type="submit" loading={submit.isPending} disabled={!typeId || !reason.trim()}>Submit request</Button>
             </form>
           </CardContent>
         </Card>

@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { toast } from 'sonner'
-import { Bell, Briefcase, Camera, Pencil, Plus, Trash2 } from 'lucide-react'
+import { Bell, Briefcase, Camera, MessageCircle, Pencil, Plus, Trash2 } from 'lucide-react'
 import { PageHeader } from '@/components/layout/AppShell'
 import { Card, CardContent, CardDescription, CardTitle } from '@/components/ui/Card'
 import { Input } from '@/components/ui/Input'
@@ -24,6 +24,7 @@ export default function SettingsPage() {
       <div className="flex flex-col gap-4">
         <SelfieRequiredCard />
         <NotificationEmailCard />
+        <HrWhatsAppCard />
         <DesignationsCard />
       </div>
     </>
@@ -105,6 +106,74 @@ function NotificationEmailCard() {
           onChange={onToggle}
           ariaLabel="Toggle notification emails"
         />
+      </CardContent>
+    </Card>
+  )
+}
+
+function HrWhatsAppCard() {
+  const { data: number = '' } = useAppSetting<string>('hr_whatsapp_number', '')
+  const { data: prefill = 'Hi HR, ' } = useAppSetting<string>(
+    'hr_whatsapp_default_message',
+    'Hi HR, ',
+  )
+  const setting = useSetAppSetting()
+  const [num, setNum] = useState(number)
+  const [pre, setPre] = useState(prefill)
+
+  // When the queried defaults arrive, mirror them once.
+  if (num === '' && number) setNum(number)
+  if (pre === 'Hi HR, ' && prefill && prefill !== pre) setPre(prefill)
+
+  async function save() {
+    try {
+      await setting.mutateAsync({ key: 'hr_whatsapp_number', value: num.trim() })
+      await setting.mutateAsync({ key: 'hr_whatsapp_default_message', value: pre })
+      toast.success('Saved')
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : 'Could not save')
+    }
+  }
+
+  return (
+    <Card>
+      <CardContent className="flex flex-col gap-3 p-6">
+        <div className="flex items-start gap-3">
+          <span className="grid h-10 w-10 place-items-center rounded-lg bg-primary/10 text-primary">
+            <MessageCircle className="h-5 w-5" />
+          </span>
+          <div className="flex-1">
+            <CardTitle>HR WhatsApp</CardTitle>
+            <CardDescription className="mt-1">
+              Drives the floating chat button on /me. Use full international format,
+              e.g. <span className="font-mono">+919876543210</span>. Leave blank to hide the button.
+            </CardDescription>
+          </div>
+        </div>
+        <div className="grid gap-3 sm:grid-cols-2">
+          <div>
+            <Label className="mb-1 block text-xs">Number</Label>
+            <Input
+              type="tel"
+              value={num}
+              onChange={(e) => setNum(e.target.value)}
+              placeholder="+91…"
+            />
+          </div>
+          <div>
+            <Label className="mb-1 block text-xs">Default message</Label>
+            <Input
+              value={pre}
+              onChange={(e) => setPre(e.target.value)}
+              placeholder="Hi HR, "
+            />
+          </div>
+        </div>
+        <div>
+          <Button size="sm" onClick={save} loading={setting.isPending}>
+            Save
+          </Button>
+        </div>
       </CardContent>
     </Card>
   )
