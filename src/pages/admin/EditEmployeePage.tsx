@@ -10,13 +10,21 @@ import { Input } from '@/components/ui/Input'
 import { Button } from '@/components/ui/Button'
 import { isValidEmail } from '@/lib/identity'
 import { useDesignations } from '@/lib/designations'
+import {
+  getSignedKycUrl,
+  useUpdateKycLast4,
+  useUploadKyc,
+  useVerifyKyc,
+  type KycKind,
+  type KycStatus,
+} from '@/lib/kyc'
 
 interface Employee {
   id: string
   employee_code: string
   full_name: string
   phone: string | null
-  work_email: string | null
+  personal_email: string | null
   outlet_id: string | null
   is_active: boolean
   hired_on: string | null
@@ -28,6 +36,13 @@ interface Employee {
   address: string | null
   emergency_contact_name: string | null
   emergency_contact_phone: string | null
+  home_lat: number | null
+  home_lng: number | null
+  aadhaar_last4: string | null
+  pan_last4: string | null
+  kyc_status: 'pending' | 'submitted' | 'verified' | 'rejected'
+  kyc_verified_at: string | null
+  kyc_notes: string | null
 }
 
 interface OutletOption {
@@ -47,7 +62,7 @@ export default function EditEmployeePage() {
       const { data, error } = await supabase
         .from('v_employees')
         .select(
-          'id, employee_code, full_name, phone, work_email, outlet_id, is_active, hired_on, monthly_salary, exit_date, exit_reason, designation_code, date_of_birth, address, emergency_contact_name, emergency_contact_phone',
+          'id, employee_code, full_name, phone, personal_email, outlet_id, is_active, hired_on, monthly_salary, exit_date, exit_reason, designation_code, date_of_birth, address, emergency_contact_name, emergency_contact_phone, home_lat, home_lng, aadhaar_last4, pan_last4, kyc_status, kyc_verified_at, kyc_notes',
         )
         .eq('id', id)
         .maybeSingle()
@@ -73,7 +88,7 @@ export default function EditEmployeePage() {
 
   const [fullName, setFullName] = useState('')
   const [phone, setPhone] = useState('')
-  const [workEmail, setWorkEmail] = useState('')
+  const [personalEmail, setPersonalEmail] = useState('')
   const [outletId, setOutletId] = useState('')
   const [isActive, setIsActive] = useState(true)
   const [monthlySalary, setMonthlySalary] = useState('')
@@ -84,6 +99,8 @@ export default function EditEmployeePage() {
   const [address, setAddress] = useState('')
   const [emergencyName, setEmergencyName] = useState('')
   const [emergencyPhone, setEmergencyPhone] = useState('')
+  const [homeLat, setHomeLat] = useState('')
+  const [homeLng, setHomeLng] = useState('')
   const [err, setErr] = useState<string | null>(null)
 
   useEffect(() => {
@@ -91,7 +108,7 @@ export default function EditEmployeePage() {
     const e = employeeQ.data
     setFullName(e.full_name ?? '')
     setPhone(e.phone ?? '')
-    setWorkEmail(e.work_email ?? '')
+    setPersonalEmail(e.personal_email ?? '')
     setOutletId(e.outlet_id ?? '')
     setIsActive(e.is_active)
     setMonthlySalary(e.monthly_salary != null ? String(e.monthly_salary) : '')
@@ -102,6 +119,8 @@ export default function EditEmployeePage() {
     setAddress(e.address ?? '')
     setEmergencyName(e.emergency_contact_name ?? '')
     setEmergencyPhone(e.emergency_contact_phone ?? '')
+    setHomeLat(e.home_lat != null ? String(e.home_lat) : '')
+    setHomeLng(e.home_lng != null ? String(e.home_lng) : '')
   }, [employeeQ.data])
 
   const save = useMutation({
@@ -109,7 +128,7 @@ export default function EditEmployeePage() {
       if (!id) throw new Error('No employee id')
       const cleanName = fullName.trim().replace(/\s+/g, ' ')
       const cleanPhone = phone.trim().replace(/\s+/g, '') || null
-      const cleanEmail = workEmail.trim().toLowerCase() || null
+      const cleanEmail = personalEmail.trim().toLowerCase() || null
 
       const salaryNum = monthlySalary.trim() === '' ? null : Number(monthlySalary)
       if (salaryNum != null && (Number.isNaN(salaryNum) || salaryNum < 0)) {
@@ -118,7 +137,7 @@ export default function EditEmployeePage() {
       const patch = {
         full_name: cleanName,
         phone: cleanPhone,
-        work_email: cleanEmail,
+        personal_email: cleanEmail,
         outlet_id: outletId || null,
         is_active: isActive,
         monthly_salary: salaryNum,
@@ -129,6 +148,8 @@ export default function EditEmployeePage() {
         address: address.trim() || null,
         emergency_contact_name: emergencyName.trim() || null,
         emergency_contact_phone: emergencyPhone.trim() || null,
+        home_lat: homeLat.trim() === '' ? null : Number(homeLat),
+        home_lng: homeLng.trim() === '' ? null : Number(homeLng),
       }
       const { error } = await supabase
         .schema('core' as never)
@@ -139,8 +160,8 @@ export default function EditEmployeePage() {
         if (error.code === '23505') {
           if (error.message.includes('phone'))
             throw new Error('That phone number is already in use.')
-          if (error.message.includes('work_email'))
-            throw new Error('That work email is already in use.')
+          if (error.message.includes('personal_email'))
+            throw new Error('That email is already in use.')
         }
         throw error
       }
@@ -161,8 +182,8 @@ export default function EditEmployeePage() {
     e.preventDefault()
     setErr(null)
     if (!fullName.trim()) return setErr('Full name is required.')
-    if (workEmail.trim() && !isValidEmail(workEmail.trim())) {
-      return setErr('Work email looks invalid.')
+    if (personalEmail.trim() && !isValidEmail(personalEmail.trim())) {
+      return setErr('Personal email looks invalid.')
     }
     if (!outletId) return setErr('Select an outlet.')
     save.mutate()
@@ -218,11 +239,11 @@ export default function EditEmployeePage() {
                 placeholder="+91…"
               />
             </Field>
-            <Field label="Work email">
+            <Field label="Personal email">
               <Input
                 type="email"
-                value={workEmail}
-                onChange={(ev) => setWorkEmail(ev.target.value)}
+                value={personalEmail}
+                onChange={(ev) => setPersonalEmail(ev.target.value)}
                 placeholder="firstname@flaxitup.com"
               />
             </Field>
@@ -312,6 +333,60 @@ export default function EditEmployeePage() {
               />
             </Field>
 
+            <div className="sm:col-span-2 grid gap-2 rounded-lg border border-border bg-muted/30 p-3">
+              <div className="flex items-center justify-between gap-2">
+                <Label>Home location</Label>
+                <button
+                  type="button"
+                  onClick={() => {
+                    if (!('geolocation' in navigator)) return
+                    navigator.geolocation.getCurrentPosition(
+                      (pos) => {
+                        setHomeLat(pos.coords.latitude.toFixed(6))
+                        setHomeLng(pos.coords.longitude.toFixed(6))
+                        toast.success('Captured location')
+                      },
+                      (err) => toast.error(err.message),
+                      { enableHighAccuracy: true, timeout: 10000 },
+                    )
+                  }}
+                  className="text-xs text-primary hover:underline"
+                >
+                  📍 Use my current location
+                </button>
+              </div>
+              <div className="grid gap-2 sm:grid-cols-2">
+                <Input
+                  type="number"
+                  step="any"
+                  inputMode="decimal"
+                  value={homeLat}
+                  onChange={(ev) => setHomeLat(ev.target.value)}
+                  placeholder="Latitude (e.g. 12.9716)"
+                />
+                <Input
+                  type="number"
+                  step="any"
+                  inputMode="decimal"
+                  value={homeLng}
+                  onChange={(ev) => setHomeLng(ev.target.value)}
+                  placeholder="Longitude (e.g. 77.5946)"
+                />
+              </div>
+              {homeLat && homeLng ? (
+                <a
+                  href={`https://www.openstreetmap.org/?mlat=${homeLat}&mlon=${homeLng}#map=16/${homeLat}/${homeLng}`}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="text-xs text-primary hover:underline"
+                >
+                  Open in map
+                </a>
+              ) : null}
+            </div>
+
+            {employeeQ.data ? <KycCard employee={employeeQ.data} /> : null}
+
             <div className="space-y-2 sm:col-span-2">
               <Label>Status</Label>
               <label className="flex items-center gap-2 text-sm">
@@ -346,6 +421,201 @@ export default function EditEmployeePage() {
 
       <ResetPinCard employeeId={e.id} />
     </>
+  )
+}
+
+function KycCard({ employee }: { employee: Employee }) {
+  const upload = useUploadKyc()
+  const verify = useVerifyKyc()
+  const updateLast4 = useUpdateKycLast4()
+
+  const [aadhaarLast4, setAadhaarLast4] = useState(employee.aadhaar_last4 ?? '')
+  const [panLast4, setPanLast4] = useState(employee.pan_last4 ?? '')
+  const [notes, setNotes] = useState(employee.kyc_notes ?? '')
+
+  useEffect(() => {
+    setAadhaarLast4(employee.aadhaar_last4 ?? '')
+    setPanLast4(employee.pan_last4 ?? '')
+    setNotes(employee.kyc_notes ?? '')
+  }, [employee.id, employee.aadhaar_last4, employee.pan_last4, employee.kyc_notes])
+
+  async function onUpload(kind: KycKind, file: File | null) {
+    if (!file) return
+    try {
+      await upload.mutateAsync({ employee_id: employee.id, kind, file })
+      toast.success(`${kind.toUpperCase()} uploaded`)
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : 'Upload failed')
+    }
+  }
+
+  async function onView(kind: KycKind) {
+    try {
+      const url = await getSignedKycUrl(employee.id, kind, 60)
+      if (!url) {
+        toast.error('No document on file')
+        return
+      }
+      window.open(url, '_blank')
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : 'Could not get URL')
+    }
+  }
+
+  async function onVerify(status: KycStatus) {
+    try {
+      await verify.mutateAsync({ employee_id: employee.id, status, notes: notes.trim() || undefined })
+      toast.success(`KYC ${status}`)
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : 'Could not save')
+    }
+  }
+
+  async function onSaveLast4() {
+    const a = aadhaarLast4.trim()
+    const p = panLast4.trim().toUpperCase()
+    if (a && !/^[0-9]{4}$/.test(a)) {
+      toast.error('Aadhaar last-4 must be 4 digits')
+      return
+    }
+    if (p && !/^[A-Z0-9]{4}$/.test(p)) {
+      toast.error('PAN last-4 must be 4 alphanumeric chars')
+      return
+    }
+    try {
+      await updateLast4.mutateAsync({
+        employee_id: employee.id,
+        aadhaar_last4: a || null,
+        pan_last4: p || null,
+      })
+      toast.success('Saved')
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : 'Could not save')
+    }
+  }
+
+  return (
+    <div className="sm:col-span-2 grid gap-3 rounded-lg border border-border bg-muted/30 p-3">
+      <div className="flex items-center justify-between gap-2">
+        <Label>KYC</Label>
+        <KycStatusPill status={employee.kyc_status} />
+      </div>
+
+      <div className="grid gap-3 sm:grid-cols-2">
+        <KycRow
+          kind="aadhaar"
+          label="Aadhaar"
+          last4={aadhaarLast4}
+          setLast4={setAadhaarLast4}
+          onUpload={(f) => onUpload('aadhaar', f)}
+          onView={() => onView('aadhaar')}
+        />
+        <KycRow
+          kind="pan"
+          label="PAN"
+          last4={panLast4}
+          setLast4={setPanLast4}
+          onUpload={(f) => onUpload('pan', f)}
+          onView={() => onView('pan')}
+        />
+      </div>
+
+      <Input
+        value={notes}
+        onChange={(e) => setNotes(e.target.value)}
+        placeholder="Verification notes (optional)"
+      />
+
+      <div className="flex flex-wrap items-center gap-2">
+        <Button type="button" size="sm" variant="outline" onClick={onSaveLast4}>
+          Save last-4
+        </Button>
+        <Button
+          type="button"
+          size="sm"
+          onClick={() => onVerify('verified')}
+          loading={verify.isPending}
+        >
+          Mark verified
+        </Button>
+        <Button
+          type="button"
+          size="sm"
+          variant="ghost"
+          onClick={() => onVerify('rejected')}
+          className="text-destructive hover:text-destructive"
+        >
+          Reject
+        </Button>
+        {employee.kyc_verified_at ? (
+          <span className="text-xs text-muted-foreground">
+            Verified {new Date(employee.kyc_verified_at).toLocaleDateString()}
+          </span>
+        ) : null}
+      </div>
+    </div>
+  )
+}
+
+function KycRow({
+  label,
+  last4,
+  setLast4,
+  onUpload,
+  onView,
+}: {
+  kind: KycKind
+  label: string
+  last4: string
+  setLast4: (s: string) => void
+  onUpload: (file: File) => void
+  onView: () => void
+}) {
+  return (
+    <div className="rounded border border-border bg-surface p-3">
+      <div className="mb-2 text-xs font-medium uppercase tracking-wide text-muted-foreground">
+        {label}
+      </div>
+      <Input
+        value={last4}
+        onChange={(e) => setLast4(e.target.value)}
+        placeholder="Last 4 digits"
+        maxLength={4}
+        className="mb-2"
+      />
+      <div className="flex flex-wrap items-center gap-2 text-sm">
+        <label className="cursor-pointer text-primary hover:underline">
+          <input
+            type="file"
+            accept="image/jpeg,image/png,image/webp,application/pdf"
+            className="hidden"
+            onChange={(e) => {
+              const f = e.target.files?.[0]
+              if (f) onUpload(f)
+              e.target.value = ''
+            }}
+          />
+          Upload file
+        </label>
+        <button type="button" onClick={onView} className="text-primary hover:underline">
+          View
+        </button>
+      </div>
+    </div>
+  )
+}
+
+function KycStatusPill({ status }: { status: 'pending' | 'submitted' | 'verified' | 'rejected' }) {
+  const map: Record<string, string> = {
+    pending: 'bg-muted text-muted-foreground',
+    submitted: 'bg-warning/10 text-warning',
+    verified: 'bg-primary/10 text-primary',
+    rejected: 'bg-destructive/10 text-destructive',
+  }
+  return (
+    <span className={'rounded-full px-2 py-0.5 text-xs font-medium ' + (map[status] ?? map.pending)}>
+      {status}
+    </span>
   )
 }
 

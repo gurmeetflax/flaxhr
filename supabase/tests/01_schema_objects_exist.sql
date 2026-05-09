@@ -77,7 +77,10 @@ begin
     'public.mark_notification_read(uuid)',
     'public.mark_all_notifications_read()',
     'public.upsert_my_notification_prefs(boolean,boolean,text[])',
-    'public.run_birthdays_today()'
+    'public.run_birthdays_today()',
+    'public.set_kyc_document(text,text)',
+    'public.verify_kyc(uuid,text,text)',
+    'public.signed_kyc_url(uuid,text,integer)'
   ]) loop
     if to_regprocedure(fn) is null then
       missing := missing || fn;

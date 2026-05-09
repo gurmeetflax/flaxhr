@@ -118,7 +118,7 @@ export interface BirthdayTodayRow {
   employee_id: string
   employee_code: string
   full_name: string
-  work_email: string | null
+  personal_email: string | null
   outlet_id: string | null
   date_of_birth: string
 }
@@ -129,7 +129,7 @@ export function useBirthdaysToday() {
     queryFn: async () => {
       const { data, error } = await supabase
         .from('v_birthday_today')
-        .select('employee_id, employee_code, full_name, work_email, outlet_id, date_of_birth')
+        .select('employee_id, employee_code, full_name, personal_email, outlet_id, date_of_birth')
       if (error) throw error
       return (data ?? []) as BirthdayTodayRow[]
     },

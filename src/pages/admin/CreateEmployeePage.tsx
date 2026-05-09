@@ -38,7 +38,7 @@ export default function CreateEmployeePage() {
 
   const [fullName, setFullName] = useState('')
   const [phone, setPhone] = useState('')
-  const [workEmail, setWorkEmail] = useState('')
+  const [personalEmail, setPersonalEmail] = useState('')
   const [outletId, setOutletId] = useState('')
   const [designationCode, setDesignationCode] = useState('')
   const [pin, setPin] = useState('')
@@ -63,7 +63,7 @@ export default function CreateEmployeePage() {
       return
     }
 
-    const cleanEmail = workEmail.trim().toLowerCase()
+    const cleanEmail = personalEmail.trim().toLowerCase()
     if (cleanEmail && !isValidEmail(cleanEmail)) {
       setErr('Work email looks invalid.')
       return
@@ -77,12 +77,12 @@ export default function CreateEmployeePage() {
       // Pre-submit dup check across name, phone, email.
       const filters: string[] = [`full_name.ilike.${cleanName}`]
       if (cleanPhone) filters.push(`phone.eq.${cleanPhone}`)
-      if (cleanEmail) filters.push(`work_email.ilike.${cleanEmail}`)
+      if (cleanEmail) filters.push(`personal_email.ilike.${cleanEmail}`)
 
       const { data: existing, error: lookupErr } = await supabase
         .schema('core' as never)
         .from('employees')
-        .select('id, full_name, phone, work_email, employee_code')
+        .select('id, full_name, phone, personal_email, employee_code')
         .or(filters.join(','))
         .is('deleted_at', null)
       if (lookupErr) throw lookupErr
@@ -103,7 +103,7 @@ export default function CreateEmployeePage() {
       }
       const dupEmail =
         cleanEmail &&
-        existing?.find((e) => (e.work_email ?? '').toLowerCase() === cleanEmail)
+        existing?.find((e) => (e.personal_email ?? '').toLowerCase() === cleanEmail)
       if (dupEmail) {
         setErr(`That work email is already in use by ${dupEmail.employee_code}.`)
         setBusy(false)
@@ -135,7 +135,7 @@ export default function CreateEmployeePage() {
           user_id: userId,
           full_name: cleanName,
           phone: cleanPhone,
-          work_email: cleanEmail || null,
+          personal_email: cleanEmail || null,
           outlet_id: outletId,
           designation_code: designationCode || null,
           date_of_birth: dob || null,
@@ -145,8 +145,8 @@ export default function CreateEmployeePage() {
           if (empErr.message.includes('phone')) {
             throw new Error('That phone number is already in use.')
           }
-          if (empErr.message.includes('work_email')) {
-            throw new Error('That work email is already in use.')
+          if (empErr.message.includes('personal_email')) {
+            throw new Error('That email is already in use.')
           }
         }
         throw empErr
@@ -195,11 +195,11 @@ export default function CreateEmployeePage() {
                 placeholder="+91…"
               />
             </Field>
-            <Field label="Work email">
+            <Field label="Personal email">
               <Input
                 type="email"
-                value={workEmail}
-                onChange={(e) => setWorkEmail(e.target.value)}
+                value={personalEmail}
+                onChange={(e) => setPersonalEmail(e.target.value)}
                 placeholder="firstname@flaxitup.com"
               />
             </Field>

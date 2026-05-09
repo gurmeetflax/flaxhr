@@ -117,7 +117,7 @@ function BirthdaysTodayCard() {
                   <span className="font-medium">{r.full_name}</span>{' '}
                   <span className="font-mono text-xs text-muted-foreground">{r.employee_code}</span>
                 </span>
-                <span className="text-xs text-muted-foreground">{r.work_email ?? '—'}</span>
+                <span className="text-xs text-muted-foreground">{r.personal_email ?? '—'}</span>
               </li>
             ))}
           </ul>

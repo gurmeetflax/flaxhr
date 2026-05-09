@@ -9,7 +9,7 @@ import { employeeCodeToEmail, isValidEmail } from '@/lib/identity'
  */
 export const BULK_COLUMNS = [
   'full_name',
-  'work_email',
+  'personal_email',
   'phone',
   'outlet_id',
   'designation_code',
@@ -23,7 +23,7 @@ export type BulkColumn = (typeof BULK_COLUMNS)[number]
 export interface RawRow {
   rowIndex: number
   full_name: string
-  work_email: string
+  personal_email: string
   phone: string
   outlet_id: string
   designation_code: string
@@ -64,10 +64,14 @@ export function parseCsv(text: string): RawRow[] {
       throw new Error(`Missing required column "${r}". See the template.`)
     }
   }
+  // Back-compat: accept the legacy `work_email` header for one cycle.
+  if (!headers.includes('personal_email') && headers.includes('work_email')) {
+    console.warn('[bulkEmployees] CSV uses legacy "work_email" header — please rename to "personal_email".')
+  }
   return (result.data ?? []).map((row, i) => ({
     rowIndex: i + 2, // +2 for header row + 1-based
     full_name: (row.full_name ?? '').trim(),
-    work_email: (row.work_email ?? '').trim().toLowerCase(),
+    personal_email: (row.personal_email ?? row.work_email ?? '').trim().toLowerCase(),
     phone: (row.phone ?? '').trim().replace(/\s+/g, ''),
     outlet_id: (row.outlet_id ?? '').trim(),
     designation_code: (row.designation_code ?? '').trim().toLowerCase(),
@@ -99,12 +103,12 @@ export function validateRows(rows: RawRow[], ctx: ValidateContext): ValidatedRow
       errors.push(`outlet_id "${r.outlet_id}" not found`)
     if (r.designation_code && !ctx.validDesignationCodes.has(r.designation_code))
       errors.push(`designation_code "${r.designation_code}" not found`)
-    if (r.work_email) {
-      if (!isValidEmail(r.work_email)) errors.push('work_email looks invalid')
-      else if (seenEmails.has(r.work_email)) errors.push('duplicate work_email in this CSV')
-      else if (ctx.existingEmails.has(r.work_email))
-        errors.push('work_email already exists in DB')
-      seenEmails.add(r.work_email)
+    if (r.personal_email) {
+      if (!isValidEmail(r.personal_email)) errors.push('personal_email looks invalid')
+      else if (seenEmails.has(r.personal_email)) errors.push('duplicate personal_email in this CSV')
+      else if (ctx.existingEmails.has(r.personal_email))
+        errors.push('personal_email already exists in DB')
+      seenEmails.add(r.personal_email)
     }
     if (r.phone) {
       if (seenPhones.has(r.phone)) errors.push('duplicate phone in this CSV')
@@ -133,7 +137,7 @@ export async function fetchValidationContext(): Promise<ValidateContext> {
     supabase
       .schema('core' as never)
       .from('employees')
-      .select('phone, work_email')
+      .select('phone, personal_email')
       .is('deleted_at', null),
     supabase.from('v_designations').select('code').eq('is_active', true),
   ])
@@ -146,9 +150,9 @@ export async function fetchValidationContext(): Promise<ValidateContext> {
   )
   const existingPhones = new Set<string>()
   const existingEmails = new Set<string>()
-  for (const e of (employeesRes.data ?? []) as Array<{ phone: string | null; work_email: string | null }>) {
+  for (const e of (employeesRes.data ?? []) as Array<{ phone: string | null; personal_email: string | null }>) {
     if (e.phone) existingPhones.add(e.phone)
-    if (e.work_email) existingEmails.add(e.work_email.toLowerCase())
+    if (e.personal_email) existingEmails.add(e.personal_email.toLowerCase())
   }
   return { validOutletIds, validDesignationCodes, existingPhones, existingEmails }
 }
@@ -195,7 +199,7 @@ export async function importOne(row: ValidatedRow): Promise<ImportedRow> {
         user_id: userId,
         full_name: row.full_name.replace(/\s+/g, ' '),
         phone: row.phone || null,
-        work_email: row.work_email || null,
+        personal_email: row.personal_email || null,
         outlet_id: row.outlet_id,
         designation_code: row.designation_code || null,
         hired_on: row.hired_on || null,
@@ -226,7 +230,7 @@ export function resultsToCsv(results: ImportedRow[]): string {
       employee_code: r.employee_code ?? '',
       pin: r.pin ?? '',
       outlet_id: r.outlet_id,
-      work_email: r.work_email,
+      personal_email: r.personal_email,
       phone: r.phone,
     })),
   )
