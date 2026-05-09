@@ -121,6 +121,7 @@ with (security_invoker = true) as
          e.personal_email, e.phone, e.outlet_id, e.is_active,
          e.hired_on, e.created_at, e.updated_at,
          e.monthly_salary, e.exit_date, e.exit_reason,
+         e.designation_code,
          e.date_of_birth, e.address,
          e.emergency_contact_name, e.emergency_contact_phone,
          e.home_lat, e.home_lng,

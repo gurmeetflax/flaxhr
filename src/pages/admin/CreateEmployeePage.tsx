@@ -43,6 +43,15 @@ export default function CreateEmployeePage() {
   const [designationCode, setDesignationCode] = useState('')
   const [pin, setPin] = useState('')
   const [dob, setDob] = useState('')
+  const [hiredOn, setHiredOn] = useState('')
+  const [monthlySalary, setMonthlySalary] = useState('')
+  const [address, setAddress] = useState('')
+  const [emergencyName, setEmergencyName] = useState('')
+  const [emergencyPhone, setEmergencyPhone] = useState('')
+  const [homeLat, setHomeLat] = useState('')
+  const [homeLng, setHomeLng] = useState('')
+  const [aadhaarLast4, setAadhaarLast4] = useState('')
+  const [panLast4, setPanLast4] = useState('')
   const [err, setErr] = useState<string | null>(null)
   const [busy, setBusy] = useState(false)
 
@@ -65,7 +74,28 @@ export default function CreateEmployeePage() {
 
     const cleanEmail = personalEmail.trim().toLowerCase()
     if (cleanEmail && !isValidEmail(cleanEmail)) {
-      setErr('Work email looks invalid.')
+      setErr('Personal email looks invalid.')
+      return
+    }
+    const aClean = aadhaarLast4.trim()
+    if (aClean && !/^[0-9]{4}$/.test(aClean)) {
+      setErr('Aadhaar last-4 must be 4 digits.')
+      return
+    }
+    const pClean = panLast4.trim().toUpperCase()
+    if (pClean && !/^[A-Z0-9]{4}$/.test(pClean)) {
+      setErr('PAN last-4 must be 4 alphanumeric chars.')
+      return
+    }
+    const salaryNum = monthlySalary.trim() === '' ? null : Number(monthlySalary)
+    if (salaryNum != null && (Number.isNaN(salaryNum) || salaryNum < 0)) {
+      setErr('Monthly salary must be a non-negative number.')
+      return
+    }
+    const latNum = homeLat.trim() === '' ? null : Number(homeLat)
+    const lngNum = homeLng.trim() === '' ? null : Number(homeLng)
+    if ((latNum != null && Number.isNaN(latNum)) || (lngNum != null && Number.isNaN(lngNum))) {
+      setErr('Home lat/lng must be numbers.')
       return
     }
 
@@ -139,6 +169,15 @@ export default function CreateEmployeePage() {
           outlet_id: outletId,
           designation_code: designationCode || null,
           date_of_birth: dob || null,
+          hired_on: hiredOn || null,
+          monthly_salary: salaryNum,
+          address: address.trim() || null,
+          emergency_contact_name: emergencyName.trim() || null,
+          emergency_contact_phone: emergencyPhone.trim() || null,
+          home_lat: latNum,
+          home_lng: lngNum,
+          aadhaar_last4: aClean || null,
+          pan_last4: pClean || null,
         })
       if (empErr) {
         if (empErr.code === '23505') {
@@ -250,6 +289,111 @@ export default function CreateEmployeePage() {
                 max={new Date().toISOString().slice(0, 10)}
               />
             </Field>
+            <Field label="Hired on">
+              <Input
+                type="date"
+                value={hiredOn}
+                onChange={(e) => setHiredOn(e.target.value)}
+                max={new Date().toISOString().slice(0, 10)}
+              />
+            </Field>
+            <Field label="Monthly salary (₹)">
+              <Input
+                type="number"
+                inputMode="decimal"
+                min={0}
+                step="0.01"
+                value={monthlySalary}
+                onChange={(e) => setMonthlySalary(e.target.value)}
+                placeholder="e.g. 25000"
+              />
+            </Field>
+            <div className="sm:col-span-2">
+              <Label className="mb-1 block">Address</Label>
+              <Input
+                value={address}
+                onChange={(e) => setAddress(e.target.value)}
+                placeholder="Street, area, city"
+              />
+            </div>
+            <Field label="Emergency contact name">
+              <Input
+                value={emergencyName}
+                onChange={(e) => setEmergencyName(e.target.value)}
+                placeholder="Full name"
+              />
+            </Field>
+            <Field label="Emergency contact phone">
+              <Input
+                type="tel"
+                value={emergencyPhone}
+                onChange={(e) => setEmergencyPhone(e.target.value)}
+                placeholder="+91…"
+              />
+            </Field>
+
+            <div className="sm:col-span-2 grid gap-2 rounded-lg border border-border bg-muted/30 p-3">
+              <div className="flex items-center justify-between gap-2">
+                <Label>Home location</Label>
+                <button
+                  type="button"
+                  onClick={() => {
+                    if (!('geolocation' in navigator)) return
+                    navigator.geolocation.getCurrentPosition(
+                      (pos) => {
+                        setHomeLat(pos.coords.latitude.toFixed(6))
+                        setHomeLng(pos.coords.longitude.toFixed(6))
+                      },
+                      () => {},
+                      { enableHighAccuracy: true, timeout: 10000 },
+                    )
+                  }}
+                  className="text-xs text-primary hover:underline"
+                >
+                  📍 Use my current location
+                </button>
+              </div>
+              <div className="grid gap-2 sm:grid-cols-2">
+                <Input
+                  type="number"
+                  step="any"
+                  inputMode="decimal"
+                  value={homeLat}
+                  onChange={(e) => setHomeLat(e.target.value)}
+                  placeholder="Latitude"
+                />
+                <Input
+                  type="number"
+                  step="any"
+                  inputMode="decimal"
+                  value={homeLng}
+                  onChange={(e) => setHomeLng(e.target.value)}
+                  placeholder="Longitude"
+                />
+              </div>
+            </div>
+
+            <Field label="Aadhaar last-4">
+              <Input
+                inputMode="numeric"
+                pattern="[0-9]*"
+                maxLength={4}
+                value={aadhaarLast4}
+                onChange={(e) => setAadhaarLast4(e.target.value.replace(/\D/g, ''))}
+                placeholder="1234"
+              />
+            </Field>
+            <Field label="PAN last-4">
+              <Input
+                maxLength={4}
+                value={panLast4}
+                onChange={(e) => setPanLast4(e.target.value.toUpperCase())}
+                placeholder="AB12"
+              />
+            </Field>
+            <p className="sm:col-span-2 text-xs text-muted-foreground">
+              KYC document uploads (Aadhaar/PAN files) happen on the Edit page after creation.
+            </p>
 
             {err ? (
               <p className="sm:col-span-2 text-sm text-destructive">{err}</p>
