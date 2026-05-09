@@ -11,6 +11,7 @@ import { Button } from '@/components/ui/Button'
 import { employeeCodeToEmail, isValidEmail } from '@/lib/identity'
 import { useDesignations } from '@/lib/designations'
 import { uploadKycFile } from '@/lib/kyc'
+import { useAppSetting } from '@/lib/appSettings'
 
 interface Outlet {
   id: string
@@ -56,6 +57,12 @@ export default function CreateEmployeePage() {
   const [panLast4, setPanLast4] = useState('')
   const [aadhaarFile, setAadhaarFile] = useState<File | null>(null)
   const [panFile, setPanFile] = useState<File | null>(null)
+  const [uniformAmount, setUniformAmount] = useState('')
+  const { data: defaultUniformMonths = 2 } = useAppSetting<number>(
+    'uniform_default_recovery_months',
+    2,
+  )
+  const [uniformMonths, setUniformMonths] = useState('')
   const [err, setErr] = useState<string | null>(null)
   const [busy, setBusy] = useState(false)
 
@@ -211,7 +218,31 @@ export default function CreateEmployeePage() {
         .insert({ user_id: userId, role: 'employee', outlet_id: outletId })
       if (roleErr) throw roleErr
 
-      // 5. Best-effort KYC uploads. Failures don't block creation.
+      // 5. Optional uniform deduction. Total amount + months.
+      const uniformTotal = uniformAmount.trim() === '' ? null : Number(uniformAmount)
+      const monthsParsed = uniformMonths.trim() === '' ? Number(defaultUniformMonths) : Number(uniformMonths)
+      if (uniformTotal != null && (Number.isNaN(uniformTotal) || uniformTotal <= 0)) {
+        toast.error('Uniform amount must be a positive number')
+      } else if (uniformTotal != null && (Number.isNaN(monthsParsed) || monthsParsed < 1)) {
+        toast.error('Uniform recovery months must be at least 1')
+      } else if (uniformTotal != null && empRow?.id) {
+        const monthly = Math.round((uniformTotal / monthsParsed) * 100) / 100
+        const { error: dedErr } = await supabase
+          .schema('core' as never)
+          .from('deductions')
+          .insert({
+            employee_id: empRow.id,
+            kind: 'uniform',
+            total_amount: uniformTotal,
+            monthly_amount: monthly,
+            months_total: monthsParsed,
+            months_remaining: monthsParsed,
+            notes: 'Uniform recovery',
+          })
+        if (dedErr) toast.error(`Uniform deduction not saved: ${dedErr.message}`)
+      }
+
+      // 6. Best-effort KYC uploads. Failures don't block creation.
       const newId = empRow?.id as string | undefined
       const kycErrors: string[] = []
       if (newId && aadhaarFile) {
@@ -443,6 +474,36 @@ export default function CreateEmployeePage() {
                 required
               />
             </Field>
+            <div className="sm:col-span-2 grid gap-2 rounded-lg border border-border bg-muted/30 p-3">
+              <Label>Uniform deduction <span className="text-xs font-normal text-muted-foreground">(optional, recovers from monthly payroll)</span></Label>
+              <div className="grid gap-2 sm:grid-cols-2">
+                <div>
+                  <Label className="mb-1 block text-xs">Total amount (₹)</Label>
+                  <Input
+                    type="number"
+                    inputMode="decimal"
+                    min={0}
+                    step="0.01"
+                    value={uniformAmount}
+                    onChange={(e) => setUniformAmount(e.target.value)}
+                    placeholder="e.g. 500"
+                  />
+                </div>
+                <div>
+                  <Label className="mb-1 block text-xs">Recover over (months)</Label>
+                  <Input
+                    type="number"
+                    inputMode="numeric"
+                    min={1}
+                    max={12}
+                    value={uniformMonths}
+                    onChange={(e) => setUniformMonths(e.target.value)}
+                    placeholder={String(defaultUniformMonths)}
+                  />
+                </div>
+              </div>
+            </div>
+
             <div className="sm:col-span-2 grid gap-2 rounded-lg border border-border bg-muted/30 p-3">
               <Label>KYC documents <span className="text-xs font-normal text-muted-foreground">(optional, can also be added later on Edit)</span></Label>
               <div className="grid gap-2 sm:grid-cols-2">
