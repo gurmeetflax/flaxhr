@@ -206,11 +206,18 @@ export default function EmployeesListPage() {
                         </span>
                       </td>
                       <td className="px-4 py-3 text-right">
-                        <Link to={`/admin/employees/${e.id}`}>
-                          <Button variant="ghost" size="sm">
-                            Edit
-                          </Button>
-                        </Link>
+                        <div className="flex justify-end gap-1">
+                          <Link to={`/admin/employees/${e.id}/snapshot`}>
+                            <Button variant="ghost" size="sm">
+                              Snapshot
+                            </Button>
+                          </Link>
+                          <Link to={`/admin/employees/${e.id}`}>
+                            <Button variant="ghost" size="sm">
+                              Edit
+                            </Button>
+                          </Link>
+                        </div>
                       </td>
                     </tr>
                   ))}

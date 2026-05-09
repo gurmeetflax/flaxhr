@@ -11,10 +11,12 @@ import {
   History,
   Home,
   ListChecks,
+  LogOut,
   Plane,
   Receipt,
   Settings as SettingsIcon,
   Store,
+  TrendingDown,
   Users,
   Wallet,
 } from 'lucide-react'
@@ -45,6 +47,11 @@ import GiftCodesPage from '@/pages/admin/GiftCodesPage'
 import PayrollPage from '@/pages/admin/PayrollPage'
 import PayrollRunPage from '@/pages/admin/PayrollRunPage'
 import PayslipPage from '@/pages/me/PayslipPage'
+import FnfListPage from '@/pages/admin/FnfListPage'
+import FnfDetailPage from '@/pages/admin/FnfDetailPage'
+import PipsPage from '@/pages/admin/PipsPage'
+import EmployeeSnapshotPage from '@/pages/admin/EmployeeSnapshotPage'
+import MyPipPage from '@/pages/me/MyPipPage'
 import ServiceChargePage from '@/pages/admin/ServiceChargePage'
 import ServiceChargeRunPage from '@/pages/admin/ServiceChargeRunPage'
 import SalesPage from '@/pages/admin/SalesPage'
@@ -70,6 +77,8 @@ const adminNav = [
   { to: '/admin/service-charge', label: 'Service charge', icon: CircleDollarSign },
   { to: '/admin/payroll', label: 'Payroll', icon: Wallet },
   { to: '/admin/evaluations', label: 'Evaluations', icon: ClipboardCheck },
+  { to: '/admin/pips', label: 'PIPs', icon: TrendingDown },
+  { to: '/admin/fnf', label: 'FnF & clearance', icon: LogOut },
   { to: '/admin/gift-codes', label: 'Birthday vouchers', icon: Gift },
   { to: '/admin/settings', label: 'Settings', icon: SettingsIcon },
 ]
@@ -81,6 +90,7 @@ const employeeNav = [
   { to: '/me/roster', label: 'My roster', icon: CalendarDays },
   { to: '/me/leave', label: 'Leave', icon: Plane },
   { to: '/me/payslips', label: 'Payslips', icon: Receipt },
+  { to: '/me/pip', label: 'Performance plan', icon: TrendingDown },
   { to: '/me/overview', label: 'My space', icon: Home },
 ]
 
@@ -128,6 +138,10 @@ export default function App() {
         <Route path="/admin/gift-codes" element={<GiftCodesPage />} />
         <Route path="/admin/payroll" element={<PayrollPage />} />
         <Route path="/admin/payroll/runs/:id" element={<PayrollRunPage />} />
+        <Route path="/admin/fnf" element={<FnfListPage />} />
+        <Route path="/admin/fnf/:id" element={<FnfDetailPage />} />
+        <Route path="/admin/pips" element={<PipsPage />} />
+        <Route path="/admin/employees/:id/snapshot" element={<EmployeeSnapshotPage />} />
         <Route path="/admin/notifications" element={<NotificationsPage />} />
       </Route>
 
@@ -145,6 +159,7 @@ export default function App() {
         <Route path="/me/leave" element={<LeavePage />} />
         <Route path="/me/overview" element={<MyDashboard />} />
         <Route path="/me/payslips" element={<PayslipPage />} />
+        <Route path="/me/pip" element={<MyPipPage />} />
         <Route path="/me/notifications" element={<NotificationsPage />} />
       </Route>
 
