@@ -15,6 +15,7 @@ export const BULK_COLUMNS = [
   'designation_code',
   'hired_on',
   'monthly_salary',
+  'date_of_birth',
 ] as const
 
 export type BulkColumn = (typeof BULK_COLUMNS)[number]
@@ -28,6 +29,7 @@ export interface RawRow {
   designation_code: string
   hired_on: string
   monthly_salary: string
+  date_of_birth: string
 }
 
 export interface ValidatedRow extends RawRow {
@@ -71,6 +73,7 @@ export function parseCsv(text: string): RawRow[] {
     designation_code: (row.designation_code ?? '').trim().toLowerCase(),
     hired_on: (row.hired_on ?? '').trim(),
     monthly_salary: (row.monthly_salary ?? '').trim(),
+    date_of_birth: (row.date_of_birth ?? '').trim(),
   }))
 }
 
@@ -110,6 +113,8 @@ export function validateRows(rows: RawRow[], ctx: ValidateContext): ValidatedRow
     }
     if (r.hired_on && !/^\d{4}-\d{2}-\d{2}$/.test(r.hired_on))
       errors.push('hired_on must be YYYY-MM-DD')
+    if (r.date_of_birth && !/^\d{4}-\d{2}-\d{2}$/.test(r.date_of_birth))
+      errors.push('date_of_birth must be YYYY-MM-DD')
     if (r.monthly_salary) {
       const n = Number(r.monthly_salary)
       if (Number.isNaN(n) || n < 0) errors.push('monthly_salary must be a non-negative number')
@@ -195,6 +200,7 @@ export async function importOne(row: ValidatedRow): Promise<ImportedRow> {
         designation_code: row.designation_code || null,
         hired_on: row.hired_on || null,
         monthly_salary: row.monthly_salary ? Number(row.monthly_salary) : null,
+        date_of_birth: row.date_of_birth || null,
       })
     if (empErr) throw empErr
 
@@ -229,6 +235,6 @@ export function resultsToCsv(results: ImportedRow[]): string {
 
 export const TEMPLATE_CSV = [
   BULK_COLUMNS.join(','),
-  'Asha Sharma,asha@flaxitup.com,9876500001,BND,cashier,2026-04-01,18000',
-  'Ravi Kumar,,9876500002,BND,helper,,15000',
+  'Asha Sharma,asha@flaxitup.com,9876500001,BND,cashier,2026-04-01,18000,1995-06-12',
+  'Ravi Kumar,,9876500002,BND,helper,,15000,',
 ].join('\n')

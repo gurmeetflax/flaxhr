@@ -42,6 +42,7 @@ export default function CreateEmployeePage() {
   const [outletId, setOutletId] = useState('')
   const [designationCode, setDesignationCode] = useState('')
   const [pin, setPin] = useState('')
+  const [dob, setDob] = useState('')
   const [err, setErr] = useState<string | null>(null)
   const [busy, setBusy] = useState(false)
 
@@ -137,6 +138,7 @@ export default function CreateEmployeePage() {
           work_email: cleanEmail || null,
           outlet_id: outletId,
           designation_code: designationCode || null,
+          date_of_birth: dob || null,
         })
       if (empErr) {
         if (empErr.code === '23505') {
@@ -238,6 +240,14 @@ export default function CreateEmployeePage() {
                 value={pin}
                 onChange={(e) => setPin(e.target.value.replace(/\D/g, ''))}
                 required
+              />
+            </Field>
+            <Field label="Date of birth">
+              <Input
+                type="date"
+                value={dob}
+                onChange={(e) => setDob(e.target.value)}
+                max={new Date().toISOString().slice(0, 10)}
               />
             </Field>
 

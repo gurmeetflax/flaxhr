@@ -142,7 +142,7 @@ function UploadCard({
         <CardDescription>
           Required columns: <span className="font-mono">full_name</span>,{' '}
           <span className="font-mono">outlet_id</span>. Optional:{' '}
-          <span className="font-mono">work_email, phone, designation_code, hired_on, monthly_salary</span>.
+          <span className="font-mono">work_email, phone, designation_code, hired_on, monthly_salary, date_of_birth</span>.
           Header row required; column order is flexible.
         </CardDescription>
 

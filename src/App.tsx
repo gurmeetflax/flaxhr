@@ -7,6 +7,7 @@ import {
   ClipboardCheck,
   ClipboardList,
   CircleDollarSign,
+  Gift,
   History,
   Home,
   ListChecks,
@@ -38,6 +39,7 @@ import EvaluationsPage from '@/pages/admin/EvaluationsPage'
 import EvaluationBuilderPage from '@/pages/admin/EvaluationBuilderPage'
 import EvaluationRunPage from '@/pages/admin/EvaluationRunPage'
 import SettingsPage from '@/pages/admin/SettingsPage'
+import GiftCodesPage from '@/pages/admin/GiftCodesPage'
 import ServiceChargePage from '@/pages/admin/ServiceChargePage'
 import ServiceChargeRunPage from '@/pages/admin/ServiceChargeRunPage'
 import SalesPage from '@/pages/admin/SalesPage'
@@ -62,6 +64,7 @@ const adminNav = [
   { to: '/admin/sales', label: 'Sales', icon: CircleDollarSign },
   { to: '/admin/service-charge', label: 'Service charge', icon: CircleDollarSign },
   { to: '/admin/evaluations', label: 'Evaluations', icon: ClipboardCheck },
+  { to: '/admin/gift-codes', label: 'Birthday vouchers', icon: Gift },
   { to: '/admin/settings', label: 'Settings', icon: SettingsIcon },
 ]
 
@@ -115,6 +118,7 @@ export default function App() {
           element={<EvaluationRunPage />}
         />
         <Route path="/admin/settings" element={<SettingsPage />} />
+        <Route path="/admin/gift-codes" element={<GiftCodesPage />} />
         <Route path="/admin/notifications" element={<NotificationsPage />} />
       </Route>
 

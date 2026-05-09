@@ -24,6 +24,10 @@ interface Employee {
   exit_date: string | null
   exit_reason: string | null
   designation_code: string | null
+  date_of_birth: string | null
+  address: string | null
+  emergency_contact_name: string | null
+  emergency_contact_phone: string | null
 }
 
 interface OutletOption {
@@ -43,7 +47,7 @@ export default function EditEmployeePage() {
       const { data, error } = await supabase
         .from('v_employees')
         .select(
-          'id, employee_code, full_name, phone, work_email, outlet_id, is_active, hired_on, monthly_salary, exit_date, exit_reason, designation_code',
+          'id, employee_code, full_name, phone, work_email, outlet_id, is_active, hired_on, monthly_salary, exit_date, exit_reason, designation_code, date_of_birth, address, emergency_contact_name, emergency_contact_phone',
         )
         .eq('id', id)
         .maybeSingle()
@@ -76,6 +80,10 @@ export default function EditEmployeePage() {
   const [exitDate, setExitDate] = useState('')
   const [exitReason, setExitReason] = useState('')
   const [designationCode, setDesignationCode] = useState('')
+  const [dob, setDob] = useState('')
+  const [address, setAddress] = useState('')
+  const [emergencyName, setEmergencyName] = useState('')
+  const [emergencyPhone, setEmergencyPhone] = useState('')
   const [err, setErr] = useState<string | null>(null)
 
   useEffect(() => {
@@ -90,6 +98,10 @@ export default function EditEmployeePage() {
     setExitDate(e.exit_date ?? '')
     setExitReason(e.exit_reason ?? '')
     setDesignationCode(e.designation_code ?? '')
+    setDob(e.date_of_birth ?? '')
+    setAddress(e.address ?? '')
+    setEmergencyName(e.emergency_contact_name ?? '')
+    setEmergencyPhone(e.emergency_contact_phone ?? '')
   }, [employeeQ.data])
 
   const save = useMutation({
@@ -113,6 +125,10 @@ export default function EditEmployeePage() {
         designation_code: designationCode || null,
         exit_date: exitDate || null,
         exit_reason: exitReason.trim() || null,
+        date_of_birth: dob || null,
+        address: address.trim() || null,
+        emergency_contact_name: emergencyName.trim() || null,
+        emergency_contact_phone: emergencyPhone.trim() || null,
       }
       const { error } = await supabase
         .schema('core' as never)
@@ -262,6 +278,37 @@ export default function EditEmployeePage() {
                 value={exitReason}
                 onChange={(ev) => setExitReason(ev.target.value)}
                 placeholder="Resignation, terminated, …"
+              />
+            </Field>
+
+            <Field label="Date of birth">
+              <Input
+                type="date"
+                value={dob}
+                onChange={(ev) => setDob(ev.target.value)}
+                max={new Date().toISOString().slice(0, 10)}
+              />
+            </Field>
+            <Field label="Address">
+              <Input
+                value={address}
+                onChange={(ev) => setAddress(ev.target.value)}
+                placeholder="Street, area, city"
+              />
+            </Field>
+            <Field label="Emergency contact name">
+              <Input
+                value={emergencyName}
+                onChange={(ev) => setEmergencyName(ev.target.value)}
+                placeholder="Full name"
+              />
+            </Field>
+            <Field label="Emergency contact phone">
+              <Input
+                type="tel"
+                value={emergencyPhone}
+                onChange={(ev) => setEmergencyPhone(ev.target.value)}
+                placeholder="+91…"
               />
             </Field>
 
