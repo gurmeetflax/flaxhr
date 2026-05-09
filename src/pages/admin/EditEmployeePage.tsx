@@ -18,6 +18,7 @@ import {
   type KycKind,
   type KycStatus,
 } from '@/lib/kyc'
+import { useEmployeeOutlets, useSetEmployeeOutlets } from '@/lib/employeeOutlets'
 
 interface Employee {
   id: string
@@ -391,6 +392,13 @@ export default function EditEmployeePage() {
             </div>
 
             {employeeQ.data ? <KycCard employee={employeeQ.data} /> : null}
+            {employeeQ.data ? (
+              <ExtraOutletsCard
+                employeeId={employeeQ.data.id}
+                primaryOutletId={employeeQ.data.outlet_id}
+                allOutlets={outletsQ.data ?? []}
+              />
+            ) : null}
 
             <div className="space-y-2 sm:col-span-2">
               <Label>Status</Label>
@@ -441,6 +449,71 @@ export default function EditEmployeePage() {
 
       <ResetPinCard employeeId={e.id} />
     </>
+  )
+}
+
+function ExtraOutletsCard({
+  employeeId,
+  primaryOutletId,
+  allOutlets,
+}: {
+  employeeId: string
+  primaryOutletId: string | null
+  allOutlets: OutletOption[]
+}) {
+  const { data: rows = [] } = useEmployeeOutlets(employeeId)
+  const setOutlets = useSetEmployeeOutlets()
+
+  const extras = rows.filter((r) => !r.is_primary)
+  const extraIds = new Set(extras.map((r) => r.outlet_id))
+  const allowed = allOutlets.filter((o) => o.id !== primaryOutletId)
+
+  async function toggle(outletId: string) {
+    const next = extraIds.has(outletId)
+      ? Array.from(extraIds).filter((id) => id !== outletId)
+      : [...Array.from(extraIds), outletId]
+    try {
+      await setOutlets.mutateAsync({ employee_id: employeeId, outlet_ids: next })
+      toast.success('Updated outlets')
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : 'Could not save')
+    }
+  }
+
+  return (
+    <div className="sm:col-span-2 grid gap-2 rounded-lg border border-border bg-muted/30 p-3">
+      <div>
+        <Label>Also covers (extra outlets)</Label>
+        <p className="mt-1 text-xs text-muted-foreground">
+          Employees can punch + be rostered at any of these. The home outlet (above) is automatic.
+        </p>
+      </div>
+      <div className="flex flex-wrap gap-2">
+        {allowed.length === 0 ? (
+          <span className="text-xs text-muted-foreground">No other outlets to add.</span>
+        ) : (
+          allowed.map((o) => {
+            const on = extraIds.has(o.id)
+            return (
+              <button
+                key={o.id}
+                type="button"
+                onClick={() => toggle(o.id)}
+                disabled={setOutlets.isPending}
+                className={
+                  'rounded-full border px-3 py-1 text-xs font-medium transition-colors ' +
+                  (on
+                    ? 'border-primary bg-primary/10 text-primary'
+                    : 'border-border bg-surface text-muted-foreground hover:border-primary/50')
+                }
+              >
+                {o.display_name ?? o.id}
+              </button>
+            )
+          })
+        )}
+      </div>
+    </div>
   )
 }
 
