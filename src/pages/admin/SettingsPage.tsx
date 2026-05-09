@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { toast } from 'sonner'
-import { Bell, Briefcase, Camera, MessageCircle, Pencil, Plus, Trash2 } from 'lucide-react'
+import { Bell, Briefcase, Camera, MapPin, MessageCircle, Pencil, Plus, Trash2 } from 'lucide-react'
+import { useCities, useUpsertCity } from '@/lib/cities'
 import { PageHeader } from '@/components/layout/AppShell'
 import { Card, CardContent, CardDescription, CardTitle } from '@/components/ui/Card'
 import { Input } from '@/components/ui/Input'
@@ -25,6 +26,7 @@ export default function SettingsPage() {
         <SelfieRequiredCard />
         <NotificationEmailCard />
         <HrWhatsAppCard />
+        <CitiesCard />
         <DesignationsCard />
       </div>
     </>
@@ -174,6 +176,137 @@ function HrWhatsAppCard() {
             Save
           </Button>
         </div>
+      </CardContent>
+    </Card>
+  )
+}
+
+function CitiesCard() {
+  const { data: cities = [], isLoading } = useCities(false)
+  const upsert = useUpsertCity()
+  const [adding, setAdding] = useState(false)
+  const [draftId, setDraftId] = useState('')
+  const [draftName, setDraftName] = useState('')
+
+  async function save() {
+    const id = draftId.trim().toLowerCase()
+    const name = draftName.trim()
+    if (!id || !name) {
+      toast.error('Slug and display name are required.')
+      return
+    }
+    if (!/^[a-z0-9_-]+$/.test(id)) {
+      toast.error('Slug can only contain lowercase letters, digits, _ and -.')
+      return
+    }
+    try {
+      await upsert.mutateAsync({
+        id,
+        display_name: name,
+        is_active: true,
+        display_order: (cities.length + 1) * 10,
+      })
+      toast.success('City added')
+      setAdding(false)
+      setDraftId('')
+      setDraftName('')
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : 'Could not save')
+    }
+  }
+
+  async function toggleActive(id: string, name: string, active: boolean) {
+    try {
+      await upsert.mutateAsync({ id, display_name: name, is_active: !active })
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : 'Could not update')
+    }
+  }
+
+  async function rename(id: string, current: string) {
+    const next = prompt('Display name', current)
+    if (!next || !next.trim() || next === current) return
+    try {
+      await upsert.mutateAsync({ id, display_name: next.trim() })
+      toast.success('Renamed')
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : 'Could not rename')
+    }
+  }
+
+  return (
+    <Card>
+      <CardContent className="flex flex-col gap-3 p-6">
+        <div className="flex items-start gap-3">
+          <span className="grid h-10 w-10 place-items-center rounded-lg bg-primary/10 text-primary">
+            <MapPin className="h-5 w-5" />
+          </span>
+          <div className="flex-1">
+            <CardTitle>Cities</CardTitle>
+            <CardDescription className="mt-1">
+              Master list for outlet city dropdowns + dashboard filtering.
+              Outlet city values are normalised (lowercased, trimmed) automatically.
+            </CardDescription>
+          </div>
+          <Button size="sm" onClick={() => setAdding(true)}>
+            <Plus className="h-4 w-4" /> Add
+          </Button>
+        </div>
+        {isLoading ? (
+          <p className="text-sm text-muted-foreground">Loading…</p>
+        ) : cities.length === 0 ? (
+          <p className="text-sm text-muted-foreground">No cities yet.</p>
+        ) : (
+          <ul className="flex flex-col divide-y divide-border text-sm">
+            {cities.map((c) => (
+              <li key={c.id} className="flex items-center gap-3 py-2">
+                <div className="flex-1">
+                  <div className="font-medium">{c.display_name}</div>
+                  <div className="font-mono text-xs text-muted-foreground">{c.id}</div>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => toggleActive(c.id, c.display_name, c.is_active)}
+                  className={
+                    'rounded-full px-2 py-0.5 text-xs font-medium ' +
+                    (c.is_active ? 'bg-primary/10 text-primary' : 'bg-muted text-muted-foreground')
+                  }
+                >
+                  {c.is_active ? 'Active' : 'Inactive'}
+                </button>
+                <Button size="sm" variant="ghost" onClick={() => rename(c.id, c.display_name)}>
+                  <Pencil className="h-4 w-4" />
+                </Button>
+              </li>
+            ))}
+          </ul>
+        )}
+        {adding ? (
+          <div className="grid gap-3 rounded-lg border border-border bg-muted/30 p-4 sm:grid-cols-[1fr_2fr_auto_auto]">
+            <div>
+              <Label className="mb-1 block text-xs">Slug</Label>
+              <Input
+                value={draftId}
+                onChange={(e) => setDraftId(e.target.value)}
+                placeholder="bangalore"
+              />
+            </div>
+            <div>
+              <Label className="mb-1 block text-xs">Display name</Label>
+              <Input
+                value={draftName}
+                onChange={(e) => setDraftName(e.target.value)}
+                placeholder="Bangalore"
+              />
+            </div>
+            <Button onClick={save} loading={upsert.isPending} className="self-end">
+              Add
+            </Button>
+            <Button variant="ghost" onClick={() => setAdding(false)} className="self-end">
+              Cancel
+            </Button>
+          </div>
+        ) : null}
       </CardContent>
     </Card>
   )

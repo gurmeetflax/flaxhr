@@ -47,6 +47,7 @@ interface Employee {
   kyc_status: 'pending' | 'submitted' | 'verified' | 'rejected'
   kyc_verified_at: string | null
   kyc_notes: string | null
+  selfie_required: boolean | null
 }
 
 interface OutletOption {
@@ -66,7 +67,7 @@ export default function EditEmployeePage() {
       const { data, error } = await supabase
         .from('v_employees')
         .select(
-          'id, employee_code, first_name, last_name, full_name, phone, personal_email, outlet_id, is_active, hired_on, monthly_salary, exit_date, exit_reason, designation_code, date_of_birth, address, emergency_contact_name, emergency_contact_phone, home_lat, home_lng, aadhaar_last4, pan_last4, kyc_status, kyc_verified_at, kyc_notes',
+          'id, employee_code, first_name, last_name, full_name, phone, personal_email, outlet_id, is_active, hired_on, monthly_salary, exit_date, exit_reason, designation_code, date_of_birth, address, emergency_contact_name, emergency_contact_phone, home_lat, home_lng, aadhaar_last4, pan_last4, kyc_status, kyc_verified_at, kyc_notes, selfie_required',
         )
         .eq('id', id)
         .maybeSingle()
@@ -106,6 +107,8 @@ export default function EditEmployeePage() {
   const [emergencyPhone, setEmergencyPhone] = useState('')
   const [homeLat, setHomeLat] = useState('')
   const [homeLng, setHomeLng] = useState('')
+  // 'inherit' = null, 'always' = true, 'never' = false
+  const [selfieMode, setSelfieMode] = useState<'inherit' | 'always' | 'never'>('inherit')
   const [err, setErr] = useState<string | null>(null)
 
   useEffect(() => {
@@ -127,6 +130,10 @@ export default function EditEmployeePage() {
     setEmergencyPhone(e.emergency_contact_phone ?? '')
     setHomeLat(e.home_lat != null ? String(e.home_lat) : '')
     setHomeLng(e.home_lng != null ? String(e.home_lng) : '')
+    setSelfieMode(
+      e.selfie_required === true ? 'always' :
+      e.selfie_required === false ? 'never' : 'inherit'
+    )
   }, [employeeQ.data])
 
   const save = useMutation({
@@ -158,6 +165,9 @@ export default function EditEmployeePage() {
         emergency_contact_phone: emergencyPhone.trim() || null,
         home_lat: homeLat.trim() === '' ? null : Number(homeLat),
         home_lng: homeLng.trim() === '' ? null : Number(homeLng),
+        selfie_required:
+          selfieMode === 'always' ? true :
+          selfieMode === 'never' ? false : null,
       }
       const { error } = await supabase
         .schema('core' as never)
@@ -400,6 +410,30 @@ export default function EditEmployeePage() {
                 allOutlets={outletsQ.data ?? []}
               />
             ) : null}
+
+            <div className="sm:col-span-2 grid gap-2 rounded-lg border border-border bg-muted/30 p-3">
+              <Label>Selfie on punch</Label>
+              <p className="text-xs text-muted-foreground">
+                Override the global "Require selfie" setting for this employee.
+              </p>
+              <div className="flex flex-wrap gap-1.5">
+                {(['inherit', 'always', 'never'] as const).map((m) => (
+                  <button
+                    key={m}
+                    type="button"
+                    onClick={() => setSelfieMode(m)}
+                    className={
+                      'rounded-full border px-3 py-1 text-xs font-medium capitalize transition-colors ' +
+                      (selfieMode === m
+                        ? 'border-primary bg-primary/10 text-primary'
+                        : 'border-border bg-surface text-muted-foreground hover:border-primary/50')
+                    }
+                  >
+                    {m === 'inherit' ? 'Default (use global)' : m === 'always' ? 'Always required' : 'Never required'}
+                  </button>
+                ))}
+              </div>
+            </div>
 
             <div className="space-y-2 sm:col-span-2">
               <Label>Status</Label>

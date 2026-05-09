@@ -28,7 +28,10 @@ export default function PunchPage() {
   const { data: todayPunches = [] } = useMyTodayPunches()
   const nextType = useNextPunchType()
   const punch = usePunch()
-  const { data: selfieRequired = true } = useAppSetting<boolean>('selfie_required', true)
+  const { data: globalSelfieRequired = true } = useAppSetting<boolean>('selfie_required', true)
+  // Per-employee override (null => inherit global).
+  const empOverride = (employee as { selfie_required?: boolean | null } | undefined)?.selfie_required
+  const selfieRequired = empOverride == null ? globalSelfieRequired : empOverride
 
   const [coords, setCoords] = useState<{ lat: number; lng: number; accuracy: number } | null>(null)
   const [geoError, setGeoError] = useState<string | null>(null)
