@@ -2,6 +2,7 @@ import { useEffect, useState, type FormEvent } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { toast } from 'sonner'
+import { Trash2 } from 'lucide-react'
 import { supabase } from '@/lib/supabase'
 import { PageHeader } from '@/components/layout/AppShell'
 import { Card, CardContent } from '@/components/ui/Card'
@@ -448,6 +449,7 @@ export default function EditEmployeePage() {
       </Card>
 
       <ResetPinCard employeeId={e.id} />
+      <DangerZoneCard employeeId={e.id} fullName={e.full_name} />
     </>
   )
 }
@@ -709,6 +711,71 @@ function KycStatusPill({ status }: { status: 'pending' | 'submitted' | 'verified
     <span className={'rounded-full px-2 py-0.5 text-xs font-medium ' + (map[status] ?? map.pending)}>
       {status}
     </span>
+  )
+}
+
+function DangerZoneCard({ employeeId, fullName }: { employeeId: string; fullName: string }) {
+  const navigate = useNavigate()
+  const qc = useQueryClient()
+  const remove = useMutation({
+    mutationFn: async () => {
+      // Soft-delete: hide from directory, mark inactive, demote roles.
+      const stamp = new Date().toISOString()
+      const { error: e1 } = await supabase
+        .schema('core' as never)
+        .from('employees')
+        .update({ deleted_at: stamp, is_active: false })
+        .eq('id', employeeId)
+      if (e1) throw e1
+
+      // Soft-delete role rows so the user can't sign in or be looked up.
+      const { data: emp } = await supabase
+        .schema('core' as never)
+        .from('employees')
+        .select('user_id')
+        .eq('id', employeeId)
+        .maybeSingle()
+      const userId = (emp as { user_id: string | null } | null)?.user_id
+      if (userId) {
+        await supabase
+          .schema('core' as never)
+          .from('user_roles')
+          .update({ deleted_at: stamp })
+          .eq('user_id', userId)
+      }
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['employees-list'] })
+      toast.success('Employee deleted')
+      navigate('/admin/employees', { replace: true })
+    },
+    onError: (e: Error) => toast.error(e.message),
+  })
+
+  return (
+    <Card className="mt-4 border-destructive/40">
+      <CardContent className="flex flex-wrap items-center justify-between gap-3 p-6">
+        <div>
+          <h3 className="text-sm font-semibold text-destructive">Danger zone</h3>
+          <p className="mt-1 text-xs text-muted-foreground">
+            Soft-deletes the employee. They disappear from the directory and can no longer sign in. Their attendance, leave, and payslip history is retained for audit.
+          </p>
+        </div>
+        <Button
+          variant="ghost"
+          size="sm"
+          loading={remove.isPending}
+          onClick={() => {
+            if (confirm(`Delete ${fullName}? This hides them from the directory and revokes login. History is retained. Continue?`)) {
+              remove.mutate()
+            }
+          }}
+          className="text-destructive hover:text-destructive"
+        >
+          <Trash2 className="h-4 w-4" /> Delete employee
+        </Button>
+      </CardContent>
+    </Card>
   )
 }
 
