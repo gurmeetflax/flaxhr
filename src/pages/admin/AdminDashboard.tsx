@@ -14,6 +14,7 @@ import {
   Users,
   XCircle,
 } from 'lucide-react'
+import { toast } from 'sonner'
 import { supabase } from '@/lib/supabase'
 import { PageHeader } from '@/components/layout/AppShell'
 import { Card, CardContent, CardDescription, CardTitle } from '@/components/ui/Card'
@@ -384,9 +385,51 @@ function TodayEmployeesCard({
               First in-punch + roster check (today, {format(new Date(), 'd MMM')}).
             </CardDescription>
           </div>
-          <span className="text-xs font-mono text-muted-foreground">
-            {rows.length} total
-          </span>
+          <div className="flex items-center gap-2">
+            <span className="text-xs font-mono text-muted-foreground">
+              {rows.length} total
+            </span>
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={async () => {
+                const lines = [
+                  `*Today's employees · ${format(new Date(), 'd MMM yyyy')}*`,
+                  `Total ${rows.length} · On time ${totals.on_time ?? 0} · Late ${totals.late ?? 0} · Missed ${totals.missed ?? 0} · Unscheduled ${totals.unscheduled ?? 0}`,
+                  '',
+                  ...rows.slice(0, 40).map((r) => {
+                    const t = r.actual_in ? format(new Date(r.actual_in), 'HH:mm') : '—'
+                    const tag =
+                      r.flag === 'on_time'
+                        ? '✅'
+                        : r.flag === 'late'
+                          ? '⏰'
+                          : r.flag === 'missed'
+                            ? '❌'
+                            : '🟡'
+                    return `${tag} ${r.employee_name} (${r.employee_code}) · ${r.outlet_name ?? '—'} · ${t}`
+                  }),
+                  rows.length > 40 ? `…and ${rows.length - 40} more` : '',
+                ]
+                  .filter(Boolean)
+                  .join('\n')
+                try {
+                  const { data, error } = await supabase.functions.invoke('slack-post', {
+                    body: { text: lines },
+                  })
+                  if (error) throw error
+                  if (data && (data as { ok?: boolean }).ok === false) {
+                    throw new Error((data as { error?: string }).error ?? 'slack failed')
+                  }
+                  toast.success('Posted to Slack')
+                } catch (e) {
+                  toast.error(e instanceof Error ? e.message : 'Slack post failed')
+                }
+              }}
+            >
+              Send to Slack
+            </Button>
+          </div>
         </div>
 
         <div className="flex flex-wrap gap-1.5">
