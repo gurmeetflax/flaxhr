@@ -9,16 +9,26 @@ import { Input } from '@/components/ui/Input'
 import { Button } from '@/components/ui/Button'
 import { cn } from '@/lib/utils'
 
+function kycPillClasses(status: string): string {
+  switch (status) {
+    case 'verified':  return 'bg-primary/10 text-primary'
+    case 'submitted': return 'bg-warning/10 text-warning'
+    case 'rejected':  return 'bg-destructive/10 text-destructive'
+    default:          return 'bg-muted text-muted-foreground'
+  }
+}
+
 interface EmployeeRow {
   id: string
   employee_code: string
   full_name: string
   phone: string | null
-  work_email: string | null
+  personal_email: string | null
   outlet_id: string | null
   outlet_name: string | null
   outlet_city: string | null
   is_active: boolean
+  kyc_status: 'pending' | 'submitted' | 'verified' | 'rejected'
 }
 
 interface OutletOption {
@@ -50,7 +60,7 @@ export default function EmployeesListPage() {
       const { data, error } = await supabase
         .from('v_employees')
         .select(
-          'id, employee_code, full_name, phone, work_email, outlet_id, outlet_name, outlet_city, is_active',
+          'id, employee_code, full_name, phone, personal_email, outlet_id, outlet_name, outlet_city, is_active, kyc_status',
         )
         .order('employee_code', { ascending: true })
       if (error) throw error
@@ -68,7 +78,7 @@ export default function EmployeesListPage() {
         e.employee_code.toLowerCase().includes(needle) ||
         e.full_name.toLowerCase().includes(needle) ||
         (e.phone ?? '').toLowerCase().includes(needle) ||
-        (e.work_email ?? '').toLowerCase().includes(needle)
+        (e.personal_email ?? '').toLowerCase().includes(needle)
       )
     })
   }, [employeesQ.data, q, outletFilter, inactiveVisible])
@@ -156,6 +166,7 @@ export default function EmployeesListPage() {
                     <th className="px-4 py-2.5 font-medium">Outlet</th>
                     <th className="px-4 py-2.5 font-medium">Phone</th>
                     <th className="px-4 py-2.5 font-medium">Email</th>
+                    <th className="px-4 py-2.5 font-medium">KYC</th>
                     <th className="px-4 py-2.5 font-medium">Status</th>
                     <th className="px-4 py-2.5" />
                   </tr>
@@ -171,7 +182,17 @@ export default function EmployeesListPage() {
                         )}
                       </td>
                       <td className="px-4 py-3 text-muted-foreground">{e.phone ?? '—'}</td>
-                      <td className="px-4 py-3 text-muted-foreground">{e.work_email ?? '—'}</td>
+                      <td className="px-4 py-3 text-muted-foreground">{e.personal_email ?? '—'}</td>
+                      <td className="px-4 py-3">
+                        <span
+                          className={cn(
+                            'rounded-md px-2 py-0.5 text-xs font-medium capitalize',
+                            kycPillClasses(e.kyc_status),
+                          )}
+                        >
+                          {e.kyc_status}
+                        </span>
+                      </td>
                       <td className="px-4 py-3">
                         <span
                           className={cn(

@@ -8,26 +8,31 @@ import { employeeCodeToEmail, isValidEmail } from '@/lib/identity'
  * as missing.
  */
 export const BULK_COLUMNS = [
-  'full_name',
-  'work_email',
+  'first_name',
+  'last_name',
+  'personal_email',
   'phone',
   'outlet_id',
   'designation_code',
   'hired_on',
   'monthly_salary',
+  'date_of_birth',
 ] as const
 
 export type BulkColumn = (typeof BULK_COLUMNS)[number]
 
 export interface RawRow {
   rowIndex: number
+  first_name: string
+  last_name: string
   full_name: string
-  work_email: string
+  personal_email: string
   phone: string
   outlet_id: string
   designation_code: string
   hired_on: string
   monthly_salary: string
+  date_of_birth: string
 }
 
 export interface ValidatedRow extends RawRow {
@@ -56,22 +61,44 @@ export function parseCsv(text: string): RawRow[] {
     throw new Error(`CSV parse error on row ${first.row}: ${first.message}`)
   }
   const headers = result.meta.fields ?? []
-  const required: BulkColumn[] = ['full_name', 'outlet_id']
-  for (const r of required) {
-    if (!headers.includes(r)) {
-      throw new Error(`Missing required column "${r}". See the template.`)
-    }
+  // Required: first_name + last_name + outlet_id, with one-cycle back-compat
+  // for a legacy `full_name` column.
+  const hasNamesSplit = headers.includes('first_name') && headers.includes('last_name')
+  const hasFullName = headers.includes('full_name')
+  if (!hasNamesSplit && !hasFullName) {
+    throw new Error('Missing required columns. CSV needs "first_name" and "last_name" (or legacy "full_name"). See the template.')
   }
-  return (result.data ?? []).map((row, i) => ({
-    rowIndex: i + 2, // +2 for header row + 1-based
-    full_name: (row.full_name ?? '').trim(),
-    work_email: (row.work_email ?? '').trim().toLowerCase(),
-    phone: (row.phone ?? '').trim().replace(/\s+/g, ''),
-    outlet_id: (row.outlet_id ?? '').trim(),
-    designation_code: (row.designation_code ?? '').trim().toLowerCase(),
-    hired_on: (row.hired_on ?? '').trim(),
-    monthly_salary: (row.monthly_salary ?? '').trim(),
-  }))
+  if (!headers.includes('outlet_id')) {
+    throw new Error('Missing required column "outlet_id". See the template.')
+  }
+  if (hasFullName && !hasNamesSplit) {
+    console.warn('[bulkEmployees] CSV uses legacy "full_name" header — please switch to "first_name" + "last_name".')
+  }
+  if (!headers.includes('personal_email') && headers.includes('work_email')) {
+    console.warn('[bulkEmployees] CSV uses legacy "work_email" header — please rename to "personal_email".')
+  }
+  return (result.data ?? []).map((row, i) => {
+    let first = (row.first_name ?? '').trim()
+    let last = (row.last_name ?? '').trim()
+    if (!first && !last && row.full_name) {
+      const parts = row.full_name.trim().split(/\s+/)
+      first = parts.shift() ?? ''
+      last = parts.join(' ')
+    }
+    return ({
+      rowIndex: i + 2,
+      first_name: first,
+      last_name: last,
+      full_name: `${first} ${last}`.trim(),
+      personal_email: (row.personal_email ?? row.work_email ?? '').trim().toLowerCase(),
+      phone: (row.phone ?? '').trim().replace(/\s+/g, ''),
+      outlet_id: (row.outlet_id ?? '').trim(),
+      designation_code: (row.designation_code ?? '').trim().toLowerCase(),
+      hired_on: (row.hired_on ?? '').trim(),
+      monthly_salary: (row.monthly_salary ?? '').trim(),
+      date_of_birth: (row.date_of_birth ?? '').trim(),
+    })
+  })
 }
 
 export interface ValidateContext {
@@ -87,21 +114,22 @@ export function validateRows(rows: RawRow[], ctx: ValidateContext): ValidatedRow
   const seenNames = new Set<string>()
   return rows.map((r) => {
     const errors: string[] = []
-    if (!r.full_name) errors.push('full_name is required')
+    if (!r.first_name) errors.push('first_name is required')
+    if (!r.last_name) errors.push('last_name is required')
     const normName = r.full_name.toLowerCase().replace(/\s+/g, ' ')
-    if (normName && seenNames.has(normName)) errors.push('duplicate full_name in this CSV')
+    if (normName && seenNames.has(normName)) errors.push('duplicate name in this CSV')
     seenNames.add(normName)
     if (!r.outlet_id) errors.push('outlet_id is required')
     else if (!ctx.validOutletIds.has(r.outlet_id))
       errors.push(`outlet_id "${r.outlet_id}" not found`)
     if (r.designation_code && !ctx.validDesignationCodes.has(r.designation_code))
       errors.push(`designation_code "${r.designation_code}" not found`)
-    if (r.work_email) {
-      if (!isValidEmail(r.work_email)) errors.push('work_email looks invalid')
-      else if (seenEmails.has(r.work_email)) errors.push('duplicate work_email in this CSV')
-      else if (ctx.existingEmails.has(r.work_email))
-        errors.push('work_email already exists in DB')
-      seenEmails.add(r.work_email)
+    if (r.personal_email) {
+      if (!isValidEmail(r.personal_email)) errors.push('personal_email looks invalid')
+      else if (seenEmails.has(r.personal_email)) errors.push('duplicate personal_email in this CSV')
+      else if (ctx.existingEmails.has(r.personal_email))
+        errors.push('personal_email already exists in DB')
+      seenEmails.add(r.personal_email)
     }
     if (r.phone) {
       if (seenPhones.has(r.phone)) errors.push('duplicate phone in this CSV')
@@ -110,6 +138,8 @@ export function validateRows(rows: RawRow[], ctx: ValidateContext): ValidatedRow
     }
     if (r.hired_on && !/^\d{4}-\d{2}-\d{2}$/.test(r.hired_on))
       errors.push('hired_on must be YYYY-MM-DD')
+    if (r.date_of_birth && !/^\d{4}-\d{2}-\d{2}$/.test(r.date_of_birth))
+      errors.push('date_of_birth must be YYYY-MM-DD')
     if (r.monthly_salary) {
       const n = Number(r.monthly_salary)
       if (Number.isNaN(n) || n < 0) errors.push('monthly_salary must be a non-negative number')
@@ -128,7 +158,7 @@ export async function fetchValidationContext(): Promise<ValidateContext> {
     supabase
       .schema('core' as never)
       .from('employees')
-      .select('phone, work_email')
+      .select('phone, personal_email')
       .is('deleted_at', null),
     supabase.from('v_designations').select('code').eq('is_active', true),
   ])
@@ -141,9 +171,9 @@ export async function fetchValidationContext(): Promise<ValidateContext> {
   )
   const existingPhones = new Set<string>()
   const existingEmails = new Set<string>()
-  for (const e of (employeesRes.data ?? []) as Array<{ phone: string | null; work_email: string | null }>) {
+  for (const e of (employeesRes.data ?? []) as Array<{ phone: string | null; personal_email: string | null }>) {
     if (e.phone) existingPhones.add(e.phone)
-    if (e.work_email) existingEmails.add(e.work_email.toLowerCase())
+    if (e.personal_email) existingEmails.add(e.personal_email.toLowerCase())
   }
   return { validOutletIds, validDesignationCodes, existingPhones, existingEmails }
 }
@@ -188,13 +218,15 @@ export async function importOne(row: ValidatedRow): Promise<ImportedRow> {
       .insert({
         employee_code: code,
         user_id: userId,
-        full_name: row.full_name.replace(/\s+/g, ' '),
+        first_name: row.first_name.trim(),
+        last_name: row.last_name.trim(),
         phone: row.phone || null,
-        work_email: row.work_email || null,
+        personal_email: row.personal_email || null,
         outlet_id: row.outlet_id,
         designation_code: row.designation_code || null,
         hired_on: row.hired_on || null,
         monthly_salary: row.monthly_salary ? Number(row.monthly_salary) : null,
+        date_of_birth: row.date_of_birth || null,
       })
     if (empErr) throw empErr
 
@@ -216,11 +248,13 @@ export function resultsToCsv(results: ImportedRow[]): string {
   const ok = results.filter((r) => r.status === 'success')
   const csv = Papa.unparse(
     ok.map((r) => ({
+      first_name: r.first_name,
+      last_name: r.last_name,
       full_name: r.full_name,
       employee_code: r.employee_code ?? '',
       pin: r.pin ?? '',
       outlet_id: r.outlet_id,
-      work_email: r.work_email,
+      personal_email: r.personal_email,
       phone: r.phone,
     })),
   )
@@ -229,6 +263,6 @@ export function resultsToCsv(results: ImportedRow[]): string {
 
 export const TEMPLATE_CSV = [
   BULK_COLUMNS.join(','),
-  'Asha Sharma,asha@flaxitup.com,9876500001,BND,cashier,2026-04-01,18000',
-  'Ravi Kumar,,9876500002,BND,helper,,15000',
+  'Asha,Sharma,asha@example.com,9876500001,BND,cashier,2026-04-01,18000,1995-06-12',
+  'Ravi,Kumar,,9876500002,BND,helper,,15000,',
 ].join('\n')

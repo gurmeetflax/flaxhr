@@ -14,6 +14,7 @@ import {
   Users,
   XCircle,
 } from 'lucide-react'
+import { toast } from 'sonner'
 import { supabase } from '@/lib/supabase'
 import { PageHeader } from '@/components/layout/AppShell'
 import { Card, CardContent, CardDescription, CardTitle } from '@/components/ui/Card'
@@ -22,8 +23,10 @@ import { cn } from '@/lib/utils'
 import {
   useAdminDashboardSummary,
   useRosterVsAttendance,
+  useTodayPunches,
   type RosterAttendanceFlag,
   type RosterAttendanceRow,
+  type TodayPunch,
 } from '@/lib/dashboards'
 
 interface OutletOption {
@@ -56,6 +59,7 @@ export default function AdminDashboard() {
   const outletId = outletFilter === ALL_OUTLETS ? null : outletFilter
   const summary = useAdminDashboardSummary(periodMonth, outletId)
   const rosterCheck = useRosterVsAttendance(today, outletId)
+  const todayPunches = useTodayPunches(outletId)
 
   const periodLabel = format(new Date(periodMonth), 'MMM yyyy')
 
@@ -142,9 +146,10 @@ export default function AdminDashboard() {
 
       <div className="mt-6 grid gap-4 lg:grid-cols-2">
         <TeamCard outletId={outletId} />
-        <RosterAttendanceCard
-          rows={rosterCheck.data ?? []}
-          loading={rosterCheck.isLoading}
+        <TodayEmployeesCard
+          rosterRows={rosterCheck.data ?? []}
+          punches={todayPunches.data ?? []}
+          loading={rosterCheck.isLoading || todayPunches.isLoading}
         />
       </div>
     </>
@@ -285,57 +290,199 @@ function TeamRowItem({ row, isNew }: { row: TeamRow; isNew?: boolean }) {
   )
 }
 
-function RosterAttendanceCard({
-  rows,
+type ComplianceFlag = RosterAttendanceFlag | 'unscheduled'
+
+interface TodayRow {
+  employee_id: string
+  employee_code: string
+  employee_name: string
+  outlet_name: string | null
+  shift_name: string | null
+  planned_start: string | null
+  actual_in: string | null
+  delta_minutes: number | null
+  flag: ComplianceFlag
+  is_rostered: boolean
+}
+
+function TodayEmployeesCard({
+  rosterRows,
+  punches,
   loading,
 }: {
-  rows: RosterAttendanceRow[]
+  rosterRows: RosterAttendanceRow[]
+  punches: TodayPunch[]
   loading: boolean
 }) {
+  // Merge: rostered rows are the seed (they have shift + planned). Then
+  // add punchers who weren't rostered as 'unscheduled'.
+  const rows: TodayRow[] = useMemo(() => {
+    const byEmp = new Map<string, TodayRow>()
+    for (const r of rosterRows) {
+      byEmp.set(r.employee_id, {
+        employee_id: r.employee_id,
+        employee_code: r.employee_code,
+        employee_name: r.employee_name,
+        outlet_name: r.outlet_name,
+        shift_name: r.shift_name,
+        planned_start: r.planned_start,
+        actual_in: r.actual_in,
+        delta_minutes: r.delta_minutes,
+        flag: r.flag,
+        is_rostered: true,
+      })
+    }
+    // First in-punch per employee.
+    const firstIn = new Map<string, TodayPunch>()
+    for (const p of punches) {
+      if (p.type !== 'in') continue
+      const existing = firstIn.get(p.employee_id)
+      if (!existing || new Date(p.punched_at) < new Date(existing.punched_at)) {
+        firstIn.set(p.employee_id, p)
+      }
+    }
+    for (const [empId, p] of firstIn.entries()) {
+      if (byEmp.has(empId)) continue
+      byEmp.set(empId, {
+        employee_id: empId,
+        employee_code: p.employee_code,
+        employee_name: p.full_name,
+        outlet_name: p.outlet_name,
+        shift_name: null,
+        planned_start: null,
+        actual_in: p.punched_at,
+        delta_minutes: null,
+        flag: 'unscheduled',
+        is_rostered: false,
+      })
+    }
+    return Array.from(byEmp.values()).sort((a, b) => {
+      // Sort: actual punchers (with time) first, then missed.
+      const ta = a.actual_in ? new Date(a.actual_in).getTime() : Infinity
+      const tb = b.actual_in ? new Date(b.actual_in).getTime() : Infinity
+      return ta - tb
+    })
+  }, [rosterRows, punches])
+
   const totals = rows.reduce(
     (acc, r) => {
       acc[r.flag] = (acc[r.flag] ?? 0) + 1
       return acc
     },
-    {} as Record<RosterAttendanceFlag, number>,
+    {} as Record<ComplianceFlag, number>,
   )
+
+  const [filter, setFilter] = useState<'all' | ComplianceFlag>('all')
+  const filtered = filter === 'all' ? rows : rows.filter((r) => r.flag === filter)
 
   return (
     <Card>
       <CardContent className="flex flex-col gap-3 p-6">
         <div className="flex items-start justify-between gap-3">
           <div>
-            <CardTitle>Roster vs attendance — today</CardTitle>
+            <CardTitle>Today's employees</CardTitle>
             <CardDescription>
-              Cross-check of published rosters against first in-punch.
+              First in-punch + roster check (today, {format(new Date(), 'd MMM')}).
             </CardDescription>
           </div>
-          <div className="flex items-center gap-2 text-xs">
-            <Pill tone="ok">{totals.on_time ?? 0} on time</Pill>
-            <Pill tone="warn">{totals.late ?? 0} late</Pill>
-            <Pill tone="bad">{totals.missed ?? 0} missed</Pill>
+          <div className="flex items-center gap-2">
+            <span className="text-xs font-mono text-muted-foreground">
+              {rows.length} total
+            </span>
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={async () => {
+                const lines = [
+                  `*Today's employees · ${format(new Date(), 'd MMM yyyy')}*`,
+                  `Total ${rows.length} · On time ${totals.on_time ?? 0} · Late ${totals.late ?? 0} · Missed ${totals.missed ?? 0} · Unscheduled ${totals.unscheduled ?? 0}`,
+                  '',
+                  ...rows.slice(0, 40).map((r) => {
+                    const t = r.actual_in ? format(new Date(r.actual_in), 'HH:mm') : '—'
+                    const tag =
+                      r.flag === 'on_time'
+                        ? '✅'
+                        : r.flag === 'late'
+                          ? '⏰'
+                          : r.flag === 'missed'
+                            ? '❌'
+                            : '🟡'
+                    return `${tag} ${r.employee_name} (${r.employee_code}) · ${r.outlet_name ?? '—'} · ${t}`
+                  }),
+                  rows.length > 40 ? `…and ${rows.length - 40} more` : '',
+                ]
+                  .filter(Boolean)
+                  .join('\n')
+                try {
+                  const { data, error } = await supabase.functions.invoke('slack-post', {
+                    body: { text: lines },
+                  })
+                  if (error) throw error
+                  if (data && (data as { ok?: boolean }).ok === false) {
+                    throw new Error((data as { error?: string }).error ?? 'slack failed')
+                  }
+                  toast.success('Posted to Slack')
+                } catch (e) {
+                  toast.error(e instanceof Error ? e.message : 'Slack post failed')
+                }
+              }}
+            >
+              Send to Slack
+            </Button>
           </div>
         </div>
+
+        <div className="flex flex-wrap gap-1.5">
+          <ComplianceChip
+            label={`All ${rows.length}`}
+            active={filter === 'all'}
+            onClick={() => setFilter('all')}
+            tone="neutral"
+          />
+          <ComplianceChip
+            label={`On time ${totals.on_time ?? 0}`}
+            active={filter === 'on_time'}
+            onClick={() => setFilter('on_time')}
+            tone="ok"
+          />
+          <ComplianceChip
+            label={`Late ${totals.late ?? 0}`}
+            active={filter === 'late'}
+            onClick={() => setFilter('late')}
+            tone="warn"
+          />
+          <ComplianceChip
+            label={`Missed ${totals.missed ?? 0}`}
+            active={filter === 'missed'}
+            onClick={() => setFilter('missed')}
+            tone="bad"
+          />
+          <ComplianceChip
+            label={`Unscheduled ${totals.unscheduled ?? 0}`}
+            active={filter === 'unscheduled'}
+            onClick={() => setFilter('unscheduled')}
+            tone="neutral"
+          />
+        </div>
+
         {loading ? (
           <CardDescription>Loading…</CardDescription>
-        ) : rows.length === 0 ? (
-          <CardDescription>No published roster for today.</CardDescription>
+        ) : filtered.length === 0 ? (
+          <CardDescription>Nothing to show.</CardDescription>
         ) : (
           <div className="overflow-x-auto overscroll-x-contain">
             <table className="w-full text-sm">
               <thead>
                 <tr className="text-left text-xs uppercase text-muted-foreground">
                   <th className="py-2 pr-3">Employee</th>
-                  <th className="py-2 pr-3">Outlet</th>
-                  <th className="py-2 pr-3">Shift</th>
-                  <th className="py-2 pr-3">Planned</th>
+                  <th className="py-2 pr-3">Location</th>
                   <th className="py-2 pr-3">In</th>
-                  <th className="py-2 pr-3">Δ</th>
+                  <th className="py-2 pr-3">Roster</th>
                   <th className="py-2">Status</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-border">
-                {rows.map((r) => (
+                {filtered.map((r) => (
                   <tr
                     key={r.employee_id}
                     className={cn(
@@ -352,21 +499,19 @@ function RosterAttendanceCard({
                     <td className="py-2 pr-3 text-muted-foreground">
                       {r.outlet_name ?? '—'}
                     </td>
-                    <td className="py-2 pr-3 text-muted-foreground">
-                      {r.shift_name ?? '—'}
-                    </td>
                     <td className="py-2 pr-3 font-mono text-xs">
-                      {r.planned_start ? r.planned_start.slice(0, 5) : '—'}
+                      {r.actual_in ? format(new Date(r.actual_in), 'HH:mm') : '—'}
                     </td>
-                    <td className="py-2 pr-3 font-mono text-xs">
-                      {r.actual_in
-                        ? format(new Date(r.actual_in), 'HH:mm')
-                        : '—'}
-                    </td>
-                    <td className="py-2 pr-3 font-mono text-xs">
-                      {r.delta_minutes == null
-                        ? '—'
-                        : `${r.delta_minutes > 0 ? '+' : ''}${r.delta_minutes}m`}
+                    <td className="py-2 pr-3">
+                      {r.is_rostered ? (
+                        <span className="inline-flex items-center gap-1 text-xs text-primary">
+                          <CheckCircle2 className="h-3 w-3" /> Yes
+                        </span>
+                      ) : (
+                        <span className="inline-flex items-center gap-1 text-xs text-muted-foreground">
+                          <XCircle className="h-3 w-3" /> No
+                        </span>
+                      )}
                     </td>
                     <td className="py-2">
                       <FlagBadge flag={r.flag} />
@@ -382,7 +527,41 @@ function RosterAttendanceCard({
   )
 }
 
-function FlagBadge({ flag }: { flag: RosterAttendanceFlag }) {
+function ComplianceChip({
+  label,
+  active,
+  onClick,
+  tone,
+}: {
+  label: string
+  active: boolean
+  onClick: () => void
+  tone: 'ok' | 'warn' | 'bad' | 'neutral'
+}) {
+  const toneCls =
+    tone === 'ok'
+      ? 'border-primary/40 text-primary'
+      : tone === 'warn'
+        ? 'border-amber-500/40 text-amber-700'
+        : tone === 'bad'
+          ? 'border-destructive/40 text-destructive'
+          : 'border-border text-muted-foreground'
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className={cn(
+        'rounded-full border px-2.5 py-0.5 text-xs font-medium transition-colors',
+        toneCls,
+        active ? 'bg-primary/10 ring-1 ring-primary/30' : 'bg-surface',
+      )}
+    >
+      {label}
+    </button>
+  )
+}
+
+function FlagBadge({ flag }: { flag: ComplianceFlag }) {
   if (flag === 'missed') {
     return (
       <span className="inline-flex items-center gap-1 rounded-full bg-destructive/10 px-2 py-0.5 text-xs font-medium text-destructive">
@@ -397,30 +576,16 @@ function FlagBadge({ flag }: { flag: RosterAttendanceFlag }) {
       </span>
     )
   }
+  if (flag === 'unscheduled') {
+    return (
+      <span className="inline-flex items-center gap-1 rounded-full bg-muted px-2 py-0.5 text-xs font-medium text-muted-foreground">
+        Unscheduled
+      </span>
+    )
+  }
   return (
     <span className="inline-flex items-center gap-1 rounded-full bg-primary/10 px-2 py-0.5 text-xs font-medium text-primary">
       <CheckCircle2 className="h-3 w-3" /> On time
-    </span>
-  )
-}
-
-function Pill({
-  tone,
-  children,
-}: {
-  tone: 'ok' | 'warn' | 'bad'
-  children: React.ReactNode
-}) {
-  return (
-    <span
-      className={cn(
-        'inline-flex items-center rounded-full px-2 py-0.5 font-medium',
-        tone === 'ok' && 'bg-primary/10 text-primary',
-        tone === 'warn' && 'bg-amber-500/10 text-amber-600',
-        tone === 'bad' && 'bg-destructive/10 text-destructive',
-      )}
-    >
-      {children}
     </span>
   )
 }

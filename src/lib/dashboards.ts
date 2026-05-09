@@ -66,6 +66,36 @@ export function useRosterVsAttendance(date: string, outletId: string | null) {
   })
 }
 
+export interface TodayPunch {
+  id: string
+  type: 'in' | 'out'
+  punched_at: string
+  outlet_id: string | null
+  outlet_name: string | null
+  employee_id: string
+  employee_code: string
+  full_name: string
+}
+
+export function useTodayPunches(outletId: string | null) {
+  return useQuery<TodayPunch[]>({
+    queryKey: ['today-punches', outletId],
+    staleTime: 30_000,
+    queryFn: async () => {
+      let q = supabase
+        .from('v_today_punches')
+        .select(
+          'id, type, punched_at, outlet_id, outlet_name, employee_id, employee_code, full_name',
+        )
+        .order('punched_at', { ascending: true })
+      if (outletId) q = q.eq('outlet_id', outletId)
+      const { data, error } = await q
+      if (error) throw error
+      return (data ?? []) as TodayPunch[]
+    },
+  })
+}
+
 export interface OutletMonthlySalesRow {
   outlet_id: string
   outlet_name: string | null

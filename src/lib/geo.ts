@@ -96,3 +96,5 @@ export function haversineMeters(
     Math.sin(dLat / 2) ** 2 + Math.cos(lat1) * Math.cos(lat2) * Math.sin(dLng / 2) ** 2
   return Math.round(2 * EARTH_RADIUS_M * Math.asin(Math.sqrt(h)))
 }
+
+export type GeoPermissionState = 'unknown' | 'granted' | 'prompt' | 'denied' | 'unsupported'

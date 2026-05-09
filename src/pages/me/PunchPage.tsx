@@ -16,12 +16,15 @@ import {
 } from '@/lib/attendance'
 import { GeoError, haversineMeters, watchPosition } from '@/lib/geo'
 import { useAppSetting } from '@/lib/appSettings'
+import { pickOutletForPunch, useMyOutlets } from '@/lib/employeeOutlets'
+import LocationPermissionBanner from '@/components/LocationPermissionBanner'
 
 type Step = 'idle' | 'selfie' | 'review'
 
 export default function PunchPage() {
   const { data: employee } = useMyEmployee()
   const { data: outlet, isLoading: outletLoading } = useMyOutlet()
+  const { data: myOutlets = [] } = useMyOutlets()
   const { data: todayPunches = [] } = useMyTodayPunches()
   const nextType = useNextPunchType()
   const punch = usePunch()
@@ -50,18 +53,33 @@ export default function PunchPage() {
     }
   }, [selfie])
 
-  const distance =
-    coords && outlet?.lat != null && outlet?.lng != null
+  // When the user has multiple allowed outlets, pick the closest one
+  // they're inside the geofence of. Falls back to closest overall so
+  // the distance pill stays meaningful even when out of range.
+  const pick = coords && myOutlets.length > 0
+    ? pickOutletForPunch(myOutlets, coords.lat, coords.lng)
+    : null
+  const useOutlet = pick?.outlet ?? null
+
+  const distance = useOutlet
+    ? pick?.distance_m ?? null
+    : coords && outlet?.lat != null && outlet?.lng != null
       ? haversineMeters(coords, { lat: outlet.lat, lng: outlet.lng })
       : null
 
-  const radius = outlet?.geofence_radius_m ?? 200
+  const radius = useOutlet?.geofence_radius_m ?? outlet?.geofence_radius_m ?? 200
   const inside = distance !== null && distance <= radius
   const tz = outlet?.timezone ?? 'Asia/Kolkata'
+  const showOutletPicker = myOutlets.length > 1
 
   const submitWith = async (selfieBlob: Blob | undefined, lat: number, lng: number) => {
     try {
-      const result = await punch.mutateAsync({ selfie: selfieBlob, lat, lng })
+      const result = await punch.mutateAsync({
+        selfie: selfieBlob,
+        lat,
+        lng,
+        outletId: useOutlet?.outlet_id ?? null,
+      })
       toast.success(
         `${result.type === 'in' ? 'Punched in' : 'Punched out'} at ${formatInTimeZone(
           result.punched_at,
@@ -121,8 +139,16 @@ export default function PunchPage() {
         title={
           employee?.full_name ? `Hi, ${employee.full_name.split(' ')[0]}` : 'Punch in / out'
         }
-        description={outlet?.display_name ? `Outlet: ${outlet.display_name}` : undefined}
+        description={
+          showOutletPicker && useOutlet
+            ? `Punching at: ${useOutlet.outlet_name ?? useOutlet.outlet_id}` +
+              (myOutlets.length > 1 ? ` · ${myOutlets.length} outlets allowed` : '')
+            : outlet?.display_name
+              ? `Outlet: ${outlet.display_name}`
+              : undefined
+        }
       />
+      <LocationPermissionBanner />
 
       {!outletLoading && !outlet ? (
         <Card>

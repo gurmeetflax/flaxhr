@@ -7,13 +7,16 @@ import {
   ClipboardCheck,
   ClipboardList,
   CircleDollarSign,
+  Gift,
   History,
   Home,
   ListChecks,
   Plane,
+  Receipt,
   Settings as SettingsIcon,
   Store,
   Users,
+  Wallet,
 } from 'lucide-react'
 import ProtectedRoute from '@/components/ProtectedRoute'
 import AppShell from '@/components/layout/AppShell'
@@ -38,6 +41,10 @@ import EvaluationsPage from '@/pages/admin/EvaluationsPage'
 import EvaluationBuilderPage from '@/pages/admin/EvaluationBuilderPage'
 import EvaluationRunPage from '@/pages/admin/EvaluationRunPage'
 import SettingsPage from '@/pages/admin/SettingsPage'
+import GiftCodesPage from '@/pages/admin/GiftCodesPage'
+import PayrollPage from '@/pages/admin/PayrollPage'
+import PayrollRunPage from '@/pages/admin/PayrollRunPage'
+import PayslipPage from '@/pages/me/PayslipPage'
 import ServiceChargePage from '@/pages/admin/ServiceChargePage'
 import ServiceChargeRunPage from '@/pages/admin/ServiceChargeRunPage'
 import SalesPage from '@/pages/admin/SalesPage'
@@ -47,6 +54,7 @@ import MyAttendancePage from '@/pages/me/MyAttendancePage'
 import RegularisePage from '@/pages/me/RegularisePage'
 import MyRosterPage from '@/pages/me/MyRosterPage'
 import LeavePage from '@/pages/me/LeavePage'
+import NotificationsPage from '@/pages/me/NotificationsPage'
 
 const adminNav = [
   { to: '/admin', label: 'Overview', icon: Home },
@@ -60,7 +68,9 @@ const adminNav = [
   { to: '/admin/leave/policies', label: 'Leave policies', icon: ListChecks },
   { to: '/admin/sales', label: 'Sales', icon: CircleDollarSign },
   { to: '/admin/service-charge', label: 'Service charge', icon: CircleDollarSign },
+  { to: '/admin/payroll', label: 'Payroll', icon: Wallet },
   { to: '/admin/evaluations', label: 'Evaluations', icon: ClipboardCheck },
+  { to: '/admin/gift-codes', label: 'Birthday vouchers', icon: Gift },
   { to: '/admin/settings', label: 'Settings', icon: SettingsIcon },
 ]
 
@@ -70,6 +80,7 @@ const employeeNav = [
   { to: '/me/regularise', label: 'Regularise', icon: CheckSquare },
   { to: '/me/roster', label: 'My roster', icon: CalendarDays },
   { to: '/me/leave', label: 'Leave', icon: Plane },
+  { to: '/me/payslips', label: 'Payslips', icon: Receipt },
   { to: '/me/overview', label: 'My space', icon: Home },
 ]
 
@@ -114,6 +125,10 @@ export default function App() {
           element={<EvaluationRunPage />}
         />
         <Route path="/admin/settings" element={<SettingsPage />} />
+        <Route path="/admin/gift-codes" element={<GiftCodesPage />} />
+        <Route path="/admin/payroll" element={<PayrollPage />} />
+        <Route path="/admin/payroll/runs/:id" element={<PayrollRunPage />} />
+        <Route path="/admin/notifications" element={<NotificationsPage />} />
       </Route>
 
       <Route
@@ -129,6 +144,8 @@ export default function App() {
         <Route path="/me/roster" element={<MyRosterPage />} />
         <Route path="/me/leave" element={<LeavePage />} />
         <Route path="/me/overview" element={<MyDashboard />} />
+        <Route path="/me/payslips" element={<PayslipPage />} />
+        <Route path="/me/notifications" element={<NotificationsPage />} />
       </Route>
 
       <Route path="*" element={<NotFoundPage />} />

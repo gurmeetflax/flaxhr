@@ -4,6 +4,7 @@ import { Leaf, LogOut, Menu, X } from 'lucide-react'
 import { useAuth, useMyEmployee, useMyRoles } from '@/lib/auth'
 import { cn } from '@/lib/utils'
 import { Button } from '@/components/ui/Button'
+import NotificationBell from '@/components/NotificationBell'
 
 export interface NavItem {
   to: string
@@ -145,6 +146,9 @@ function Header({
         <Menu className="h-5 w-5" />
       </button>
       <div className="flex items-center gap-3">
+        <NotificationBell
+          basePath={role === 'admin' || role === 'hr' ? '/admin' : '/me'}
+        />
         <div className="text-right leading-tight">
           <div className="max-w-[40vw] truncate text-sm font-medium md:max-w-none">{name}</div>
           <div className="text-xs capitalize text-muted-foreground">{role}</div>

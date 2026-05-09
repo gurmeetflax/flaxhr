@@ -161,6 +161,10 @@ interface PunchInput {
   selfie?: Blob
   lat: number
   lng: number
+  /** When the user covers multiple outlets, pass the picked one
+   * (closest by GPS that they're inside the geofence of). When null,
+   * the server falls back to the employee's home outlet. */
+  outletId?: string | null
 }
 
 export function usePunch() {
@@ -168,7 +172,7 @@ export function usePunch() {
   const qc = useQueryClient()
 
   return useMutation<PunchResult, Error, PunchInput>({
-    mutationFn: async ({ selfie, lat, lng }) => {
+    mutationFn: async ({ selfie, lat, lng, outletId }) => {
       if (!user) throw new Error('Not signed in')
 
       // When the selfie_required setting is off, the client may omit the
@@ -199,13 +203,36 @@ export function usePunch() {
         p_selfie_path: path,
         p_user_agent:
           typeof navigator !== 'undefined' ? navigator.userAgent.slice(0, 256) : null,
+        p_outlet_id: outletId ?? null,
       })
 
       if (error) throw mapPunchError(error.message)
       return data as PunchResult
     },
-    onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ['my-today-punches'] })
+    onSuccess: async (result) => {
+      // Optimistically insert so the next-action button flips before
+      // the network round-trip completes.
+      qc.setQueriesData<PunchLog[]>(
+        { queryKey: ['my-today-punches'] },
+        (old) => {
+          if (!old) return old
+          return [
+            {
+              id: result.id,
+              type: result.type,
+              punched_at: result.punched_at,
+              selfie_path: result.selfie_path,
+              is_within_geofence: result.is_within_geofence,
+              distance_m: result.distance_m,
+              lat: null,
+              lng: null,
+              outlet_id: result.outlet_id,
+            } as PunchLog,
+            ...old,
+          ]
+        },
+      )
+      await qc.invalidateQueries({ queryKey: ['my-today-punches'] })
     },
   })
 }
@@ -231,6 +258,8 @@ function mapPunchError(message: string): Error {
   if (m.includes('SELFIE_REQUIRED')) return new Error('Selfie is required.')
   if (m.includes('LOCATION_REQUIRED')) return new Error('Location is required.')
   if (m.includes('NO_OUTLET_ASSIGNED')) return new Error('No outlet is assigned to you.')
+  if (m.includes('OUTLET_NOT_ALLOWED'))
+    return new Error("You're not assigned to that outlet — ask HR to add it.")
   if (m.includes('OUTLET_GEOFENCE_NOT_CONFIGURED'))
     return new Error('Your outlet has no geofence configured. Ask an admin.')
   if (m.includes('NO_ACTIVE_EMPLOYEE'))

@@ -10,6 +10,8 @@ import { Input } from '@/components/ui/Input'
 import { Button } from '@/components/ui/Button'
 import { employeeCodeToEmail, isValidEmail } from '@/lib/identity'
 import { useDesignations } from '@/lib/designations'
+import { uploadKycFile } from '@/lib/kyc'
+import { useAppSetting } from '@/lib/appSettings'
 
 interface Outlet {
   id: string
@@ -36,12 +38,31 @@ export default function CreateEmployeePage() {
 
   const designationsQ = useDesignations({ activeOnly: true })
 
-  const [fullName, setFullName] = useState('')
+  const [firstName, setFirstName] = useState('')
+  const [lastName, setLastName] = useState('')
   const [phone, setPhone] = useState('')
-  const [workEmail, setWorkEmail] = useState('')
+  const [personalEmail, setPersonalEmail] = useState('')
   const [outletId, setOutletId] = useState('')
   const [designationCode, setDesignationCode] = useState('')
   const [pin, setPin] = useState('')
+  const [dob, setDob] = useState('')
+  const [hiredOn, setHiredOn] = useState('')
+  const [monthlySalary, setMonthlySalary] = useState('')
+  const [address, setAddress] = useState('')
+  const [emergencyName, setEmergencyName] = useState('')
+  const [emergencyPhone, setEmergencyPhone] = useState('')
+  const [homeLat, setHomeLat] = useState('')
+  const [homeLng, setHomeLng] = useState('')
+  const [aadhaarLast4, setAadhaarLast4] = useState('')
+  const [panLast4, setPanLast4] = useState('')
+  const [aadhaarFile, setAadhaarFile] = useState<File | null>(null)
+  const [panFile, setPanFile] = useState<File | null>(null)
+  const [uniformAmount, setUniformAmount] = useState('')
+  const { data: defaultUniformMonths = 2 } = useAppSetting<number>(
+    'uniform_default_recovery_months',
+    2,
+  )
+  const [uniformMonths, setUniformMonths] = useState('')
   const [err, setErr] = useState<string | null>(null)
   const [busy, setBusy] = useState(false)
 
@@ -53,8 +74,12 @@ export default function CreateEmployeePage() {
       setErr('PIN must be exactly 6 digits.')
       return
     }
-    if (!fullName.trim()) {
-      setErr('Full name is required.')
+    if (!firstName.trim()) {
+      setErr('First name is required.')
+      return
+    }
+    if (!lastName.trim()) {
+      setErr('Last name is required.')
       return
     }
     if (!outletId) {
@@ -62,26 +87,49 @@ export default function CreateEmployeePage() {
       return
     }
 
-    const cleanEmail = workEmail.trim().toLowerCase()
+    const cleanEmail = personalEmail.trim().toLowerCase()
     if (cleanEmail && !isValidEmail(cleanEmail)) {
-      setErr('Work email looks invalid.')
+      setErr('Personal email looks invalid.')
+      return
+    }
+    const aClean = aadhaarLast4.trim()
+    if (aClean && !/^[0-9]{4}$/.test(aClean)) {
+      setErr('Aadhaar last-4 must be 4 digits.')
+      return
+    }
+    const pClean = panLast4.trim().toUpperCase()
+    if (pClean && !/^[A-Z0-9]{4}$/.test(pClean)) {
+      setErr('PAN last-4 must be 4 alphanumeric chars.')
+      return
+    }
+    const salaryNum = monthlySalary.trim() === '' ? null : Number(monthlySalary)
+    if (salaryNum != null && (Number.isNaN(salaryNum) || salaryNum < 0)) {
+      setErr('Monthly salary must be a non-negative number.')
+      return
+    }
+    const latNum = homeLat.trim() === '' ? null : Number(homeLat)
+    const lngNum = homeLng.trim() === '' ? null : Number(homeLng)
+    if ((latNum != null && Number.isNaN(latNum)) || (lngNum != null && Number.isNaN(lngNum))) {
+      setErr('Home lat/lng must be numbers.')
       return
     }
 
     setBusy(true)
     try {
-      const cleanName = fullName.trim().replace(/\s+/g, ' ')
+      const cleanFirst = firstName.trim().replace(/\s+/g, ' ')
+      const cleanLast = lastName.trim().replace(/\s+/g, ' ')
+      const cleanName = `${cleanFirst} ${cleanLast}`.trim()
       const cleanPhone = phone.trim().replace(/\s+/g, '') || null
 
       // Pre-submit dup check across name, phone, email.
       const filters: string[] = [`full_name.ilike.${cleanName}`]
       if (cleanPhone) filters.push(`phone.eq.${cleanPhone}`)
-      if (cleanEmail) filters.push(`work_email.ilike.${cleanEmail}`)
+      if (cleanEmail) filters.push(`personal_email.ilike.${cleanEmail}`)
 
       const { data: existing, error: lookupErr } = await supabase
         .schema('core' as never)
         .from('employees')
-        .select('id, full_name, phone, work_email, employee_code')
+        .select('id, full_name, phone, personal_email, employee_code')
         .or(filters.join(','))
         .is('deleted_at', null)
       if (lookupErr) throw lookupErr
@@ -102,7 +150,7 @@ export default function CreateEmployeePage() {
       }
       const dupEmail =
         cleanEmail &&
-        existing?.find((e) => (e.work_email ?? '').toLowerCase() === cleanEmail)
+        existing?.find((e) => (e.personal_email ?? '').toLowerCase() === cleanEmail)
       if (dupEmail) {
         setErr(`That work email is already in use by ${dupEmail.employee_code}.`)
         setBusy(false)
@@ -126,25 +174,38 @@ export default function CreateEmployeePage() {
       if (!userId) throw new Error('Sign-up returned no user.')
 
       // 3. Insert employees row linked to this auth user.
-      const { error: empErr } = await supabase
+      const { data: empRow, error: empErr } = await supabase
         .schema('core' as never)
         .from('employees')
         .insert({
           employee_code: assignedCode,
           user_id: userId,
-          full_name: cleanName,
+          first_name: cleanFirst,
+          last_name: cleanLast,
           phone: cleanPhone,
-          work_email: cleanEmail || null,
+          personal_email: cleanEmail || null,
           outlet_id: outletId,
           designation_code: designationCode || null,
+          date_of_birth: dob || null,
+          hired_on: hiredOn || null,
+          monthly_salary: salaryNum,
+          address: address.trim() || null,
+          emergency_contact_name: emergencyName.trim() || null,
+          emergency_contact_phone: emergencyPhone.trim() || null,
+          home_lat: latNum,
+          home_lng: lngNum,
+          aadhaar_last4: aClean || null,
+          pan_last4: pClean || null,
         })
+        .select('id')
+        .single()
       if (empErr) {
         if (empErr.code === '23505') {
           if (empErr.message.includes('phone')) {
             throw new Error('That phone number is already in use.')
           }
-          if (empErr.message.includes('work_email')) {
-            throw new Error('That work email is already in use.')
+          if (empErr.message.includes('personal_email')) {
+            throw new Error('That email is already in use.')
           }
         }
         throw empErr
@@ -157,8 +218,54 @@ export default function CreateEmployeePage() {
         .insert({ user_id: userId, role: 'employee', outlet_id: outletId })
       if (roleErr) throw roleErr
 
+      // 5. Optional uniform deduction. Total amount + months.
+      const uniformTotal = uniformAmount.trim() === '' ? null : Number(uniformAmount)
+      const monthsParsed = uniformMonths.trim() === '' ? Number(defaultUniformMonths) : Number(uniformMonths)
+      if (uniformTotal != null && (Number.isNaN(uniformTotal) || uniformTotal <= 0)) {
+        toast.error('Uniform amount must be a positive number')
+      } else if (uniformTotal != null && (Number.isNaN(monthsParsed) || monthsParsed < 1)) {
+        toast.error('Uniform recovery months must be at least 1')
+      } else if (uniformTotal != null && empRow?.id) {
+        const monthly = Math.round((uniformTotal / monthsParsed) * 100) / 100
+        const { error: dedErr } = await supabase
+          .schema('core' as never)
+          .from('deductions')
+          .insert({
+            employee_id: empRow.id,
+            kind: 'uniform',
+            total_amount: uniformTotal,
+            monthly_amount: monthly,
+            months_total: monthsParsed,
+            months_remaining: monthsParsed,
+            notes: 'Uniform recovery',
+          })
+        if (dedErr) toast.error(`Uniform deduction not saved: ${dedErr.message}`)
+      }
+
+      // 6. Best-effort KYC uploads. Failures don't block creation.
+      const newId = empRow?.id as string | undefined
+      const kycErrors: string[] = []
+      if (newId && aadhaarFile) {
+        try {
+          await uploadKycFile(newId, 'aadhaar', aadhaarFile, true)
+        } catch (e) {
+          kycErrors.push(`Aadhaar: ${e instanceof Error ? e.message : 'upload failed'}`)
+        }
+      }
+      if (newId && panFile) {
+        try {
+          await uploadKycFile(newId, 'pan', panFile, true)
+        } catch (e) {
+          kycErrors.push(`PAN: ${e instanceof Error ? e.message : 'upload failed'}`)
+        }
+      }
+
       qc.invalidateQueries({ queryKey: ['admin-dashboard-counts'] })
-      toast.success(`Employee created: ${cleanName} (${assignedCode})`)
+      if (kycErrors.length > 0) {
+        toast.error(`Employee created but KYC upload had errors. Finish on Edit. (${kycErrors.join('; ')})`)
+      } else {
+        toast.success(`Employee created: ${cleanName} (${assignedCode})`)
+      }
       navigate('/admin', { replace: true })
     } catch (e) {
       const msg = e instanceof Error ? e.message : 'Could not create employee.'
@@ -182,23 +289,28 @@ export default function CreateEmployeePage() {
               Employee code (FLAX0001, FLAX0002, …) is assigned automatically
               when you submit.
             </p>
-            <Field label="Full name" required>
-              <Input value={fullName} onChange={(e) => setFullName(e.target.value)} required />
+            <Field label="First name" required>
+              <Input value={firstName} onChange={(e) => setFirstName(e.target.value)} required />
             </Field>
-            <Field label="Phone">
+            <Field label="Last name" required>
+              <Input value={lastName} onChange={(e) => setLastName(e.target.value)} required />
+            </Field>
+            <Field label="Phone" required>
               <Input
                 type="tel"
                 value={phone}
                 onChange={(e) => setPhone(e.target.value)}
                 placeholder="+91…"
+                required
               />
             </Field>
-            <Field label="Work email">
+            <Field label="Personal email" required>
               <Input
                 type="email"
-                value={workEmail}
-                onChange={(e) => setWorkEmail(e.target.value)}
-                placeholder="firstname@flaxitup.com"
+                value={personalEmail}
+                onChange={(e) => setPersonalEmail(e.target.value)}
+                placeholder="firstname@example.com"
+                required
               />
             </Field>
             <Field label="Outlet" required>
@@ -216,13 +328,14 @@ export default function CreateEmployeePage() {
                 ))}
               </select>
             </Field>
-            <Field label="Designation">
+            <Field label="Designation" required>
               <select
                 value={designationCode}
                 onChange={(e) => setDesignationCode(e.target.value)}
+                required
                 className="flex h-10 w-full rounded-lg border border-input bg-surface px-3 py-2 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
               >
-                <option value="">Unassigned</option>
+                <option value="">Select…</option>
                 {(designationsQ.data ?? []).map((d) => (
                   <option key={d.code} value={d.code}>
                     {d.name}
@@ -240,6 +353,186 @@ export default function CreateEmployeePage() {
                 required
               />
             </Field>
+            <Field label="Date of birth" required>
+              <Input
+                type="date"
+                value={dob}
+                onChange={(e) => setDob(e.target.value)}
+                max={new Date().toISOString().slice(0, 10)}
+                required
+              />
+            </Field>
+            <Field label="Hired on" required>
+              <Input
+                type="date"
+                value={hiredOn}
+                onChange={(e) => setHiredOn(e.target.value)}
+                max={new Date().toISOString().slice(0, 10)}
+                required
+              />
+            </Field>
+            <Field label="Monthly salary (₹)" required>
+              <Input
+                type="number"
+                inputMode="decimal"
+                min={0}
+                step="0.01"
+                value={monthlySalary}
+                onChange={(e) => setMonthlySalary(e.target.value)}
+                placeholder="e.g. 25000"
+                required
+              />
+            </Field>
+            <div className="sm:col-span-2">
+              <Label className="mb-1 block">Address <span className="text-destructive">*</span></Label>
+              <Input
+                value={address}
+                onChange={(e) => setAddress(e.target.value)}
+                placeholder="Street, area, city"
+                required
+              />
+            </div>
+            <Field label="Emergency contact name" required>
+              <Input
+                value={emergencyName}
+                onChange={(e) => setEmergencyName(e.target.value)}
+                placeholder="Full name"
+                required
+              />
+            </Field>
+            <Field label="Emergency contact phone" required>
+              <Input
+                type="tel"
+                value={emergencyPhone}
+                onChange={(e) => setEmergencyPhone(e.target.value)}
+                placeholder="+91…"
+                required
+              />
+            </Field>
+
+            <div className="sm:col-span-2 grid gap-2 rounded-lg border border-border bg-muted/30 p-3">
+              <div className="flex items-center justify-between gap-2">
+                <Label>Home location <span className="text-destructive">*</span></Label>
+                <button
+                  type="button"
+                  onClick={() => {
+                    if (!('geolocation' in navigator)) return
+                    navigator.geolocation.getCurrentPosition(
+                      (pos) => {
+                        setHomeLat(pos.coords.latitude.toFixed(6))
+                        setHomeLng(pos.coords.longitude.toFixed(6))
+                      },
+                      () => {},
+                      { enableHighAccuracy: true, timeout: 10000 },
+                    )
+                  }}
+                  className="text-xs text-primary hover:underline"
+                >
+                  📍 Use my current location
+                </button>
+              </div>
+              <div className="grid gap-2 sm:grid-cols-2">
+                <Input
+                  type="number"
+                  step="any"
+                  inputMode="decimal"
+                  value={homeLat}
+                  onChange={(e) => setHomeLat(e.target.value)}
+                  placeholder="Latitude"
+                  required
+                />
+                <Input
+                  type="number"
+                  step="any"
+                  inputMode="decimal"
+                  value={homeLng}
+                  onChange={(e) => setHomeLng(e.target.value)}
+                  placeholder="Longitude"
+                  required
+                />
+              </div>
+            </div>
+
+            <Field label="Aadhaar last-4" required>
+              <Input
+                inputMode="numeric"
+                pattern="[0-9]{4}"
+                maxLength={4}
+                value={aadhaarLast4}
+                onChange={(e) => setAadhaarLast4(e.target.value.replace(/\D/g, ''))}
+                placeholder="1234"
+                required
+              />
+            </Field>
+            <Field label="PAN last-4" required>
+              <Input
+                maxLength={4}
+                pattern="[A-Z0-9]{4}"
+                value={panLast4}
+                onChange={(e) => setPanLast4(e.target.value.toUpperCase())}
+                placeholder="AB12"
+                required
+              />
+            </Field>
+            <div className="sm:col-span-2 grid gap-2 rounded-lg border border-border bg-muted/30 p-3">
+              <Label>Uniform deduction <span className="text-xs font-normal text-muted-foreground">(optional, recovers from monthly payroll)</span></Label>
+              <div className="grid gap-2 sm:grid-cols-2">
+                <div>
+                  <Label className="mb-1 block text-xs">Total amount (₹)</Label>
+                  <Input
+                    type="number"
+                    inputMode="decimal"
+                    min={0}
+                    step="0.01"
+                    value={uniformAmount}
+                    onChange={(e) => setUniformAmount(e.target.value)}
+                    placeholder="e.g. 500"
+                  />
+                </div>
+                <div>
+                  <Label className="mb-1 block text-xs">Recover over (months)</Label>
+                  <Input
+                    type="number"
+                    inputMode="numeric"
+                    min={1}
+                    max={12}
+                    value={uniformMonths}
+                    onChange={(e) => setUniformMonths(e.target.value)}
+                    placeholder={String(defaultUniformMonths)}
+                  />
+                </div>
+              </div>
+            </div>
+
+            <div className="sm:col-span-2 grid gap-2 rounded-lg border border-border bg-muted/30 p-3">
+              <Label>KYC documents <span className="text-xs font-normal text-muted-foreground">(optional, can also be added later on Edit)</span></Label>
+              <div className="grid gap-2 sm:grid-cols-2">
+                <div>
+                  <Label className="mb-1 block text-xs">Aadhaar file</Label>
+                  <input
+                    type="file"
+                    accept="image/jpeg,image/png,image/webp,application/pdf"
+                    onChange={(e) => setAadhaarFile(e.target.files?.[0] ?? null)}
+                    className="text-sm"
+                  />
+                  {aadhaarFile ? (
+                    <p className="mt-1 truncate text-xs text-muted-foreground">{aadhaarFile.name}</p>
+                  ) : null}
+                </div>
+                <div>
+                  <Label className="mb-1 block text-xs">PAN file</Label>
+                  <input
+                    type="file"
+                    accept="image/jpeg,image/png,image/webp,application/pdf"
+                    onChange={(e) => setPanFile(e.target.files?.[0] ?? null)}
+                    className="text-sm"
+                  />
+                  {panFile ? (
+                    <p className="mt-1 truncate text-xs text-muted-foreground">{panFile.name}</p>
+                  ) : null}
+                </div>
+              </div>
+            </div>
 
             {err ? (
               <p className="sm:col-span-2 text-sm text-destructive">{err}</p>

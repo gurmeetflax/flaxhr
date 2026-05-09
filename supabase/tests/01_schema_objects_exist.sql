@@ -17,7 +17,11 @@ begin
     'core.leave_requests',
     'attendance.logs',
     'attendance.regularisations',
-    'public.flax_outlets'
+    'public.flax_outlets',
+    'core.notifications',
+    'core.notification_prefs',
+    'core.gift_codes',
+    'core.birthday_log'
   ]) loop
     if to_regclass(t) is null then
       missing := missing || t;
@@ -40,7 +44,11 @@ begin
     'public.v_roster',
     'public.v_my_roster',
     'public.v_leave_requests',
-    'public.v_my_leave_balances'
+    'public.v_my_leave_balances',
+    'public.v_my_notifications',
+    'public.v_my_notification_prefs',
+    'public.v_birthday_today',
+    'public.v_gift_codes_stats'
   ]) loop
     if to_regclass(t) is null then
       missing := missing || t;
@@ -65,7 +73,14 @@ begin
     'public.submit_regularisation(timestamptz,text,text,text,text)',
     'public.decide_regularisation(uuid,text,text)',
     'public.submit_leave_request(uuid,date,date,text,text)',
-    'public.decide_leave_request(uuid,text,text)'
+    'public.decide_leave_request(uuid,text,text)',
+    'public.mark_notification_read(uuid)',
+    'public.mark_all_notifications_read()',
+    'public.upsert_my_notification_prefs(boolean,boolean,text[])',
+    'public.run_birthdays_today()',
+    'public.set_kyc_document(text,text)',
+    'public.verify_kyc(uuid,text,text)',
+    'public.signed_kyc_url(uuid,text,integer)'
   ]) loop
     if to_regprocedure(fn) is null then
       missing := missing || fn;
