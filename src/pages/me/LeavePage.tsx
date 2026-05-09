@@ -44,7 +44,11 @@ export default function LeavePage() {
       toast.success('Request submitted')
       setReason('')
     } catch (err) {
-      toast.error(humanise(err instanceof Error ? err.message : 'Failed'))
+      const msg =
+        err instanceof Error
+          ? err.message
+          : (err as { message?: string })?.message ?? JSON.stringify(err)
+      toast.error(humanise(msg))
     }
   }
 
