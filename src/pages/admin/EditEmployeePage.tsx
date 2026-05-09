@@ -231,20 +231,22 @@ export default function EditEmployeePage() {
             <Field label="Full name" required>
               <Input value={fullName} onChange={(ev) => setFullName(ev.target.value)} required />
             </Field>
-            <Field label="Phone">
+            <Field label="Phone" required>
               <Input
                 type="tel"
                 value={phone}
                 onChange={(ev) => setPhone(ev.target.value)}
                 placeholder="+91…"
+                required
               />
             </Field>
-            <Field label="Personal email">
+            <Field label="Personal email" required>
               <Input
                 type="email"
                 value={personalEmail}
                 onChange={(ev) => setPersonalEmail(ev.target.value)}
-                placeholder="firstname@flaxitup.com"
+                placeholder="firstname@example.com"
+                required
               />
             </Field>
             <Field label="Outlet" required>
@@ -262,13 +264,14 @@ export default function EditEmployeePage() {
                 ))}
               </select>
             </Field>
-            <Field label="Designation">
+            <Field label="Designation" required>
               <select
                 value={designationCode}
                 onChange={(ev) => setDesignationCode(ev.target.value)}
+                required
                 className="flex h-10 w-full rounded-lg border border-input bg-surface px-3 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
               >
-                <option value="">Unassigned</option>
+                <option value="">Select…</option>
                 {(designationsQ.data ?? []).map((d) => (
                   <option key={d.code} value={d.code}>
                     {d.name}
@@ -276,7 +279,7 @@ export default function EditEmployeePage() {
                 ))}
               </select>
             </Field>
-            <Field label="Monthly salary (₹)">
+            <Field label="Monthly salary (₹)" required>
               <Input
                 type="number"
                 inputMode="decimal"
@@ -285,24 +288,11 @@ export default function EditEmployeePage() {
                 value={monthlySalary}
                 onChange={(ev) => setMonthlySalary(ev.target.value)}
                 placeholder="e.g. 25000"
-              />
-            </Field>
-            <Field label="Exit date">
-              <Input
-                type="date"
-                value={exitDate}
-                onChange={(ev) => setExitDate(ev.target.value)}
-              />
-            </Field>
-            <Field label="Exit reason">
-              <Input
-                value={exitReason}
-                onChange={(ev) => setExitReason(ev.target.value)}
-                placeholder="Resignation, terminated, …"
+                required
               />
             </Field>
 
-            <Field label="Date of birth">
+            <Field label="Date of birth" required>
               <Input
                 type="date"
                 value={dob}
@@ -310,32 +300,35 @@ export default function EditEmployeePage() {
                 max={new Date().toISOString().slice(0, 10)}
               />
             </Field>
-            <Field label="Address">
+            <Field label="Address" required>
               <Input
                 value={address}
                 onChange={(ev) => setAddress(ev.target.value)}
                 placeholder="Street, area, city"
+                required
               />
             </Field>
-            <Field label="Emergency contact name">
+            <Field label="Emergency contact name" required>
               <Input
                 value={emergencyName}
                 onChange={(ev) => setEmergencyName(ev.target.value)}
                 placeholder="Full name"
+                required
               />
             </Field>
-            <Field label="Emergency contact phone">
+            <Field label="Emergency contact phone" required>
               <Input
                 type="tel"
                 value={emergencyPhone}
                 onChange={(ev) => setEmergencyPhone(ev.target.value)}
                 placeholder="+91…"
+                required
               />
             </Field>
 
             <div className="sm:col-span-2 grid gap-2 rounded-lg border border-border bg-muted/30 p-3">
               <div className="flex items-center justify-between gap-2">
-                <Label>Home location</Label>
+                <Label>Home location <span className="text-destructive">*</span></Label>
                 <button
                   type="button"
                   onClick={() => {
@@ -363,6 +356,7 @@ export default function EditEmployeePage() {
                   value={homeLat}
                   onChange={(ev) => setHomeLat(ev.target.value)}
                   placeholder="Latitude (e.g. 12.9716)"
+                  required
                 />
                 <Input
                   type="number"
@@ -371,6 +365,7 @@ export default function EditEmployeePage() {
                   value={homeLng}
                   onChange={(ev) => setHomeLng(ev.target.value)}
                   placeholder="Longitude (e.g. 77.5946)"
+                  required
                 />
               </div>
               {homeLat && homeLng ? (
@@ -404,6 +399,21 @@ export default function EditEmployeePage() {
                 </p>
               ) : null}
             </div>
+
+            <Field label="Exit date">
+              <Input
+                type="date"
+                value={exitDate}
+                onChange={(ev) => setExitDate(ev.target.value)}
+              />
+            </Field>
+            <Field label="Exit reason">
+              <Input
+                value={exitReason}
+                onChange={(ev) => setExitReason(ev.target.value)}
+                placeholder="Resignation, terminated, …"
+              />
+            </Field>
 
             {err ? <p className="sm:col-span-2 text-sm text-destructive">{err}</p> : null}
 

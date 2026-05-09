@@ -226,20 +226,22 @@ export default function CreateEmployeePage() {
             <Field label="Full name" required>
               <Input value={fullName} onChange={(e) => setFullName(e.target.value)} required />
             </Field>
-            <Field label="Phone">
+            <Field label="Phone" required>
               <Input
                 type="tel"
                 value={phone}
                 onChange={(e) => setPhone(e.target.value)}
                 placeholder="+91…"
+                required
               />
             </Field>
-            <Field label="Personal email">
+            <Field label="Personal email" required>
               <Input
                 type="email"
                 value={personalEmail}
                 onChange={(e) => setPersonalEmail(e.target.value)}
-                placeholder="firstname@flaxitup.com"
+                placeholder="firstname@example.com"
+                required
               />
             </Field>
             <Field label="Outlet" required>
@@ -257,13 +259,14 @@ export default function CreateEmployeePage() {
                 ))}
               </select>
             </Field>
-            <Field label="Designation">
+            <Field label="Designation" required>
               <select
                 value={designationCode}
                 onChange={(e) => setDesignationCode(e.target.value)}
+                required
                 className="flex h-10 w-full rounded-lg border border-input bg-surface px-3 py-2 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
               >
-                <option value="">Unassigned</option>
+                <option value="">Select…</option>
                 {(designationsQ.data ?? []).map((d) => (
                   <option key={d.code} value={d.code}>
                     {d.name}
@@ -281,23 +284,25 @@ export default function CreateEmployeePage() {
                 required
               />
             </Field>
-            <Field label="Date of birth">
+            <Field label="Date of birth" required>
               <Input
                 type="date"
                 value={dob}
                 onChange={(e) => setDob(e.target.value)}
                 max={new Date().toISOString().slice(0, 10)}
+                required
               />
             </Field>
-            <Field label="Hired on">
+            <Field label="Hired on" required>
               <Input
                 type="date"
                 value={hiredOn}
                 onChange={(e) => setHiredOn(e.target.value)}
                 max={new Date().toISOString().slice(0, 10)}
+                required
               />
             </Field>
-            <Field label="Monthly salary (₹)">
+            <Field label="Monthly salary (₹)" required>
               <Input
                 type="number"
                 inputMode="decimal"
@@ -306,35 +311,39 @@ export default function CreateEmployeePage() {
                 value={monthlySalary}
                 onChange={(e) => setMonthlySalary(e.target.value)}
                 placeholder="e.g. 25000"
+                required
               />
             </Field>
             <div className="sm:col-span-2">
-              <Label className="mb-1 block">Address</Label>
+              <Label className="mb-1 block">Address <span className="text-destructive">*</span></Label>
               <Input
                 value={address}
                 onChange={(e) => setAddress(e.target.value)}
                 placeholder="Street, area, city"
+                required
               />
             </div>
-            <Field label="Emergency contact name">
+            <Field label="Emergency contact name" required>
               <Input
                 value={emergencyName}
                 onChange={(e) => setEmergencyName(e.target.value)}
                 placeholder="Full name"
+                required
               />
             </Field>
-            <Field label="Emergency contact phone">
+            <Field label="Emergency contact phone" required>
               <Input
                 type="tel"
                 value={emergencyPhone}
                 onChange={(e) => setEmergencyPhone(e.target.value)}
                 placeholder="+91…"
+                required
               />
             </Field>
 
             <div className="sm:col-span-2 grid gap-2 rounded-lg border border-border bg-muted/30 p-3">
               <div className="flex items-center justify-between gap-2">
-                <Label>Home location</Label>
+                <Label>Home location <span className="text-destructive">*</span></Label>
                 <button
                   type="button"
                   onClick={() => {
@@ -361,6 +370,7 @@ export default function CreateEmployeePage() {
                   value={homeLat}
                   onChange={(e) => setHomeLat(e.target.value)}
                   placeholder="Latitude"
+                  required
                 />
                 <Input
                   type="number"
@@ -369,26 +379,30 @@ export default function CreateEmployeePage() {
                   value={homeLng}
                   onChange={(e) => setHomeLng(e.target.value)}
                   placeholder="Longitude"
+                  required
                 />
               </div>
             </div>
 
-            <Field label="Aadhaar last-4">
+            <Field label="Aadhaar last-4" required>
               <Input
                 inputMode="numeric"
-                pattern="[0-9]*"
+                pattern="[0-9]{4}"
                 maxLength={4}
                 value={aadhaarLast4}
                 onChange={(e) => setAadhaarLast4(e.target.value.replace(/\D/g, ''))}
                 placeholder="1234"
+                required
               />
             </Field>
-            <Field label="PAN last-4">
+            <Field label="PAN last-4" required>
               <Input
                 maxLength={4}
+                pattern="[A-Z0-9]{4}"
                 value={panLast4}
                 onChange={(e) => setPanLast4(e.target.value.toUpperCase())}
                 placeholder="AB12"
+                required
               />
             </Field>
             <p className="sm:col-span-2 text-xs text-muted-foreground">
