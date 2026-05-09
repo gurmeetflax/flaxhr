@@ -209,8 +209,30 @@ export function usePunch() {
       if (error) throw mapPunchError(error.message)
       return data as PunchResult
     },
-    onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ['my-today-punches'] })
+    onSuccess: async (result) => {
+      // Optimistically insert so the next-action button flips before
+      // the network round-trip completes.
+      qc.setQueriesData<PunchLog[]>(
+        { queryKey: ['my-today-punches'] },
+        (old) => {
+          if (!old) return old
+          return [
+            {
+              id: result.id,
+              type: result.type,
+              punched_at: result.punched_at,
+              selfie_path: result.selfie_path,
+              is_within_geofence: result.is_within_geofence,
+              distance_m: result.distance_m,
+              lat: null,
+              lng: null,
+              outlet_id: result.outlet_id,
+            } as PunchLog,
+            ...old,
+          ]
+        },
+      )
+      await qc.invalidateQueries({ queryKey: ['my-today-punches'] })
     },
   })
 }

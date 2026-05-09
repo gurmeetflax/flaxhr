@@ -60,6 +60,20 @@
     /* Stop the document rubber-band on iOS — combined with svh, scroll
        feels stable rather than elastic. */
     overscroll-behavior-y: none;
+    /* Prevent horizontal overflow from accidentally-wide cards/tables
+       triggering a zoomed-out viewport on phones. */
+    overflow-x: hidden;
+  }
+
+  /* iOS Safari auto-zooms inputs whose font-size is below 16px — that's
+     the "I have to zoom out to see the app" trap. Force ≥16px on phones;
+     keep the tighter 14px on tablets+. */
+  @media (max-width: 640px) {
+    input,
+    textarea,
+    select {
+      font-size: 16px !important;
+    }
   }
 
   *,
