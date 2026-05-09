@@ -17,6 +17,7 @@ import {
 import { GeoError, haversineMeters, watchPosition } from '@/lib/geo'
 import { useAppSetting } from '@/lib/appSettings'
 import { pickOutletForPunch, useMyOutlets } from '@/lib/employeeOutlets'
+import LocationPermissionBanner from '@/components/LocationPermissionBanner'
 
 type Step = 'idle' | 'selfie' | 'review'
 
@@ -147,6 +148,7 @@ export default function PunchPage() {
               : undefined
         }
       />
+      <LocationPermissionBanner />
 
       {!outletLoading && !outlet ? (
         <Card>
