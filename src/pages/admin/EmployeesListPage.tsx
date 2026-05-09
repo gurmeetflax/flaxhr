@@ -94,6 +94,11 @@ export default function EmployeesListPage() {
         }
         actions={
           <div className="flex items-center gap-2">
+            <Link to="/admin/employees/deleted">
+              <Button size="sm" variant="ghost" className="text-muted-foreground">
+                Deleted
+              </Button>
+            </Link>
             <Link to="/admin/employees/bulk">
               <Button size="sm" variant="secondary">
                 <Upload className="h-4 w-4" /> Bulk upload

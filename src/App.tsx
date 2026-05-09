@@ -32,6 +32,7 @@ import EmployeesListPage from '@/pages/admin/EmployeesListPage'
 import CreateEmployeePage from '@/pages/admin/CreateEmployeePage'
 import BulkEmployeesPage from '@/pages/admin/BulkEmployeesPage'
 import EditEmployeePage from '@/pages/admin/EditEmployeePage'
+import DeletedEmployeesPage from '@/pages/admin/DeletedEmployeesPage'
 import OutletsPage from '@/pages/admin/OutletsPage'
 import NewOutletPage from '@/pages/admin/NewOutletPage'
 import EditOutletPage from '@/pages/admin/EditOutletPage'
@@ -123,6 +124,7 @@ export default function App() {
         <Route path="/admin/outlets/new" element={<NewOutletPage />} />
         <Route path="/admin/outlets/:id" element={<EditOutletPage />} />
         <Route path="/admin/employees" element={<EmployeesListPage />} />
+        <Route path="/admin/employees/deleted" element={<DeletedEmployeesPage />} />
         <Route path="/admin/employees/new" element={<CreateEmployeePage />} />
         <Route path="/admin/employees/bulk" element={<BulkEmployeesPage />} />
         <Route path="/admin/employees/:id" element={<EditEmployeePage />} />
