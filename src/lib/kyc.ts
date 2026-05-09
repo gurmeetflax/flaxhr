@@ -15,15 +15,18 @@ function mimeToExt(mime: string): string {
 }
 
 /**
- * Upload a KYC file for the current user. The path scheme is
- * `{employee_id}/{kind}/{epoch}.{ext}` so admin/HR can browse by
- * employee. After upload, set_kyc_document RPC writes the path on
- * core.employees and bumps kyc_status to 'submitted'.
+ * Upload a KYC file. Path scheme: `{employee_id}/{kind}/{epoch}.{ext}`.
+ *
+ * `viaAdmin=true` (default) uses admin_set_kyc_document(p_employee, …)
+ * — required when admin/HR uploads on behalf of another employee.
+ * `viaAdmin=false` uses set_kyc_document — for future self-uploads
+ * from /me where the path's owner *is* the caller's employee.
  */
 export async function uploadKycFile(
   employeeId: string,
   kind: KycKind,
   file: File,
+  viaAdmin = true,
 ): Promise<string> {
   const ext = mimeToExt(file.type)
   const path = `${employeeId}/${kind}/${Date.now()}.${ext}`
@@ -36,11 +39,20 @@ export async function uploadKycFile(
     })
   if (upErr) throw upErr
 
-  const { error: rpcErr } = await supabase.rpc('set_kyc_document', {
-    p_kind: kind,
-    p_path: path,
-  })
-  if (rpcErr) throw rpcErr
+  if (viaAdmin) {
+    const { error: rpcErr } = await supabase.rpc('admin_set_kyc_document', {
+      p_employee: employeeId,
+      p_kind: kind,
+      p_path: path,
+    })
+    if (rpcErr) throw rpcErr
+  } else {
+    const { error: rpcErr } = await supabase.rpc('set_kyc_document', {
+      p_kind: kind,
+      p_path: path,
+    })
+    if (rpcErr) throw rpcErr
+  }
 
   return path
 }
@@ -73,8 +85,9 @@ export function useUploadKyc() {
       employee_id: string
       kind: KycKind
       file: File
+      viaAdmin?: boolean
     }) => {
-      return uploadKycFile(input.employee_id, input.kind, input.file)
+      return uploadKycFile(input.employee_id, input.kind, input.file, input.viaAdmin ?? true)
     },
     onSuccess: (_p, vars) => {
       qc.invalidateQueries({ queryKey: ['employee', vars.employee_id] })

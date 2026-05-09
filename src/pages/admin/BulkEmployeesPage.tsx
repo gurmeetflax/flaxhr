@@ -140,10 +140,11 @@ function UploadCard({
       <CardContent className="flex flex-col gap-4 p-6">
         <CardTitle>Upload a CSV</CardTitle>
         <CardDescription>
-          Required columns: <span className="font-mono">full_name</span>,{' '}
+          Required columns: <span className="font-mono">first_name</span>,{' '}
+          <span className="font-mono">last_name</span>,{' '}
           <span className="font-mono">outlet_id</span>. Optional:{' '}
           <span className="font-mono">personal_email, phone, designation_code, hired_on, monthly_salary, date_of_birth</span>.
-          Header row required; column order is flexible.
+          Header row required; column order is flexible. Legacy <span className="font-mono">full_name</span> is still accepted and split on the first space.
         </CardDescription>
 
         <div className="flex flex-wrap items-center gap-3">

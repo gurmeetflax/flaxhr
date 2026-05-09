@@ -10,6 +10,7 @@ import { Input } from '@/components/ui/Input'
 import { Button } from '@/components/ui/Button'
 import { employeeCodeToEmail, isValidEmail } from '@/lib/identity'
 import { useDesignations } from '@/lib/designations'
+import { uploadKycFile } from '@/lib/kyc'
 
 interface Outlet {
   id: string
@@ -36,7 +37,8 @@ export default function CreateEmployeePage() {
 
   const designationsQ = useDesignations({ activeOnly: true })
 
-  const [fullName, setFullName] = useState('')
+  const [firstName, setFirstName] = useState('')
+  const [lastName, setLastName] = useState('')
   const [phone, setPhone] = useState('')
   const [personalEmail, setPersonalEmail] = useState('')
   const [outletId, setOutletId] = useState('')
@@ -52,6 +54,8 @@ export default function CreateEmployeePage() {
   const [homeLng, setHomeLng] = useState('')
   const [aadhaarLast4, setAadhaarLast4] = useState('')
   const [panLast4, setPanLast4] = useState('')
+  const [aadhaarFile, setAadhaarFile] = useState<File | null>(null)
+  const [panFile, setPanFile] = useState<File | null>(null)
   const [err, setErr] = useState<string | null>(null)
   const [busy, setBusy] = useState(false)
 
@@ -63,8 +67,12 @@ export default function CreateEmployeePage() {
       setErr('PIN must be exactly 6 digits.')
       return
     }
-    if (!fullName.trim()) {
-      setErr('Full name is required.')
+    if (!firstName.trim()) {
+      setErr('First name is required.')
+      return
+    }
+    if (!lastName.trim()) {
+      setErr('Last name is required.')
       return
     }
     if (!outletId) {
@@ -101,7 +109,9 @@ export default function CreateEmployeePage() {
 
     setBusy(true)
     try {
-      const cleanName = fullName.trim().replace(/\s+/g, ' ')
+      const cleanFirst = firstName.trim().replace(/\s+/g, ' ')
+      const cleanLast = lastName.trim().replace(/\s+/g, ' ')
+      const cleanName = `${cleanFirst} ${cleanLast}`.trim()
       const cleanPhone = phone.trim().replace(/\s+/g, '') || null
 
       // Pre-submit dup check across name, phone, email.
@@ -157,13 +167,14 @@ export default function CreateEmployeePage() {
       if (!userId) throw new Error('Sign-up returned no user.')
 
       // 3. Insert employees row linked to this auth user.
-      const { error: empErr } = await supabase
+      const { data: empRow, error: empErr } = await supabase
         .schema('core' as never)
         .from('employees')
         .insert({
           employee_code: assignedCode,
           user_id: userId,
-          full_name: cleanName,
+          first_name: cleanFirst,
+          last_name: cleanLast,
           phone: cleanPhone,
           personal_email: cleanEmail || null,
           outlet_id: outletId,
@@ -179,6 +190,8 @@ export default function CreateEmployeePage() {
           aadhaar_last4: aClean || null,
           pan_last4: pClean || null,
         })
+        .select('id')
+        .single()
       if (empErr) {
         if (empErr.code === '23505') {
           if (empErr.message.includes('phone')) {
@@ -198,8 +211,30 @@ export default function CreateEmployeePage() {
         .insert({ user_id: userId, role: 'employee', outlet_id: outletId })
       if (roleErr) throw roleErr
 
+      // 5. Best-effort KYC uploads. Failures don't block creation.
+      const newId = empRow?.id as string | undefined
+      const kycErrors: string[] = []
+      if (newId && aadhaarFile) {
+        try {
+          await uploadKycFile(newId, 'aadhaar', aadhaarFile, true)
+        } catch (e) {
+          kycErrors.push(`Aadhaar: ${e instanceof Error ? e.message : 'upload failed'}`)
+        }
+      }
+      if (newId && panFile) {
+        try {
+          await uploadKycFile(newId, 'pan', panFile, true)
+        } catch (e) {
+          kycErrors.push(`PAN: ${e instanceof Error ? e.message : 'upload failed'}`)
+        }
+      }
+
       qc.invalidateQueries({ queryKey: ['admin-dashboard-counts'] })
-      toast.success(`Employee created: ${cleanName} (${assignedCode})`)
+      if (kycErrors.length > 0) {
+        toast.error(`Employee created but KYC upload had errors. Finish on Edit. (${kycErrors.join('; ')})`)
+      } else {
+        toast.success(`Employee created: ${cleanName} (${assignedCode})`)
+      }
       navigate('/admin', { replace: true })
     } catch (e) {
       const msg = e instanceof Error ? e.message : 'Could not create employee.'
@@ -223,8 +258,11 @@ export default function CreateEmployeePage() {
               Employee code (FLAX0001, FLAX0002, …) is assigned automatically
               when you submit.
             </p>
-            <Field label="Full name" required>
-              <Input value={fullName} onChange={(e) => setFullName(e.target.value)} required />
+            <Field label="First name" required>
+              <Input value={firstName} onChange={(e) => setFirstName(e.target.value)} required />
+            </Field>
+            <Field label="Last name" required>
+              <Input value={lastName} onChange={(e) => setLastName(e.target.value)} required />
             </Field>
             <Field label="Phone" required>
               <Input
@@ -405,9 +443,35 @@ export default function CreateEmployeePage() {
                 required
               />
             </Field>
-            <p className="sm:col-span-2 text-xs text-muted-foreground">
-              KYC document uploads (Aadhaar/PAN files) happen on the Edit page after creation.
-            </p>
+            <div className="sm:col-span-2 grid gap-2 rounded-lg border border-border bg-muted/30 p-3">
+              <Label>KYC documents <span className="text-xs font-normal text-muted-foreground">(optional, can also be added later on Edit)</span></Label>
+              <div className="grid gap-2 sm:grid-cols-2">
+                <div>
+                  <Label className="mb-1 block text-xs">Aadhaar file</Label>
+                  <input
+                    type="file"
+                    accept="image/jpeg,image/png,image/webp,application/pdf"
+                    onChange={(e) => setAadhaarFile(e.target.files?.[0] ?? null)}
+                    className="text-sm"
+                  />
+                  {aadhaarFile ? (
+                    <p className="mt-1 truncate text-xs text-muted-foreground">{aadhaarFile.name}</p>
+                  ) : null}
+                </div>
+                <div>
+                  <Label className="mb-1 block text-xs">PAN file</Label>
+                  <input
+                    type="file"
+                    accept="image/jpeg,image/png,image/webp,application/pdf"
+                    onChange={(e) => setPanFile(e.target.files?.[0] ?? null)}
+                    className="text-sm"
+                  />
+                  {panFile ? (
+                    <p className="mt-1 truncate text-xs text-muted-foreground">{panFile.name}</p>
+                  ) : null}
+                </div>
+              </div>
+            </div>
 
             {err ? (
               <p className="sm:col-span-2 text-sm text-destructive">{err}</p>

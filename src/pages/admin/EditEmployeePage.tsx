@@ -22,6 +22,8 @@ import {
 interface Employee {
   id: string
   employee_code: string
+  first_name: string | null
+  last_name: string | null
   full_name: string
   phone: string | null
   personal_email: string | null
@@ -62,7 +64,7 @@ export default function EditEmployeePage() {
       const { data, error } = await supabase
         .from('v_employees')
         .select(
-          'id, employee_code, full_name, phone, personal_email, outlet_id, is_active, hired_on, monthly_salary, exit_date, exit_reason, designation_code, date_of_birth, address, emergency_contact_name, emergency_contact_phone, home_lat, home_lng, aadhaar_last4, pan_last4, kyc_status, kyc_verified_at, kyc_notes',
+          'id, employee_code, first_name, last_name, full_name, phone, personal_email, outlet_id, is_active, hired_on, monthly_salary, exit_date, exit_reason, designation_code, date_of_birth, address, emergency_contact_name, emergency_contact_phone, home_lat, home_lng, aadhaar_last4, pan_last4, kyc_status, kyc_verified_at, kyc_notes',
         )
         .eq('id', id)
         .maybeSingle()
@@ -86,7 +88,8 @@ export default function EditEmployeePage() {
   })
   const designationsQ = useDesignations({ activeOnly: true })
 
-  const [fullName, setFullName] = useState('')
+  const [firstName, setFirstName] = useState('')
+  const [lastName, setLastName] = useState('')
   const [phone, setPhone] = useState('')
   const [personalEmail, setPersonalEmail] = useState('')
   const [outletId, setOutletId] = useState('')
@@ -106,7 +109,8 @@ export default function EditEmployeePage() {
   useEffect(() => {
     if (!employeeQ.data) return
     const e = employeeQ.data
-    setFullName(e.full_name ?? '')
+    setFirstName(e.first_name ?? '')
+    setLastName(e.last_name ?? '')
     setPhone(e.phone ?? '')
     setPersonalEmail(e.personal_email ?? '')
     setOutletId(e.outlet_id ?? '')
@@ -126,7 +130,8 @@ export default function EditEmployeePage() {
   const save = useMutation({
     mutationFn: async () => {
       if (!id) throw new Error('No employee id')
-      const cleanName = fullName.trim().replace(/\s+/g, ' ')
+      const cleanFirst = firstName.trim().replace(/\s+/g, ' ')
+      const cleanLast = lastName.trim().replace(/\s+/g, ' ')
       const cleanPhone = phone.trim().replace(/\s+/g, '') || null
       const cleanEmail = personalEmail.trim().toLowerCase() || null
 
@@ -135,7 +140,8 @@ export default function EditEmployeePage() {
         throw new Error('Monthly salary must be a non-negative number.')
       }
       const patch = {
-        full_name: cleanName,
+        first_name: cleanFirst,
+        last_name: cleanLast,
         phone: cleanPhone,
         personal_email: cleanEmail,
         outlet_id: outletId || null,
@@ -181,7 +187,8 @@ export default function EditEmployeePage() {
   function onSubmit(e: FormEvent) {
     e.preventDefault()
     setErr(null)
-    if (!fullName.trim()) return setErr('Full name is required.')
+    if (!firstName.trim()) return setErr('First name is required.')
+    if (!lastName.trim()) return setErr('Last name is required.')
     if (personalEmail.trim() && !isValidEmail(personalEmail.trim())) {
       return setErr('Personal email looks invalid.')
     }
@@ -228,8 +235,11 @@ export default function EditEmployeePage() {
               <Input value={e.employee_code} disabled />
               <p className="text-xs text-muted-foreground">Codes are immutable once assigned.</p>
             </div>
-            <Field label="Full name" required>
-              <Input value={fullName} onChange={(ev) => setFullName(ev.target.value)} required />
+            <Field label="First name" required>
+              <Input value={firstName} onChange={(ev) => setFirstName(ev.target.value)} required />
+            </Field>
+            <Field label="Last name" required>
+              <Input value={lastName} onChange={(ev) => setLastName(ev.target.value)} required />
             </Field>
             <Field label="Phone" required>
               <Input
