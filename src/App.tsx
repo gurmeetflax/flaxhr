@@ -16,6 +16,7 @@ import {
   Receipt,
   Settings as SettingsIcon,
   Store,
+  Sparkles,
   TrendingDown,
   Users,
   Wallet,
@@ -52,6 +53,8 @@ import FnfDetailPage from '@/pages/admin/FnfDetailPage'
 import PipsPage from '@/pages/admin/PipsPage'
 import EmployeeSnapshotPage from '@/pages/admin/EmployeeSnapshotPage'
 import MyPipPage from '@/pages/me/MyPipPage'
+import MyIncentivesPage from '@/pages/me/MyIncentivesPage'
+import MyPerformancePage from '@/pages/me/MyPerformancePage'
 import ServiceChargePage from '@/pages/admin/ServiceChargePage'
 import ServiceChargeRunPage from '@/pages/admin/ServiceChargeRunPage'
 import SalesPage from '@/pages/admin/SalesPage'
@@ -90,6 +93,8 @@ const employeeNav = [
   { to: '/me/roster', label: 'My roster', icon: CalendarDays },
   { to: '/me/leave', label: 'Leave', icon: Plane },
   { to: '/me/payslips', label: 'Payslips', icon: Receipt },
+  { to: '/me/incentives', label: 'My incentives', icon: CircleDollarSign },
+  { to: '/me/performance', label: 'My performance', icon: Sparkles },
   { to: '/me/pip', label: 'Performance plan', icon: TrendingDown },
   { to: '/me/overview', label: 'My space', icon: Home },
 ]
@@ -159,6 +164,8 @@ export default function App() {
         <Route path="/me/leave" element={<LeavePage />} />
         <Route path="/me/overview" element={<MyDashboard />} />
         <Route path="/me/payslips" element={<PayslipPage />} />
+        <Route path="/me/incentives" element={<MyIncentivesPage />} />
+        <Route path="/me/performance" element={<MyPerformancePage />} />
         <Route path="/me/pip" element={<MyPipPage />} />
         <Route path="/me/notifications" element={<NotificationsPage />} />
       </Route>
