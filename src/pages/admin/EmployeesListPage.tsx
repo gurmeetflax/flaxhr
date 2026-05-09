@@ -94,6 +94,11 @@ export default function EmployeesListPage() {
         }
         actions={
           <div className="flex items-center gap-2">
+            <Link to="/admin/employees/deleted">
+              <Button size="sm" variant="ghost" className="text-muted-foreground">
+                Deleted
+              </Button>
+            </Link>
             <Link to="/admin/employees/bulk">
               <Button size="sm" variant="secondary">
                 <Upload className="h-4 w-4" /> Bulk upload
@@ -206,11 +211,18 @@ export default function EmployeesListPage() {
                         </span>
                       </td>
                       <td className="px-4 py-3 text-right">
-                        <Link to={`/admin/employees/${e.id}`}>
-                          <Button variant="ghost" size="sm">
-                            Edit
-                          </Button>
-                        </Link>
+                        <div className="flex justify-end gap-1">
+                          <Link to={`/admin/employees/${e.id}/snapshot`}>
+                            <Button variant="ghost" size="sm">
+                              Snapshot
+                            </Button>
+                          </Link>
+                          <Link to={`/admin/employees/${e.id}`}>
+                            <Button variant="ghost" size="sm">
+                              Edit
+                            </Button>
+                          </Link>
+                        </div>
                       </td>
                     </tr>
                   ))}

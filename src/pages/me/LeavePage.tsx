@@ -33,6 +33,18 @@ export default function LeavePage() {
   const onSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     if (!typeId) return
+    if (!start || !end) {
+      toast.error('Pick a start and end date.')
+      return
+    }
+    if (end < start) {
+      toast.error('End date must be on or after the start date.')
+      return
+    }
+    if (!reason.trim()) {
+      toast.error('Please enter a reason.')
+      return
+    }
     try {
       await submit.mutateAsync({
         leave_type_id: typeId,
@@ -116,11 +128,12 @@ export default function LeavePage() {
               </select>
               <textarea
                 className="min-h-[60px] rounded-lg border border-border bg-surface p-3 text-sm"
-                placeholder="Reason (optional)"
+                placeholder="Reason (required)"
                 value={reason}
                 onChange={(e) => setReason(e.target.value)}
+                required
               />
-              <Button type="submit" loading={submit.isPending} disabled={!typeId}>Submit request</Button>
+              <Button type="submit" loading={submit.isPending} disabled={!typeId || !reason.trim()}>Submit request</Button>
             </form>
           </CardContent>
         </Card>
@@ -174,5 +187,6 @@ function humanise(msg: string): string {
   if (msg.includes('NOTICE_PERIOD_NOT_MET')) return 'Notice period not met for this leave type.'
   if (msg.includes('INSUFFICIENT_BALANCE')) return 'Insufficient balance for this leave type.'
   if (msg.includes('INVALID_LEAVE_TYPE')) return 'That leave type is no longer available.'
+  if (msg.includes('leave_requests_check')) return 'End date must be on or after the start date.'
   return msg
 }

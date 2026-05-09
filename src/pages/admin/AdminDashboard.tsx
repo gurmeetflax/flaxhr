@@ -28,38 +28,62 @@ import {
   type RosterAttendanceRow,
   type TodayPunch,
 } from '@/lib/dashboards'
+import { useCities } from '@/lib/cities'
 
 interface OutletOption {
   id: string
   display_name: string | null
+  city: string | null
 }
 
 const ALL_OUTLETS = '__all' as const
+const ALL_CITIES = '__all' as const
 
 export default function AdminDashboard() {
   const today = useMemo(() => format(new Date(), 'yyyy-MM-dd'), [])
   const [periodMonth, setPeriodMonth] = useState(
     format(startOfMonth(new Date()), 'yyyy-MM-dd'),
   )
+  const [cityFilter, setCityFilter] = useState<string>(ALL_CITIES)
   const [outletFilter, setOutletFilter] = useState<string>(ALL_OUTLETS)
 
   const outletsQ = useQuery<OutletOption[]>({
-    queryKey: ['outlets-filter'],
+    queryKey: ['outlets-filter-with-city'],
     queryFn: async () => {
       const { data, error } = await supabase
         .from('flax_outlets')
-        .select('id, display_name')
+        .select('id, display_name, city')
         .eq('active', true)
         .order('display_name')
       if (error) throw error
       return data ?? []
     },
   })
+  const citiesQ = useCities(true)
+  const allOutlets = outletsQ.data ?? []
+  const filteredOutlets = cityFilter === ALL_CITIES
+    ? allOutlets
+    : allOutlets.filter((o) => o.city === cityFilter)
 
   const outletId = outletFilter === ALL_OUTLETS ? null : outletFilter
   const summary = useAdminDashboardSummary(periodMonth, outletId)
   const rosterCheck = useRosterVsAttendance(today, outletId)
   const todayPunches = useTodayPunches(outletId)
+
+  // City-scope filtering on the cards (KPI summary still renders for the
+  // selected outlet OR all outlets; city-only narrows the today/roster view).
+  const cityOutletIds = useMemo(
+    () => new Set(filteredOutlets.map((o) => o.id)),
+    [filteredOutlets],
+  )
+  const cityFilteredRoster = useMemo(() => {
+    if (cityFilter === ALL_CITIES || outletId) return rosterCheck.data ?? []
+    return (rosterCheck.data ?? []).filter((r) => r.outlet_id && cityOutletIds.has(r.outlet_id))
+  }, [rosterCheck.data, cityFilter, outletId, cityOutletIds])
+  const cityFilteredPunches = useMemo(() => {
+    if (cityFilter === ALL_CITIES || outletId) return todayPunches.data ?? []
+    return (todayPunches.data ?? []).filter((p) => p.outlet_id && cityOutletIds.has(p.outlet_id))
+  }, [todayPunches.data, cityFilter, outletId, cityOutletIds])
 
   const periodLabel = format(new Date(periodMonth), 'MMM yyyy')
 
@@ -70,6 +94,31 @@ export default function AdminDashboard() {
         description={`HR snapshot for ${periodLabel}`}
       />
 
+      {(citiesQ.data ?? []).length > 0 ? (
+        <div className="mb-2 -mx-1 flex flex-wrap gap-2 px-1">
+          <OutletPill
+            label="All cities"
+            icon
+            active={cityFilter === ALL_CITIES}
+            onClick={() => {
+              setCityFilter(ALL_CITIES)
+              setOutletFilter(ALL_OUTLETS)
+            }}
+          />
+          {(citiesQ.data ?? []).map((c) => (
+            <OutletPill
+              key={c.id}
+              label={c.display_name}
+              active={cityFilter === c.id}
+              onClick={() => {
+                setCityFilter(c.id)
+                setOutletFilter(ALL_OUTLETS)
+              }}
+            />
+          ))}
+        </div>
+      ) : null}
+
       <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div className="-mx-1 flex flex-wrap gap-2 px-1">
           <OutletPill
@@ -78,7 +127,7 @@ export default function AdminDashboard() {
             active={outletFilter === ALL_OUTLETS}
             onClick={() => setOutletFilter(ALL_OUTLETS)}
           />
-          {outletsQ.data?.map((o) => (
+          {filteredOutlets.map((o) => (
             <OutletPill
               key={o.id}
               label={o.display_name ?? o.id}
@@ -147,8 +196,8 @@ export default function AdminDashboard() {
       <div className="mt-6 grid gap-4 lg:grid-cols-2">
         <TeamCard outletId={outletId} />
         <TodayEmployeesCard
-          rosterRows={rosterCheck.data ?? []}
-          punches={todayPunches.data ?? []}
+          rosterRows={cityFilteredRoster}
+          punches={cityFilteredPunches}
           loading={rosterCheck.isLoading || todayPunches.isLoading}
         />
       </div>

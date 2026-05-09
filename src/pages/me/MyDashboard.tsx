@@ -1,5 +1,7 @@
+import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { format } from 'date-fns'
+import { toast } from 'sonner'
 import {
   ArrowRight,
   CalendarClock,
@@ -7,9 +9,13 @@ import {
   CircleDollarSign,
   Clock,
   Clock4,
+  MessageSquare,
   Plane,
+  Send,
   XCircle,
 } from 'lucide-react'
+import { supabase } from '@/lib/supabase'
+import { useAppSetting } from '@/lib/appSettings'
 import { useMyEmployee } from '@/lib/auth'
 import { useMyLeaveBalances } from '@/lib/leave'
 import { useMyRoster } from '@/lib/roster'
@@ -216,6 +222,9 @@ export default function MyDashboard() {
           </CardContent>
         </Card>
       )}
+
+      <FeedbackCard />
+      <WhatsAppFab />
     </>
   )
 }
@@ -280,6 +289,117 @@ function TodayCard({
         </Button>
       </CardContent>
     </Card>
+  )
+}
+
+function FeedbackCard() {
+  const [category, setCategory] = useState<'company' | 'hr' | 'operations'>('hr')
+  const [message, setMessage] = useState('')
+  const [busy, setBusy] = useState(false)
+
+  async function onSubmit(e: React.FormEvent) {
+    e.preventDefault()
+    if (!message.trim()) {
+      toast.error('Write a few words.')
+      return
+    }
+    setBusy(true)
+    try {
+      const { error } = await supabase.rpc('submit_feedback', {
+        p_category: category,
+        p_message: message.trim(),
+      })
+      if (error) throw error
+      toast.success('Thanks — feedback sent to HR.')
+      setMessage('')
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : (err as { message?: string })?.message ?? 'Failed'
+      toast.error(msg)
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  return (
+    <Card className="mt-4">
+      <CardContent className="flex flex-col gap-3 p-6">
+        <div className="flex items-start gap-3">
+          <span className="grid h-10 w-10 place-items-center rounded-lg bg-primary/10 text-primary">
+            <MessageSquare className="h-5 w-5" />
+          </span>
+          <div>
+            <CardTitle>Feedback</CardTitle>
+            <CardDescription className="mt-1">
+              Anonymous to your manager — only HR sees it. Pick a category.
+            </CardDescription>
+          </div>
+        </div>
+        <form onSubmit={onSubmit} className="flex flex-col gap-2">
+          <div className="flex flex-wrap gap-1.5">
+            {(['company', 'hr', 'operations'] as const).map((c) => (
+              <button
+                key={c}
+                type="button"
+                onClick={() => setCategory(c)}
+                className={
+                  'rounded-full border px-3 py-1 text-xs font-medium capitalize transition-colors ' +
+                  (category === c
+                    ? 'border-primary bg-primary/10 text-primary'
+                    : 'border-border bg-surface text-muted-foreground hover:border-primary/50')
+                }
+              >
+                {c}
+              </button>
+            ))}
+          </div>
+          <textarea
+            className="min-h-24 rounded-lg border border-border bg-surface p-3 text-base sm:text-sm"
+            placeholder="What's on your mind?"
+            value={message}
+            onChange={(e) => setMessage(e.target.value)}
+            required
+          />
+          <div>
+            <Button type="submit" loading={busy} disabled={!message.trim()}>
+              <Send className="h-4 w-4" /> Send
+            </Button>
+          </div>
+        </form>
+      </CardContent>
+    </Card>
+  )
+}
+
+function WhatsAppFab() {
+  const { data: number = '' } = useAppSetting<string>('hr_whatsapp_number', '')
+  const { data: prefill = 'Hi HR, ' } = useAppSetting<string>(
+    'hr_whatsapp_default_message',
+    'Hi HR, ',
+  )
+  const cleanNumber = (number ?? '').replace(/[^\d]/g, '')
+  if (!cleanNumber) return null
+
+  const href = `https://wa.me/${cleanNumber}?text=${encodeURIComponent(prefill ?? 'Hi HR, ')}`
+  return (
+    <a
+      href={href}
+      target="_blank"
+      rel="noreferrer"
+      aria-label="Chat with HR on WhatsApp"
+      className="fixed bottom-6 right-6 z-50 flex h-14 w-14 items-center justify-center rounded-full bg-[#25d366] text-white shadow-lg ring-1 ring-black/5 transition-transform hover:scale-105"
+      style={{
+        bottom: 'max(1.5rem, env(safe-area-inset-bottom))',
+        right: 'max(1.5rem, env(safe-area-inset-right))',
+      }}
+    >
+      <svg
+        viewBox="0 0 32 32"
+        className="h-7 w-7 fill-current"
+        aria-hidden
+      >
+        <path d="M19.11 17.205c-.372 0-1.088 1.39-1.518 1.39a.63.63 0 0 1-.315-.1c-.802-.402-1.504-.817-2.163-1.447-.545-.516-1.146-1.29-1.46-1.963a.426.426 0 0 1-.073-.215c0-.33.99-.945.99-1.49 0-.143-.73-2.09-.832-2.335-.143-.372-.214-.487-.6-.487-.187 0-.36-.043-.53-.043-.302 0-.53.115-.746.315-.688.645-1.032 1.318-1.06 2.264v.114c-.015.99.472 1.977 1.017 2.78 1.23 1.82 2.506 3.41 4.554 4.34.616.287 2.035.946 2.722.946.444 0 1.39-.16 1.776-.776.17-.374.245-.644.245-1.045 0-.473-2.005-1.247-2.508-1.247zm-2.95 7.668c-1.418 0-2.85-.388-4.082-1.117l-2.937.94.948-2.864a8.05 8.05 0 0 1-1.305-4.408c0-4.494 3.654-8.144 8.148-8.144 4.494 0 8.144 3.65 8.144 8.144 0 4.494-3.65 8.148-8.144 8.148zm0-17.85c-5.358 0-9.71 4.354-9.71 9.71 0 1.832.51 3.546 1.395 5.005L5 27.978l5.708-1.46a9.64 9.64 0 0 0 4.452 1.087c5.357 0 9.708-4.351 9.708-9.71 0-5.355-4.35-9.703-9.708-9.703z" />
+      </svg>
+    </a>
   )
 }
 

@@ -11,10 +11,14 @@ import {
   History,
   Home,
   ListChecks,
+  LogOut,
   Plane,
   Receipt,
   Settings as SettingsIcon,
   Store,
+  ShieldAlert,
+  Sparkles,
+  TrendingDown,
   Users,
   Wallet,
 } from 'lucide-react'
@@ -28,6 +32,7 @@ import EmployeesListPage from '@/pages/admin/EmployeesListPage'
 import CreateEmployeePage from '@/pages/admin/CreateEmployeePage'
 import BulkEmployeesPage from '@/pages/admin/BulkEmployeesPage'
 import EditEmployeePage from '@/pages/admin/EditEmployeePage'
+import DeletedEmployeesPage from '@/pages/admin/DeletedEmployeesPage'
 import OutletsPage from '@/pages/admin/OutletsPage'
 import NewOutletPage from '@/pages/admin/NewOutletPage'
 import EditOutletPage from '@/pages/admin/EditOutletPage'
@@ -45,6 +50,15 @@ import GiftCodesPage from '@/pages/admin/GiftCodesPage'
 import PayrollPage from '@/pages/admin/PayrollPage'
 import PayrollRunPage from '@/pages/admin/PayrollRunPage'
 import PayslipPage from '@/pages/me/PayslipPage'
+import FnfListPage from '@/pages/admin/FnfListPage'
+import FnfDetailPage from '@/pages/admin/FnfDetailPage'
+import PipsPage from '@/pages/admin/PipsPage'
+import EmployeeSnapshotPage from '@/pages/admin/EmployeeSnapshotPage'
+import MyPipPage from '@/pages/me/MyPipPage'
+import MyIncentivesPage from '@/pages/me/MyIncentivesPage'
+import MyPerformancePage from '@/pages/me/MyPerformancePage'
+import MyGrievancesPage from '@/pages/me/MyGrievancesPage'
+import GrievancesPage from '@/pages/admin/GrievancesPage'
 import ServiceChargePage from '@/pages/admin/ServiceChargePage'
 import ServiceChargeRunPage from '@/pages/admin/ServiceChargeRunPage'
 import SalesPage from '@/pages/admin/SalesPage'
@@ -70,6 +84,9 @@ const adminNav = [
   { to: '/admin/service-charge', label: 'Service charge', icon: CircleDollarSign },
   { to: '/admin/payroll', label: 'Payroll', icon: Wallet },
   { to: '/admin/evaluations', label: 'Evaluations', icon: ClipboardCheck },
+  { to: '/admin/pips', label: 'PIPs', icon: TrendingDown },
+  { to: '/admin/grievances', label: 'Grievances', icon: ShieldAlert },
+  { to: '/admin/fnf', label: 'FnF & clearance', icon: LogOut },
   { to: '/admin/gift-codes', label: 'Birthday vouchers', icon: Gift },
   { to: '/admin/settings', label: 'Settings', icon: SettingsIcon },
 ]
@@ -81,6 +98,10 @@ const employeeNav = [
   { to: '/me/roster', label: 'My roster', icon: CalendarDays },
   { to: '/me/leave', label: 'Leave', icon: Plane },
   { to: '/me/payslips', label: 'Payslips', icon: Receipt },
+  { to: '/me/incentives', label: 'My incentives', icon: CircleDollarSign },
+  { to: '/me/performance', label: 'My performance', icon: Sparkles },
+  { to: '/me/pip', label: 'Performance plan', icon: TrendingDown },
+  { to: '/me/grievances', label: 'Grievances', icon: ShieldAlert },
   { to: '/me/overview', label: 'My space', icon: Home },
 ]
 
@@ -103,6 +124,7 @@ export default function App() {
         <Route path="/admin/outlets/new" element={<NewOutletPage />} />
         <Route path="/admin/outlets/:id" element={<EditOutletPage />} />
         <Route path="/admin/employees" element={<EmployeesListPage />} />
+        <Route path="/admin/employees/deleted" element={<DeletedEmployeesPage />} />
         <Route path="/admin/employees/new" element={<CreateEmployeePage />} />
         <Route path="/admin/employees/bulk" element={<BulkEmployeesPage />} />
         <Route path="/admin/employees/:id" element={<EditEmployeePage />} />
@@ -128,6 +150,11 @@ export default function App() {
         <Route path="/admin/gift-codes" element={<GiftCodesPage />} />
         <Route path="/admin/payroll" element={<PayrollPage />} />
         <Route path="/admin/payroll/runs/:id" element={<PayrollRunPage />} />
+        <Route path="/admin/fnf" element={<FnfListPage />} />
+        <Route path="/admin/fnf/:id" element={<FnfDetailPage />} />
+        <Route path="/admin/pips" element={<PipsPage />} />
+        <Route path="/admin/grievances" element={<GrievancesPage />} />
+        <Route path="/admin/employees/:id/snapshot" element={<EmployeeSnapshotPage />} />
         <Route path="/admin/notifications" element={<NotificationsPage />} />
       </Route>
 
@@ -145,6 +172,10 @@ export default function App() {
         <Route path="/me/leave" element={<LeavePage />} />
         <Route path="/me/overview" element={<MyDashboard />} />
         <Route path="/me/payslips" element={<PayslipPage />} />
+        <Route path="/me/incentives" element={<MyIncentivesPage />} />
+        <Route path="/me/performance" element={<MyPerformancePage />} />
+        <Route path="/me/pip" element={<MyPipPage />} />
+        <Route path="/me/grievances" element={<MyGrievancesPage />} />
         <Route path="/me/notifications" element={<NotificationsPage />} />
       </Route>
 
