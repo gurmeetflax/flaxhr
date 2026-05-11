@@ -1,4 +1,9 @@
 {
+  // TODO: add a custom domain (route) so geolocation permission persists
+  // across deploys. Browser scopes permission per origin — each unique
+  // *.workers.dev preview URL forces the user to grant again.
+  // Configure via Cloudflare dashboard → Workers → flaxhr → Domains, or
+  // add a `routes` array here pointing at a hostname under a Zone.
   "$schema": "node_modules/wrangler/config-schema.json",
   "name": "flaxhr",
   "compatibility_date": "2026-04-21",

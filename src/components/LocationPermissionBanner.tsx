@@ -21,9 +21,18 @@ export default function LocationPermissionBanner({
   const { state, refresh } = useGeoPermission()
   const [requesting, setRequesting] = useState(false)
   const [denied, setDenied] = useState(false)
+  // iOS Safari does NOT fire permissions.onchange for geolocation, so the
+  // Permissions API stays at 'prompt' even after the user grants. Track
+  // success locally so the banner disappears reliably.
+  const [grantedLocally, setGrantedLocally] = useState(false)
 
   // Don't render anything when permission is granted/unsupported.
-  if (state === 'granted' || state === 'unsupported' || state === 'unknown') {
+  if (
+    state === 'granted' ||
+    state === 'unsupported' ||
+    state === 'unknown' ||
+    grantedLocally
+  ) {
     return null
   }
 
@@ -33,6 +42,7 @@ export default function LocationPermissionBanner({
     setRequesting(true)
     try {
       await getCurrentPosition()
+      setGrantedLocally(true)
       refresh()
     } catch (e) {
       if (e instanceof GeoError && e.code === 'denied') setDenied(true)
