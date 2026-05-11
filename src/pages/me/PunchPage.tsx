@@ -211,7 +211,8 @@ export default function PunchPage() {
                   size="lg"
                   className="w-full"
                   onClick={() => fileInputRef.current?.click()}
-                  disabled={!hasGeo || !inside}
+                  disabled={!hasGeo || !inside || punch.isPending}
+                  loading={punch.isPending}
                 >
                   <Camera className="h-4 w-4" />
                   {hasGeo
