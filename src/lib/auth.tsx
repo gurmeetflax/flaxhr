@@ -93,6 +93,7 @@ export interface EmployeeRow {
   outlet_id: string | null
   is_active: boolean
   hired_on: string | null
+  selfie_required: boolean | null
 }
 
 export function useMyEmployee() {
@@ -103,7 +104,7 @@ export function useMyEmployee() {
       if (!user) return null
       const { data, error } = await supabase
         .from('v_my_employee')
-        .select('id, employee_code, user_id, first_name, last_name, full_name, personal_email, phone, outlet_id, is_active, hired_on')
+        .select('id, employee_code, user_id, first_name, last_name, full_name, personal_email, phone, outlet_id, is_active, hired_on, selfie_required')
         .maybeSingle()
       if (error) {
         console.error('[auth] v_my_employee query failed', error)

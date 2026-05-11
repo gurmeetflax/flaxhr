@@ -38,6 +38,10 @@ export default function PunchPage() {
   const [step, setStep] = useState<Step>('idle')
   const [selfie, setSelfie] = useState<{ blob: Blob; preview: string } | null>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
+  // Bumped after every successful punch so the <input type="file"> is
+  // re-mounted; iOS Safari otherwise refuses to re-open the camera with
+  // the same input element even after .value = ''.
+  const [captureKey, setCaptureKey] = useState(0)
 
   useEffect(() => {
     const stop = watchPosition(
@@ -132,6 +136,7 @@ export default function PunchPage() {
     setSelfie(null)
     setStep('idle')
     if (fileInputRef.current) fileInputRef.current.value = ''
+    setCaptureKey((k) => k + 1)
   }
 
   const hasGeo = !!coords && !geoError
@@ -275,6 +280,7 @@ export default function PunchPage() {
               ) : null}
 
               <input
+                key={captureKey}
                 ref={fileInputRef}
                 type="file"
                 accept="image/*"
