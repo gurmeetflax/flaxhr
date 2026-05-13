@@ -36,6 +36,7 @@ begin
     'public.v_my_outlet',
     'public.v_my_today_punches',
     'public.v_today_punches',
+    'public.v_daily_attendance',
     'public.v_attendance',
     'public.v_regularisations',
     'public.v_today_shift',
