@@ -27,6 +27,7 @@ export default function SettingsPage() {
         <NotificationEmailCard />
         <HrWhatsAppCard />
         <CitiesCard />
+        <StatutoryCard />
         <DesignationsCard />
       </div>
     </>
@@ -309,6 +310,67 @@ function CitiesCard() {
         ) : null}
       </CardContent>
     </Card>
+  )
+}
+
+function StatutoryCard() {
+  const { data: pfRate = 12 } = useAppSetting<number>('pf_rate_pct', 12)
+  const { data: ptAmount = 200 } = useAppSetting<number>('pt_amount', 200)
+  const { data: esicRate = 0.75 } = useAppSetting<number>('esic_rate_pct', 0.75)
+  const { data: esicMax = 21000 } = useAppSetting<number>('esic_max_gross', 21000)
+  const setting = useSetAppSetting()
+
+  const [pf, setPf] = useState(String(pfRate))
+  const [pt, setPt] = useState(String(ptAmount))
+  const [esic, setEsic] = useState(String(esicRate))
+  const [esicMaxStr, setEsicMaxStr] = useState(String(esicMax))
+
+  async function save(key: string, value: number) {
+    try {
+      await setting.mutateAsync({ key, value })
+      toast.success('Saved')
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : 'Could not save')
+    }
+  }
+
+  return (
+    <Card>
+      <CardContent className="flex flex-col gap-3 p-6">
+        <div>
+          <CardTitle>Statutory deductions</CardTitle>
+          <CardDescription className="mt-1">
+            Default rates applied when an employee has the corresponding flag enabled.
+          </CardDescription>
+        </div>
+        <div className="grid gap-3 sm:grid-cols-2">
+          <NumRow label="PF rate (%)" value={pf} setValue={setPf} onSave={() => save('pf_rate_pct', Number(pf))} />
+          <NumRow label="PT amount (₹/month)" value={pt} setValue={setPt} onSave={() => save('pt_amount', Number(pt))} />
+          <NumRow label="ESIC rate (%)" value={esic} setValue={setEsic} onSave={() => save('esic_rate_pct', Number(esic))} />
+          <NumRow label="ESIC max gross (₹)" value={esicMaxStr} setValue={setEsicMaxStr} onSave={() => save('esic_max_gross', Number(esicMaxStr))} />
+        </div>
+      </CardContent>
+    </Card>
+  )
+}
+
+function NumRow({
+  label, value, setValue, onSave,
+}: { label: string; value: string; setValue: (s: string) => void; onSave: () => void }) {
+  return (
+    <div>
+      <Label className="mb-1 block text-xs">{label}</Label>
+      <div className="flex gap-2">
+        <Input
+          type="number"
+          inputMode="decimal"
+          step="0.01"
+          value={value}
+          onChange={(e) => setValue(e.target.value)}
+        />
+        <Button size="sm" variant="outline" onClick={onSave}>Save</Button>
+      </div>
+    </div>
   )
 }
 

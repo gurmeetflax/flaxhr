@@ -143,7 +143,11 @@ function UploadCard({
           Required columns: <span className="font-mono">first_name</span>,{' '}
           <span className="font-mono">last_name</span>,{' '}
           <span className="font-mono">outlet_id</span>. Optional:{' '}
-          <span className="font-mono">personal_email, phone, designation_code, hired_on, monthly_salary, date_of_birth</span>.
+          <span className="font-mono">
+            personal_email, phone, designation_code, hired_on, monthly_salary, date_of_birth,
+            address, emergency_contact_name, emergency_contact_phone, home_lat, home_lng,
+            aadhaar_last4, pan_last4, pf_enabled, pt_enabled, esic_enabled
+          </span>. Bool columns accept yes/no/true/false/1/0.
           Header row required; column order is flexible. Legacy <span className="font-mono">full_name</span> is still accepted and split on the first space.
         </CardDescription>
 

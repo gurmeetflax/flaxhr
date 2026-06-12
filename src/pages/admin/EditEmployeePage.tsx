@@ -48,6 +48,9 @@ interface Employee {
   kyc_verified_at: string | null
   kyc_notes: string | null
   selfie_required: boolean | null
+  pf_enabled: boolean
+  pt_enabled: boolean
+  esic_enabled: boolean
 }
 
 interface OutletOption {
@@ -67,7 +70,7 @@ export default function EditEmployeePage() {
       const { data, error } = await supabase
         .from('v_employees')
         .select(
-          'id, employee_code, first_name, last_name, full_name, phone, personal_email, outlet_id, is_active, hired_on, monthly_salary, exit_date, exit_reason, designation_code, date_of_birth, address, emergency_contact_name, emergency_contact_phone, home_lat, home_lng, aadhaar_last4, pan_last4, kyc_status, kyc_verified_at, kyc_notes, selfie_required',
+          'id, employee_code, first_name, last_name, full_name, phone, personal_email, outlet_id, is_active, hired_on, monthly_salary, exit_date, exit_reason, designation_code, date_of_birth, address, emergency_contact_name, emergency_contact_phone, home_lat, home_lng, aadhaar_last4, pan_last4, kyc_status, kyc_verified_at, kyc_notes, selfie_required, pf_enabled, pt_enabled, esic_enabled',
         )
         .eq('id', id)
         .maybeSingle()
@@ -109,6 +112,9 @@ export default function EditEmployeePage() {
   const [homeLng, setHomeLng] = useState('')
   // 'inherit' = null, 'always' = true, 'never' = false
   const [selfieMode, setSelfieMode] = useState<'inherit' | 'always' | 'never'>('inherit')
+  const [pfEnabled, setPfEnabled] = useState(false)
+  const [ptEnabled, setPtEnabled] = useState(false)
+  const [esicEnabled, setEsicEnabled] = useState(false)
   const [err, setErr] = useState<string | null>(null)
 
   useEffect(() => {
@@ -134,6 +140,9 @@ export default function EditEmployeePage() {
       e.selfie_required === true ? 'always' :
       e.selfie_required === false ? 'never' : 'inherit'
     )
+    setPfEnabled(!!e.pf_enabled)
+    setPtEnabled(!!e.pt_enabled)
+    setEsicEnabled(!!e.esic_enabled)
   }, [employeeQ.data])
 
   const save = useMutation({
@@ -168,6 +177,9 @@ export default function EditEmployeePage() {
         selfie_required:
           selfieMode === 'always' ? true :
           selfieMode === 'never' ? false : null,
+        pf_enabled: pfEnabled,
+        pt_enabled: ptEnabled,
+        esic_enabled: esicEnabled,
       }
       const { error } = await supabase
         .schema('core' as never)
@@ -432,6 +444,42 @@ export default function EditEmployeePage() {
                     {m === 'inherit' ? 'Default (use global)' : m === 'always' ? 'Always required' : 'Never required'}
                   </button>
                 ))}
+              </div>
+            </div>
+
+            <div className="sm:col-span-2 grid gap-2 rounded-lg border border-border bg-muted/30 p-3">
+              <Label>Statutory deductions</Label>
+              <p className="text-xs text-muted-foreground">
+                Applied automatically by payroll. Rates live in Settings.
+              </p>
+              <div className="flex flex-wrap gap-4 text-sm">
+                <label className="flex items-center gap-2">
+                  <input
+                    type="checkbox"
+                    checked={pfEnabled}
+                    onChange={(e) => setPfEnabled(e.target.checked)}
+                    className="h-4 w-4 rounded border-border text-primary"
+                  />
+                  PF (Provident Fund)
+                </label>
+                <label className="flex items-center gap-2">
+                  <input
+                    type="checkbox"
+                    checked={ptEnabled}
+                    onChange={(e) => setPtEnabled(e.target.checked)}
+                    className="h-4 w-4 rounded border-border text-primary"
+                  />
+                  PT (Professional Tax)
+                </label>
+                <label className="flex items-center gap-2">
+                  <input
+                    type="checkbox"
+                    checked={esicEnabled}
+                    onChange={(e) => setEsicEnabled(e.target.checked)}
+                    className="h-4 w-4 rounded border-border text-primary"
+                  />
+                  ESIC (only if gross ≤ ₹21,000)
+                </label>
               </div>
             </div>
 

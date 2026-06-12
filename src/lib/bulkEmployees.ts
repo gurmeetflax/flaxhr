@@ -17,6 +17,16 @@ export const BULK_COLUMNS = [
   'hired_on',
   'monthly_salary',
   'date_of_birth',
+  'address',
+  'emergency_contact_name',
+  'emergency_contact_phone',
+  'home_lat',
+  'home_lng',
+  'aadhaar_last4',
+  'pan_last4',
+  'pf_enabled',
+  'pt_enabled',
+  'esic_enabled',
 ] as const
 
 export type BulkColumn = (typeof BULK_COLUMNS)[number]
@@ -33,6 +43,16 @@ export interface RawRow {
   hired_on: string
   monthly_salary: string
   date_of_birth: string
+  address: string
+  emergency_contact_name: string
+  emergency_contact_phone: string
+  home_lat: string
+  home_lng: string
+  aadhaar_last4: string
+  pan_last4: string
+  pf_enabled: string
+  pt_enabled: string
+  esic_enabled: string
 }
 
 export interface ValidatedRow extends RawRow {
@@ -97,8 +117,22 @@ export function parseCsv(text: string): RawRow[] {
       hired_on: (row.hired_on ?? '').trim(),
       monthly_salary: (row.monthly_salary ?? '').trim(),
       date_of_birth: (row.date_of_birth ?? '').trim(),
+      address: (row.address ?? '').trim(),
+      emergency_contact_name: (row.emergency_contact_name ?? '').trim(),
+      emergency_contact_phone: (row.emergency_contact_phone ?? '').trim().replace(/\s+/g, ''),
+      home_lat: (row.home_lat ?? '').trim(),
+      home_lng: (row.home_lng ?? '').trim(),
+      aadhaar_last4: (row.aadhaar_last4 ?? '').trim(),
+      pan_last4: (row.pan_last4 ?? '').trim().toUpperCase(),
+      pf_enabled: (row.pf_enabled ?? '').trim().toLowerCase(),
+      pt_enabled: (row.pt_enabled ?? '').trim().toLowerCase(),
+      esic_enabled: (row.esic_enabled ?? '').trim().toLowerCase(),
     })
   })
+}
+
+function parseBool(s: string): boolean {
+  return ['1', 'true', 'yes', 'y', 'tick', 'on'].includes(s)
 }
 
 export interface ValidateContext {
@@ -144,6 +178,12 @@ export function validateRows(rows: RawRow[], ctx: ValidateContext): ValidatedRow
       const n = Number(r.monthly_salary)
       if (Number.isNaN(n) || n < 0) errors.push('monthly_salary must be a non-negative number')
     }
+    if (r.home_lat && Number.isNaN(Number(r.home_lat))) errors.push('home_lat must be a number')
+    if (r.home_lng && Number.isNaN(Number(r.home_lng))) errors.push('home_lng must be a number')
+    if (r.aadhaar_last4 && !/^[0-9]{4}$/.test(r.aadhaar_last4))
+      errors.push('aadhaar_last4 must be 4 digits')
+    if (r.pan_last4 && !/^[A-Z0-9]{4}$/.test(r.pan_last4))
+      errors.push('pan_last4 must be 4 alphanumeric chars')
     return { ...r, errors }
   })
 }
@@ -227,6 +267,16 @@ export async function importOne(row: ValidatedRow): Promise<ImportedRow> {
         hired_on: row.hired_on || null,
         monthly_salary: row.monthly_salary ? Number(row.monthly_salary) : null,
         date_of_birth: row.date_of_birth || null,
+        address: row.address || null,
+        emergency_contact_name: row.emergency_contact_name || null,
+        emergency_contact_phone: row.emergency_contact_phone || null,
+        home_lat: row.home_lat ? Number(row.home_lat) : null,
+        home_lng: row.home_lng ? Number(row.home_lng) : null,
+        aadhaar_last4: row.aadhaar_last4 || null,
+        pan_last4: row.pan_last4 || null,
+        pf_enabled: parseBool(row.pf_enabled),
+        pt_enabled: parseBool(row.pt_enabled),
+        esic_enabled: parseBool(row.esic_enabled),
       })
     if (empErr) throw empErr
 
@@ -263,6 +313,6 @@ export function resultsToCsv(results: ImportedRow[]): string {
 
 export const TEMPLATE_CSV = [
   BULK_COLUMNS.join(','),
-  'Asha,Sharma,asha@example.com,9876500001,BND,cashier,2026-04-01,18000,1995-06-12',
-  'Ravi,Kumar,,9876500002,BND,helper,,15000,',
+  'Asha,Sharma,asha@example.com,9876500001,BND,cashier,2026-04-01,18000,1995-06-12,"Sion, Mumbai",Ravi Sharma,9876511111,19.0420,72.8607,1234,AB12,yes,yes,yes',
+  'Ravi,Kumar,,9876500002,BND,helper,,15000,,,,,,,,,,,',
 ].join('\n')
