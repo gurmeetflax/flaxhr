@@ -54,6 +54,9 @@ export default function CreateEmployeePage() {
   const [homeLat, setHomeLat] = useState('')
   const [homeLng, setHomeLng] = useState('')
   const [aadhaarLast4, setAadhaarLast4] = useState('')
+  const [pfEnabled, setPfEnabled] = useState(false)
+  const [ptEnabled, setPtEnabled] = useState(false)
+  const [esicEnabled, setEsicEnabled] = useState(false)
   const [panLast4, setPanLast4] = useState('')
   const [aadhaarFile, setAadhaarFile] = useState<File | null>(null)
   const [panFile, setPanFile] = useState<File | null>(null)
@@ -196,6 +199,9 @@ export default function CreateEmployeePage() {
           home_lng: lngNum,
           aadhaar_last4: aClean || null,
           pan_last4: pClean || null,
+          pf_enabled: pfEnabled,
+          pt_enabled: ptEnabled,
+          esic_enabled: esicEnabled,
         })
         .select('id')
         .single()
@@ -501,6 +507,25 @@ export default function CreateEmployeePage() {
                     placeholder={String(defaultUniformMonths)}
                   />
                 </div>
+              </div>
+            </div>
+
+            <div className="sm:col-span-2 grid gap-2 rounded-lg border border-border bg-muted/30 p-3">
+              <Label>Statutory deductions</Label>
+              <p className="text-xs text-muted-foreground">Applied automatically by payroll. Rates live in Settings.</p>
+              <div className="flex flex-wrap gap-4 text-sm">
+                <label className="flex items-center gap-2">
+                  <input type="checkbox" checked={pfEnabled} onChange={(e) => setPfEnabled(e.target.checked)} className="h-4 w-4 rounded border-border text-primary" />
+                  PF
+                </label>
+                <label className="flex items-center gap-2">
+                  <input type="checkbox" checked={ptEnabled} onChange={(e) => setPtEnabled(e.target.checked)} className="h-4 w-4 rounded border-border text-primary" />
+                  PT
+                </label>
+                <label className="flex items-center gap-2">
+                  <input type="checkbox" checked={esicEnabled} onChange={(e) => setEsicEnabled(e.target.checked)} className="h-4 w-4 rounded border-border text-primary" />
+                  ESIC
+                </label>
               </div>
             </div>
 
