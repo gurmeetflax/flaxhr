@@ -142,7 +142,7 @@ function UploadCard({
         <CardDescription>
           Required columns: <span className="font-mono">first_name</span>,{' '}
           <span className="font-mono">last_name</span>,{' '}
-          <span className="font-mono">outlet_id</span>. Optional:{' '}
+          <span className="font-mono">outlet_id</span> (slug like <span className="font-mono">head_office</span> OR the display name like <span className="font-mono">Head Office</span>). Optional:{' '}
           <span className="font-mono">
             personal_email, phone, designation_code, hired_on, monthly_salary, date_of_birth,
             address, emergency_contact_name, emergency_contact_phone, home_lat, home_lng,

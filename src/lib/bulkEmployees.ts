@@ -137,7 +137,11 @@ function parseBool(s: string): boolean {
 
 export interface ValidateContext {
   validOutletIds: Set<string>
+  /** Resolve a display name (case-insensitive) to its canonical outlet id. */
+  outletAliases: Map<string, string>
   validDesignationCodes: Set<string>
+  /** Resolve a designation display name (case-insensitive) to its code. */
+  designationAliases: Map<string, string>
   existingPhones: Set<string>
   existingEmails: Set<string>
 }
@@ -153,11 +157,33 @@ export function validateRows(rows: RawRow[], ctx: ValidateContext): ValidatedRow
     const normName = r.full_name.toLowerCase().replace(/\s+/g, ' ')
     if (normName && seenNames.has(normName)) errors.push('duplicate name in this CSV')
     seenNames.add(normName)
-    if (!r.outlet_id) errors.push('outlet_id is required')
-    else if (!ctx.validOutletIds.has(r.outlet_id))
-      errors.push(`outlet_id "${r.outlet_id}" not found`)
-    if (r.designation_code && !ctx.validDesignationCodes.has(r.designation_code))
-      errors.push(`designation_code "${r.designation_code}" not found`)
+
+    // Accept either the outlet slug or its display name (case-insensitive).
+    if (!r.outlet_id) {
+      errors.push('outlet_id is required')
+    } else {
+      const raw = r.outlet_id
+      if (ctx.validOutletIds.has(raw)) {
+        // OK — already canonical.
+      } else {
+        const alias = ctx.outletAliases.get(raw.toLowerCase().trim())
+        if (alias) {
+          r.outlet_id = alias // canonicalise
+        } else {
+          errors.push(`outlet_id "${raw}" not found`)
+        }
+      }
+    }
+    if (r.designation_code) {
+      if (!ctx.validDesignationCodes.has(r.designation_code)) {
+        const alias = ctx.designationAliases.get(r.designation_code.toLowerCase().trim())
+        if (alias) {
+          r.designation_code = alias
+        } else {
+          errors.push(`designation_code "${r.designation_code}" not found`)
+        }
+      }
+    }
     if (r.personal_email) {
       if (!isValidEmail(r.personal_email)) errors.push('personal_email looks invalid')
       else if (seenEmails.has(r.personal_email)) errors.push('duplicate personal_email in this CSV')
@@ -194,28 +220,54 @@ export function validateRows(rows: RawRow[], ctx: ValidateContext): ValidatedRow
  */
 export async function fetchValidationContext(): Promise<ValidateContext> {
   const [outletsRes, employeesRes, designationsRes] = await Promise.all([
-    supabase.from('flax_outlets').select('id').eq('active', true),
+    supabase.from('flax_outlets').select('id, display_name, name').eq('active', true),
     supabase
       .schema('core' as never)
       .from('employees')
       .select('phone, personal_email')
       .is('deleted_at', null),
-    supabase.from('v_designations').select('code').eq('is_active', true),
+    supabase.from('v_designations').select('code, name').eq('is_active', true),
   ])
   if (outletsRes.error) throw outletsRes.error
   if (employeesRes.error) throw employeesRes.error
   if (designationsRes.error) throw designationsRes.error
-  const validOutletIds = new Set((outletsRes.data ?? []).map((o) => o.id as string))
-  const validDesignationCodes = new Set(
-    (designationsRes.data ?? []).map((d) => d.code as string),
-  )
+
+  const outlets = (outletsRes.data ?? []) as Array<{
+    id: string
+    display_name: string | null
+    name: string | null
+  }>
+  const validOutletIds = new Set(outlets.map((o) => o.id))
+  const outletAliases = new Map<string, string>()
+  for (const o of outlets) {
+    if (o.display_name) outletAliases.set(o.display_name.toLowerCase().trim(), o.id)
+    if (o.name) outletAliases.set(o.name.toLowerCase().trim(), o.id)
+  }
+
+  const designations = (designationsRes.data ?? []) as Array<{
+    code: string
+    name: string | null
+  }>
+  const validDesignationCodes = new Set(designations.map((d) => d.code))
+  const designationAliases = new Map<string, string>()
+  for (const d of designations) {
+    if (d.name) designationAliases.set(d.name.toLowerCase().trim(), d.code)
+  }
+
   const existingPhones = new Set<string>()
   const existingEmails = new Set<string>()
   for (const e of (employeesRes.data ?? []) as Array<{ phone: string | null; personal_email: string | null }>) {
     if (e.phone) existingPhones.add(e.phone)
     if (e.personal_email) existingEmails.add(e.personal_email.toLowerCase())
   }
-  return { validOutletIds, validDesignationCodes, existingPhones, existingEmails }
+  return {
+    validOutletIds,
+    outletAliases,
+    validDesignationCodes,
+    designationAliases,
+    existingPhones,
+    existingEmails,
+  }
 }
 
 /** Cryptographically random 6-digit PIN. */
