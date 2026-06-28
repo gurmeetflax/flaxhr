@@ -17,6 +17,7 @@ import {
   Settings as SettingsIcon,
   Store,
   ShieldAlert,
+  PenTool,
   Sparkles,
   TrendingDown,
   Users,
@@ -58,6 +59,7 @@ import MyPipPage from '@/pages/me/MyPipPage'
 import MyIncentivesPage from '@/pages/me/MyIncentivesPage'
 import MyPerformancePage from '@/pages/me/MyPerformancePage'
 import MyGrievancesPage from '@/pages/me/MyGrievancesPage'
+import SignaturePage from '@/pages/me/SignaturePage'
 import GrievancesPage from '@/pages/admin/GrievancesPage'
 import ServiceChargePage from '@/pages/admin/ServiceChargePage'
 import ServiceChargeRunPage from '@/pages/admin/ServiceChargeRunPage'
@@ -102,6 +104,7 @@ const employeeNav = [
   { to: '/me/performance', label: 'My performance', icon: Sparkles },
   { to: '/me/pip', label: 'Performance plan', icon: TrendingDown },
   { to: '/me/grievances', label: 'Grievances', icon: ShieldAlert },
+  { to: '/me/signature', label: 'Email signature', icon: PenTool },
   { to: '/me/overview', label: 'My space', icon: Home },
 ]
 
@@ -176,6 +179,7 @@ export default function App() {
         <Route path="/me/performance" element={<MyPerformancePage />} />
         <Route path="/me/pip" element={<MyPipPage />} />
         <Route path="/me/grievances" element={<MyGrievancesPage />} />
+        <Route path="/me/signature" element={<SignaturePage />} />
         <Route path="/me/notifications" element={<NotificationsPage />} />
       </Route>
 
