@@ -59,7 +59,7 @@ import MyPipPage from '@/pages/me/MyPipPage'
 import MyIncentivesPage from '@/pages/me/MyIncentivesPage'
 import MyPerformancePage from '@/pages/me/MyPerformancePage'
 import MyGrievancesPage from '@/pages/me/MyGrievancesPage'
-import SignaturePage from '@/pages/me/SignaturePage'
+import SignaturePage from '@/pages/admin/SignaturePage'
 import GrievancesPage from '@/pages/admin/GrievancesPage'
 import ServiceChargePage from '@/pages/admin/ServiceChargePage'
 import ServiceChargeRunPage from '@/pages/admin/ServiceChargeRunPage'
@@ -90,6 +90,7 @@ const adminNav = [
   { to: '/admin/grievances', label: 'Grievances', icon: ShieldAlert },
   { to: '/admin/fnf', label: 'FnF & clearance', icon: LogOut },
   { to: '/admin/gift-codes', label: 'Birthday vouchers', icon: Gift },
+  { to: '/admin/signature', label: 'Email signature', icon: PenTool },
   { to: '/admin/settings', label: 'Settings', icon: SettingsIcon },
 ]
 
@@ -104,7 +105,6 @@ const employeeNav = [
   { to: '/me/performance', label: 'My performance', icon: Sparkles },
   { to: '/me/pip', label: 'Performance plan', icon: TrendingDown },
   { to: '/me/grievances', label: 'Grievances', icon: ShieldAlert },
-  { to: '/me/signature', label: 'Email signature', icon: PenTool },
   { to: '/me/overview', label: 'My space', icon: Home },
 ]
 
@@ -151,6 +151,7 @@ export default function App() {
         />
         <Route path="/admin/settings" element={<SettingsPage />} />
         <Route path="/admin/gift-codes" element={<GiftCodesPage />} />
+        <Route path="/admin/signature" element={<SignaturePage />} />
         <Route path="/admin/payroll" element={<PayrollPage />} />
         <Route path="/admin/payroll/runs/:id" element={<PayrollRunPage />} />
         <Route path="/admin/fnf" element={<FnfListPage />} />
@@ -179,7 +180,6 @@ export default function App() {
         <Route path="/me/performance" element={<MyPerformancePage />} />
         <Route path="/me/pip" element={<MyPipPage />} />
         <Route path="/me/grievances" element={<MyGrievancesPage />} />
-        <Route path="/me/signature" element={<SignaturePage />} />
         <Route path="/me/notifications" element={<NotificationsPage />} />
       </Route>
 
