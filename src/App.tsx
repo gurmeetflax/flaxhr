@@ -7,6 +7,7 @@ import {
   ClipboardCheck,
   ClipboardList,
   CircleDollarSign,
+  FileBarChart,
   Gift,
   History,
   Home,
@@ -62,6 +63,7 @@ import GrievancesPage from '@/pages/admin/GrievancesPage'
 import ServiceChargePage from '@/pages/admin/ServiceChargePage'
 import ServiceChargeRunPage from '@/pages/admin/ServiceChargeRunPage'
 import SalesPage from '@/pages/admin/SalesPage'
+import ReportsPage from '@/pages/admin/ReportsPage'
 import MyDashboard from '@/pages/me/MyDashboard'
 import PunchPage from '@/pages/me/PunchPage'
 import MyAttendancePage from '@/pages/me/MyAttendancePage'
@@ -75,6 +77,7 @@ const adminNav = [
   { to: '/admin/outlets', label: 'Outlets', icon: Store },
   { to: '/admin/employees', label: 'Employees', icon: Users },
   { to: '/admin/attendance', label: 'Attendance', icon: ClipboardList },
+  { to: '/admin/reports', label: 'Reports', icon: FileBarChart },
   { to: '/admin/regularisations', label: 'Regularisations', icon: CheckSquare },
   { to: '/admin/shifts', label: 'Shifts', icon: Clock },
   { to: '/admin/roster', label: 'Roster', icon: CalendarRange },
@@ -129,6 +132,7 @@ export default function App() {
         <Route path="/admin/employees/bulk" element={<BulkEmployeesPage />} />
         <Route path="/admin/employees/:id" element={<EditEmployeePage />} />
         <Route path="/admin/attendance" element={<AttendancePage />} />
+        <Route path="/admin/reports" element={<ReportsPage />} />
         <Route path="/admin/regularisations" element={<RegularisationsPage />} />
         <Route path="/admin/shifts" element={<ShiftsPage />} />
         <Route path="/admin/roster" element={<RosterPage />} />
