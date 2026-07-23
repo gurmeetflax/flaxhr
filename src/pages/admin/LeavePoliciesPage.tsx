@@ -4,12 +4,30 @@ import { PageHeader } from '@/components/layout/AppShell'
 import { Card, CardContent, CardDescription, CardTitle } from '@/components/ui/Card'
 import { Input } from '@/components/ui/Input'
 import { Button } from '@/components/ui/Button'
-import { useLeaveTypes, useUpsertLeaveType, type LeaveType } from '@/lib/leave'
+import { Trash2 } from 'lucide-react'
+import { useDeleteLeaveType, useLeaveTypes, useUpsertLeaveType, type LeaveType } from '@/lib/leave'
 
 export default function LeavePoliciesPage() {
   const { data: types = [] } = useLeaveTypes()
   const upsert = useUpsertLeaveType()
+  const del = useDeleteLeaveType()
   const [edit, setEdit] = useState<Partial<LeaveType> | null>(null)
+
+  const remove = async (t: LeaveType) => {
+    if (
+      !window.confirm(
+        `Deactivate "${t.name}"?\n\nExisting balances and history stay intact, but employees can no longer request this type and it disappears from the admin views.`,
+      )
+    )
+      return
+    try {
+      await del.mutateAsync(t.id)
+      toast.success(`${t.name} deactivated`)
+      if (edit?.id === t.id) setEdit(null)
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : 'Failed')
+    }
+  }
 
   const save = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -93,7 +111,19 @@ export default function LeavePoliciesPage() {
                       {t.max_balance != null ? ` · max ${t.max_balance}` : ''} · {t.min_notice_days}d notice
                     </span>
                   </div>
-                  <Button size="sm" variant="outline" onClick={() => setEdit(t)}>Edit</Button>
+                  <div className="flex gap-2">
+                    <Button size="sm" variant="outline" onClick={() => setEdit(t)}>Edit</Button>
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      onClick={() => remove(t)}
+                      loading={del.isPending}
+                      aria-label={`Delete ${t.name}`}
+                      className="text-destructive hover:text-destructive"
+                    >
+                      <Trash2 className="h-4 w-4" />
+                    </Button>
+                  </div>
                 </li>
               ))}
             </ul>

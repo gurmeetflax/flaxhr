@@ -71,6 +71,32 @@ export function useUpsertLeaveType() {
   })
 }
 
+/**
+ * Soft-deletes a leave type by flipping is_active=false. Hard delete is
+ * unsafe because core.leave_requests / core.leave_balances /
+ * core.leave_balance_adjustments all FK to leave_types and cascading
+ * would wipe history. Inactive types stop appearing in the employee
+ * request form + admin balances grid but historical rows stay intact.
+ */
+export function useDeleteLeaveType() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: async (id: string) => {
+      const { error } = await supabase
+        .schema('core')
+        .from('leave_types')
+        .update({ is_active: false })
+        .eq('id', id)
+      if (error) throw error
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['leave-types'] })
+      qc.invalidateQueries({ queryKey: ['employee-leave-balances'] })
+      qc.invalidateQueries({ queryKey: ['my-leave-balances'] })
+    },
+  })
+}
+
 export function useMyLeaveBalances() {
   const { user } = useAuth()
   return useQuery<LeaveBalance[]>({
