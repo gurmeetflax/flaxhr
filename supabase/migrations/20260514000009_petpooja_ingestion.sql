@@ -209,7 +209,10 @@ with (security_invoker = true) as
   select
     outlet_id,
     date_trunc('month', created_on at time zone 'Asia/Kolkata')::date as period_month,
-    sum(total) filter (where status = 'Success') as amount,
+    -- Cast to numeric(14,2) so the outer coalesce with
+    -- outlet_monthly_sales.amount doesn't change the column's declared
+    -- type (CREATE OR REPLACE VIEW forbids type changes).
+    sum(total) filter (where status = 'Success')::numeric(14,2) as amount,
     count(*)  filter (where status = 'Success') as tickets
   from core.petpooja_orders
   where outlet_id is not null and created_on is not null
@@ -225,7 +228,7 @@ with (security_invoker = true) as
   select
     coalesce(s.outlet_id, p.outlet_id)                                as outlet_id,
     coalesce(s.period_month, p.period_month)                          as period_month,
-    coalesce(s.amount, p.amount)                                      as amount,
+    coalesce(s.amount, p.amount)::numeric(14,2)                       as amount,
     coalesce(s.updated_at, now())                                     as updated_at,
     o.display_name                                                    as outlet_name,
     p.amount                                                          as auto_amount,
