@@ -21,7 +21,10 @@ begin
     'core.notifications',
     'core.notification_prefs',
     'core.gift_codes',
-    'core.birthday_log'
+    'core.birthday_log',
+    'core.uniforms',
+    'core.warnings',
+    'core.employee_documents'
   ]) loop
     if to_regclass(t) is null then
       missing := missing || t;
@@ -39,6 +42,7 @@ begin
     'public.v_daily_attendance',
     'public.v_attendance_report',
     'public.v_employee_leave_summary',
+    'public.v_employee_snapshot',
     'public.v_attendance',
     'public.v_regularisations',
     'public.v_today_shift',
