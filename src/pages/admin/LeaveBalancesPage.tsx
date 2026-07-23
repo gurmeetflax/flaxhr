@@ -1,5 +1,6 @@
 import { useMemo, useState } from 'react'
 import { toast } from 'sonner'
+import { humanErr } from '@/lib/humanErr'
 import { PageHeader } from '@/components/layout/AppShell'
 import { Card, CardContent, CardDescription, CardTitle } from '@/components/ui/Card'
 import { Input } from '@/components/ui/Input'
@@ -68,7 +69,7 @@ export default function LeaveBalancesPage() {
       const n = await accrue.mutateAsync(undefined)
       toast.success(`Accrual complete — ${n} credits`)
     } catch (e) {
-      toast.error(e instanceof Error ? e.message : 'Accrual failed')
+      toast.error(humanErr(e, 'Accrual failed'))
     }
   }
 
@@ -83,7 +84,7 @@ export default function LeaveBalancesPage() {
       const n = await backfill.mutateAsync()
       toast.success(`${n} opening credits granted`)
     } catch (e) {
-      toast.error(e instanceof Error ? e.message : 'Backfill failed')
+      toast.error(humanErr(e, 'Backfill failed'))
     }
   }
 
@@ -221,7 +222,7 @@ function AdjustModal({
       toast.success(`${employee.employee_code}: ${n > 0 ? '+' : ''}${n} ${type?.leave_code}`)
       onClose()
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : 'Failed')
+      toast.error(humanErr(err, 'Failed'))
     }
   }
 

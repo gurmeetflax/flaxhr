@@ -25,6 +25,7 @@ import { Button } from '@/components/ui/Button'
 import { Input } from '@/components/ui/Input'
 import { Label } from '@/components/ui/Label'
 import { useEmployeeScore, useUpsertKnowledgeScore } from '@/lib/score'
+import { humanErr } from '@/lib/humanErr'
 import { useEmployeeSnapshot, useSignedUrl } from '@/lib/employeeSnapshot'
 
 const IST = 'Asia/Kolkata'
@@ -164,10 +165,10 @@ export default function EmployeeSnapshotPage() {
             {scoreQ.isPending ? (
               <div className="text-muted-foreground text-sm">Loading…</div>
             ) : scoreQ.isError ? (
-              <div className="text-destructive text-xs" title={String(scoreQ.error)}>
+              <div className="text-destructive text-xs" title={humanErr(scoreQ.error)}>
                 Failed to load
-                <div className="mt-1 text-[10px] font-mono">
-                  {scoreQ.error instanceof Error ? scoreQ.error.message : String(scoreQ.error)}
+                <div className="mt-1 text-[10px] font-mono break-all">
+                  {humanErr(scoreQ.error)}
                 </div>
               </div>
             ) : (
@@ -187,8 +188,8 @@ export default function EmployeeSnapshotPage() {
             {scoreQ.isPending ? (
               <CardDescription>Loading…</CardDescription>
             ) : scoreQ.isError ? (
-              <CardDescription className="text-destructive">
-                {scoreQ.error instanceof Error ? scoreQ.error.message : 'Failed to load'}
+              <CardDescription className="text-destructive break-all">
+                {humanErr(scoreQ.error)}
               </CardDescription>
             ) : scoreQ.data ? (
               <div className="flex flex-col gap-2">
