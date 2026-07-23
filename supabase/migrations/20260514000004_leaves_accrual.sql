@@ -377,11 +377,13 @@ grant select on public.v_employee_leave_balances to authenticated;
 do $$
 begin
   if exists (select 1 from pg_extension where extname = 'pg_cron') then
-    -- 02:00 IST on the 1st of every month == 20:30 UTC previous day
+    -- pg_cron doesn't accept 'L' (last day of month). Run at 00:30 UTC
+    -- (06:00 IST) on the 1st of every month. accrue_monthly_leaves is
+    -- idempotent per (employee, leave_type, month) so re-runs are safe.
     perform cron.schedule(
       'leaves-monthly-accrual',
-      '30 20 L * *',  -- last day of month, 20:30 UTC → 02:00 IST next day (1st)
-      $sql$select public.accrue_monthly_leaves(current_date + interval '1 day')$sql$
+      '30 0 1 * *',
+      $sql$select public.accrue_monthly_leaves(current_date)$sql$
     );
     raise notice 'Scheduled leaves-monthly-accrual via pg_cron';
   else
