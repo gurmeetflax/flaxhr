@@ -20,7 +20,6 @@ with (security_invoker = true) as
          e.hired_on, e.created_at, e.updated_at,
          e.monthly_salary, e.exit_date, e.exit_reason,
          e.designation_code,
-         d.name as designation_name,
          e.date_of_birth, e.address,
          e.emergency_contact_name, e.emergency_contact_phone,
          e.home_lat, e.home_lng,
@@ -29,8 +28,9 @@ with (security_invoker = true) as
          e.selfie_required,
          e.pf_enabled, e.pt_enabled, e.esic_enabled,
          o.display_name as outlet_name,
-         o.city as outlet_city
-    from core.employees e
+         o.city as outlet_city,
+         d.name as designation_name             -- appended at end so
+    from core.employees e                       -- CREATE OR REPLACE VIEW
     left join public.flax_outlets o on o.id = e.outlet_id
     left join core.designations d on d.code = e.designation_code
    where e.deleted_at is null;
