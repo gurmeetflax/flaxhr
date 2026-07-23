@@ -64,6 +64,7 @@ import GrievancesPage from '@/pages/admin/GrievancesPage'
 import ServiceChargePage from '@/pages/admin/ServiceChargePage'
 import ServiceChargeRunPage from '@/pages/admin/ServiceChargeRunPage'
 import SalesPage from '@/pages/admin/SalesPage'
+import PetpoojaSettingsPage from '@/pages/admin/PetpoojaSettingsPage'
 import ReportsPage from '@/pages/admin/ReportsPage'
 import MyDashboard from '@/pages/me/MyDashboard'
 import PunchPage from '@/pages/me/PunchPage'
@@ -86,6 +87,7 @@ const adminNav = [
   { to: '/admin/leave/balances', label: 'Leave balances', icon: Wallet },
   { to: '/admin/leave/policies', label: 'Leave policies', icon: ListChecks },
   { to: '/admin/sales', label: 'Sales', icon: CircleDollarSign },
+  { to: '/admin/settings/petpooja', label: 'Petpooja', icon: SettingsIcon },
   { to: '/admin/service-charge', label: 'Service charge', icon: CircleDollarSign },
   { to: '/admin/payroll', label: 'Payroll', icon: Wallet },
   { to: '/admin/evaluations', label: 'Evaluations', icon: ClipboardCheck },
@@ -142,6 +144,7 @@ export default function App() {
         <Route path="/admin/leave/balances" element={<LeaveBalancesPage />} />
         <Route path="/admin/leave/policies" element={<LeavePoliciesPage />} />
         <Route path="/admin/sales" element={<SalesPage />} />
+        <Route path="/admin/settings/petpooja" element={<PetpoojaSettingsPage />} />
         <Route path="/admin/service-charge" element={<ServiceChargePage />} />
         <Route path="/admin/service-charge/runs/:id" element={<ServiceChargeRunPage />} />
         <Route path="/admin/evaluations" element={<EvaluationsPage />} />
