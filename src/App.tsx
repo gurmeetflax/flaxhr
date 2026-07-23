@@ -43,6 +43,7 @@ import RegularisationsPage from '@/pages/admin/RegularisationsPage'
 import ShiftsPage from '@/pages/admin/ShiftsPage'
 import RosterPage from '@/pages/admin/RosterPage'
 import LeaveApprovalsPage from '@/pages/admin/LeaveApprovalsPage'
+import LeaveBalancesPage from '@/pages/admin/LeaveBalancesPage'
 import LeavePoliciesPage from '@/pages/admin/LeavePoliciesPage'
 import EvaluationsPage from '@/pages/admin/EvaluationsPage'
 import EvaluationBuilderPage from '@/pages/admin/EvaluationBuilderPage'
@@ -84,6 +85,7 @@ const adminNav = [
   { to: '/admin/shifts', label: 'Shifts', icon: Clock },
   { to: '/admin/roster', label: 'Roster', icon: CalendarRange },
   { to: '/admin/leave/approvals', label: 'Leave approvals', icon: Plane },
+  { to: '/admin/leave/balances', label: 'Leave balances', icon: Wallet },
   { to: '/admin/leave/policies', label: 'Leave policies', icon: ListChecks },
   { to: '/admin/sales', label: 'Sales', icon: CircleDollarSign },
   { to: '/admin/service-charge', label: 'Service charge', icon: CircleDollarSign },
@@ -140,6 +142,7 @@ export default function App() {
         <Route path="/admin/shifts" element={<ShiftsPage />} />
         <Route path="/admin/roster" element={<RosterPage />} />
         <Route path="/admin/leave/approvals" element={<LeaveApprovalsPage />} />
+        <Route path="/admin/leave/balances" element={<LeaveBalancesPage />} />
         <Route path="/admin/leave/policies" element={<LeavePoliciesPage />} />
         <Route path="/admin/sales" element={<SalesPage />} />
         <Route path="/admin/service-charge" element={<ServiceChargePage />} />

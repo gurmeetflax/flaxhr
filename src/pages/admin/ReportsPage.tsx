@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
-import { format, startOfMonth } from 'date-fns'
+import { format, subDays } from 'date-fns'
 import { formatInTimeZone } from 'date-fns-tz'
 import { Download } from 'lucide-react'
 import { supabase } from '@/lib/supabase'
@@ -26,7 +26,9 @@ export default function ReportsPage() {
   const [outletId, setOutletId] = useState('')
   const [search, setSearch] = useState('')
   const [statusFilter, setStatusFilter] = useState<AttendanceStatus | ''>('')
-  const [from, setFrom] = useState(format(startOfMonth(new Date()), 'yyyy-MM-dd'))
+  // Default to a rolling 30-day window — using startOfMonth caused an empty
+  // page on the 1st and 2nd of a month when nobody had punched yet.
+  const [from, setFrom] = useState(format(subDays(new Date(), 30), 'yyyy-MM-dd'))
   const [to, setTo] = useState(format(new Date(), 'yyyy-MM-dd'))
 
   const outletsQ = useQuery<OutletOption[]>({
@@ -145,7 +147,10 @@ export default function ReportsPage() {
                 {filtered.length === 0 && !isLoading ? (
                   <tr>
                     <td colSpan={11} className="px-4 py-8 text-center text-muted-foreground">
-                      No rows in this range.
+                      No rows in this range. Try widening the date filters
+                      {rows.length !== filtered.length
+                        ? ' or clearing the search / status / outlet filters.'
+                        : '.'}
                     </td>
                   </tr>
                 ) : null}
