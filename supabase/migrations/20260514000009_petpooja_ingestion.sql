@@ -74,8 +74,12 @@ create table if not exists core.petpooja_orders (
   unique (rest_id, order_id_petpooja)
 );
 
-create index if not exists pp_orders_outlet_month_idx
-  on core.petpooja_orders (outlet_id, (date_trunc('month', created_on)));
+-- Note: can't index `date_trunc('month', created_on)` because
+-- date_trunc(text, timestamptz) is STABLE (session-TZ dependent),
+-- not IMMUTABLE. Plain (outlet_id, created_on) gives the planner the
+-- same range-scan for month rollups.
+create index if not exists pp_orders_outlet_created_idx
+  on core.petpooja_orders (outlet_id, created_on desc);
 create index if not exists pp_orders_status_idx
   on core.petpooja_orders (status);
 create index if not exists pp_orders_created_idx
