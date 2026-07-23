@@ -24,7 +24,8 @@ begin
     'core.birthday_log',
     'core.uniforms',
     'core.warnings',
-    'core.employee_documents'
+    'core.employee_documents',
+    'core.leave_balance_adjustments'
   ]) loop
     if to_regclass(t) is null then
       missing := missing || t;
@@ -43,6 +44,7 @@ begin
     'public.v_attendance_report',
     'public.v_employee_leave_summary',
     'public.v_employee_snapshot',
+    'public.v_employee_leave_balances',
     'public.v_attendance',
     'public.v_regularisations',
     'public.v_today_shift',
@@ -87,7 +89,10 @@ begin
     'public.run_birthdays_today()',
     'public.set_kyc_document(text,text)',
     'public.verify_kyc(uuid,text,text)',
-    'public.signed_kyc_url(uuid,text,integer)'
+    'public.signed_kyc_url(uuid,text,integer)',
+    'public.adjust_leave_balance(uuid,uuid,numeric,text,text)',
+    'public.accrue_monthly_leaves(date)',
+    'public.backfill_opening_leave_balances()'
   ]) loop
     if to_regprocedure(fn) is null then
       missing := missing || fn;
