@@ -164,7 +164,12 @@ export default function EmployeeSnapshotPage() {
             {scoreQ.isPending ? (
               <div className="text-muted-foreground text-sm">Loading…</div>
             ) : scoreQ.isError ? (
-              <div className="text-destructive text-sm">Failed to load</div>
+              <div className="text-destructive text-xs" title={String(scoreQ.error)}>
+                Failed to load
+                <div className="mt-1 text-[10px] font-mono">
+                  {scoreQ.error instanceof Error ? scoreQ.error.message : String(scoreQ.error)}
+                </div>
+              </div>
             ) : (
               <>
                 <Gauge value={scoreQ.data?.total_score ?? 0} />
