@@ -25,7 +25,9 @@ begin
     'core.uniforms',
     'core.warnings',
     'core.employee_documents',
-    'core.leave_balance_adjustments'
+    'core.leave_balance_adjustments',
+    'core.petpooja_restaurants',
+    'core.petpooja_orders'
   ]) loop
     if to_regclass(t) is null then
       missing := missing || t;
@@ -92,7 +94,8 @@ begin
     'public.signed_kyc_url(uuid,text,integer)',
     'public.adjust_leave_balance(uuid,uuid,numeric,text,text)',
     'public.accrue_monthly_leaves(date)',
-    'public.backfill_opening_leave_balances()'
+    'public.backfill_opening_leave_balances()',
+    'public.ingest_petpooja_order(jsonb)'
   ]) loop
     if to_regprocedure(fn) is null then
       missing := missing || fn;
