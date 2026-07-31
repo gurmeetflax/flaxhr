@@ -74,8 +74,12 @@ create table if not exists core.petpooja_orders (
   unique (rest_id, order_id_petpooja)
 );
 
-create index if not exists pp_orders_outlet_month_idx
-  on core.petpooja_orders (outlet_id, (date_trunc('month', created_on)));
+-- Note: can't index `date_trunc('month', created_on)` because
+-- date_trunc(text, timestamptz) is STABLE (session-TZ dependent),
+-- not IMMUTABLE. Plain (outlet_id, created_on) gives the planner the
+-- same range-scan for month rollups.
+create index if not exists pp_orders_outlet_created_idx
+  on core.petpooja_orders (outlet_id, created_on desc);
 create index if not exists pp_orders_status_idx
   on core.petpooja_orders (status);
 create index if not exists pp_orders_created_idx
@@ -205,7 +209,10 @@ with (security_invoker = true) as
   select
     outlet_id,
     date_trunc('month', created_on at time zone 'Asia/Kolkata')::date as period_month,
-    sum(total) filter (where status = 'Success') as amount,
+    -- Cast to numeric(14,2) so the outer coalesce with
+    -- outlet_monthly_sales.amount doesn't change the column's declared
+    -- type (CREATE OR REPLACE VIEW forbids type changes).
+    sum(total) filter (where status = 'Success')::numeric(14,2) as amount,
     count(*)  filter (where status = 'Success') as tickets
   from core.petpooja_orders
   where outlet_id is not null and created_on is not null
@@ -221,7 +228,7 @@ with (security_invoker = true) as
   select
     coalesce(s.outlet_id, p.outlet_id)                                as outlet_id,
     coalesce(s.period_month, p.period_month)                          as period_month,
-    coalesce(s.amount, p.amount)                                      as amount,
+    coalesce(s.amount, p.amount)::numeric(14,2)                       as amount,
     coalesce(s.updated_at, now())                                     as updated_at,
     o.display_name                                                    as outlet_name,
     p.amount                                                          as auto_amount,

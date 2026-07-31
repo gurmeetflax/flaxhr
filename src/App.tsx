@@ -56,6 +56,8 @@ import PayslipPage from '@/pages/me/PayslipPage'
 import FnfListPage from '@/pages/admin/FnfListPage'
 import FnfDetailPage from '@/pages/admin/FnfDetailPage'
 import PipsPage from '@/pages/admin/PipsPage'
+import CardsPage from '@/pages/admin/CardsPage'
+import CardSettingsPage from '@/pages/admin/CardSettingsPage'
 import EmployeeSnapshotPage from '@/pages/admin/EmployeeSnapshotPage'
 import MyPipPage from '@/pages/me/MyPipPage'
 import MyIncentivesPage from '@/pages/me/MyIncentivesPage'
@@ -94,6 +96,7 @@ const adminNav = [
   { to: '/admin/payroll', label: 'Payroll', icon: Wallet },
   { to: '/admin/evaluations', label: 'Evaluations', icon: ClipboardCheck },
   { to: '/admin/pips', label: 'PIPs', icon: TrendingDown },
+  { to: '/admin/cards', label: 'Cards', icon: ShieldAlert },
   { to: '/admin/grievances', label: 'Grievances', icon: ShieldAlert },
   { to: '/admin/fnf', label: 'FnF & clearance', icon: LogOut },
   { to: '/admin/gift-codes', label: 'Birthday vouchers', icon: Gift },
@@ -167,6 +170,8 @@ export default function App() {
         <Route path="/admin/fnf" element={<FnfListPage />} />
         <Route path="/admin/fnf/:id" element={<FnfDetailPage />} />
         <Route path="/admin/pips" element={<PipsPage />} />
+        <Route path="/admin/cards" element={<CardsPage />} />
+        <Route path="/admin/settings/cards" element={<CardSettingsPage />} />
         <Route path="/admin/grievances" element={<GrievancesPage />} />
         <Route path="/admin/employees/:id/snapshot" element={<EmployeeSnapshotPage />} />
         <Route path="/admin/notifications" element={<NotificationsPage />} />
