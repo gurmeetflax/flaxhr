@@ -78,11 +78,11 @@ function Sidebar({
   return (
     <aside
       className={cn(
-        'fixed inset-y-0 left-0 z-50 w-60 border-r border-border bg-surface transition-transform md:translate-x-0',
+        'fixed inset-y-0 left-0 z-50 flex w-60 flex-col border-r border-border bg-surface transition-transform md:translate-x-0',
         drawerOpen ? 'translate-x-0' : '-translate-x-full md:translate-x-0',
       )}
     >
-      <div className="flex h-16 items-center justify-between border-b border-border px-5">
+      <div className="flex h-16 shrink-0 items-center justify-between border-b border-border px-5">
         <div className="flex items-center gap-2">
           <span className="grid h-8 w-8 place-items-center rounded-lg bg-primary/15 text-primary">
             <Leaf className="h-4 w-4" />
@@ -100,7 +100,7 @@ function Sidebar({
           <X className="h-5 w-5" />
         </button>
       </div>
-      <nav className="flex flex-col gap-1 p-3">
+      <nav className="flex flex-1 flex-col gap-1 overflow-y-auto p-3">
         {nav.map((item) => (
           <NavLink
             key={item.to}

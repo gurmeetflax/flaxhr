@@ -51,6 +51,8 @@ import EvaluationRunPage from '@/pages/admin/EvaluationRunPage'
 import SettingsPage from '@/pages/admin/SettingsPage'
 import GiftCodesPage from '@/pages/admin/GiftCodesPage'
 import PayrollPage from '@/pages/admin/PayrollPage'
+import OvertimePage from '@/pages/admin/OvertimePage'
+import MyOvertimePage from '@/pages/me/MyOvertimePage'
 import PayrollRunPage from '@/pages/admin/PayrollRunPage'
 import PayslipPage from '@/pages/me/PayslipPage'
 import FnfListPage from '@/pages/admin/FnfListPage'
@@ -94,6 +96,7 @@ const adminNav = [
   { to: '/admin/settings/petpooja', label: 'Petpooja', icon: SettingsIcon },
   { to: '/admin/service-charge', label: 'Service charge', icon: CircleDollarSign },
   { to: '/admin/payroll', label: 'Payroll', icon: Wallet },
+  { to: '/admin/overtime', label: 'Overtime', icon: Clock },
   { to: '/admin/evaluations', label: 'Evaluations', icon: ClipboardCheck },
   { to: '/admin/pips', label: 'PIPs', icon: TrendingDown },
   { to: '/admin/cards', label: 'Cards', icon: ShieldAlert },
@@ -111,6 +114,7 @@ const employeeNav = [
   { to: '/me/roster', label: 'My roster', icon: CalendarDays },
   { to: '/me/leave', label: 'Leave', icon: Plane },
   { to: '/me/payslips', label: 'Payslips', icon: Receipt },
+  { to: '/me/overtime', label: 'Overtime', icon: Clock },
   { to: '/me/incentives', label: 'My incentives', icon: CircleDollarSign },
   { to: '/me/performance', label: 'My performance', icon: Sparkles },
   { to: '/me/pip', label: 'Performance plan', icon: TrendingDown },
@@ -166,6 +170,7 @@ export default function App() {
         <Route path="/admin/gift-codes" element={<GiftCodesPage />} />
         <Route path="/admin/signature" element={<SignaturePage />} />
         <Route path="/admin/payroll" element={<PayrollPage />} />
+        <Route path="/admin/overtime" element={<OvertimePage />} />
         <Route path="/admin/payroll/runs/:id" element={<PayrollRunPage />} />
         <Route path="/admin/fnf" element={<FnfListPage />} />
         <Route path="/admin/fnf/:id" element={<FnfDetailPage />} />
@@ -191,6 +196,7 @@ export default function App() {
         <Route path="/me/leave" element={<LeavePage />} />
         <Route path="/me/overview" element={<MyDashboard />} />
         <Route path="/me/payslips" element={<PayslipPage />} />
+        <Route path="/me/overtime" element={<MyOvertimePage />} />
         <Route path="/me/incentives" element={<MyIncentivesPage />} />
         <Route path="/me/performance" element={<MyPerformancePage />} />
         <Route path="/me/pip" element={<MyPipPage />} />
