@@ -278,7 +278,6 @@ export default function ReportsPage() {
 }
 
 function DetailedRow({ row }: { row: AttendanceDetailedRow }) {
-  const tz = row.outlet_timezone ?? 'Asia/Kolkata'
   return (
     <tr className="hover:bg-muted/30 align-top">
       <td className="px-3 py-2 whitespace-nowrap">{formatDateDDMMYY(row.work_date)}</td>
@@ -301,8 +300,8 @@ function DetailedRow({ row }: { row: AttendanceDetailedRow }) {
       </td>
       <td className="px-3 py-2 whitespace-nowrap text-muted-foreground">{formatIstTime(row.scheduled_start_at)}</td>
       <td className="px-3 py-2 whitespace-nowrap text-muted-foreground">{formatIstTime(row.scheduled_end_at)}</td>
-      <td className="px-3 py-2">{formatLocation(row.first_in_outlet_name, row.first_in_lat, row.first_in_lng, tz)}</td>
-      <td className="px-3 py-2">{formatLocation(row.last_out_outlet_name, row.last_out_lat, row.last_out_lng, tz)}</td>
+      <td className="px-3 py-2">{formatLocation(row.first_in_outlet_name, row.first_in_lat, row.first_in_lng)}</td>
+      <td className="px-3 py-2">{formatLocation(row.last_out_outlet_name, row.last_out_lat, row.last_out_lng)}</td>
     </tr>
   )
 }
@@ -326,7 +325,6 @@ function formatLocation(
   outletName: string | null,
   lat: number | null,
   lng: number | null,
-  _tz: string,
 ): React.ReactNode {
   if (!outletName && lat == null) return <span className="text-muted-foreground">—</span>
   const mapsHref =
