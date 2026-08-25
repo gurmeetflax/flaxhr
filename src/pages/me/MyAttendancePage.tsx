@@ -1,18 +1,37 @@
-import { startOfMonth } from 'date-fns'
+import { useState } from 'react'
+import { endOfMonth, format, startOfMonth } from 'date-fns'
 import { formatInTimeZone } from 'date-fns-tz'
 import { PageHeader } from '@/components/layout/AppShell'
 import { Card, CardContent, CardDescription, CardTitle } from '@/components/ui/Card'
+import { Input } from '@/components/ui/Input'
 import { useMyAttendance, type AttendanceRow } from '@/lib/attendance'
 
 export default function MyAttendancePage() {
-  const fromDate = startOfMonth(new Date()).toISOString()
-  const { data: rows = [], isLoading } = useMyAttendance({ fromDate })
+  const [periodMonth, setPeriodMonth] = useState<string>(
+    format(startOfMonth(new Date()), 'yyyy-MM-dd'),
+  )
+
+  const monthStart = new Date(periodMonth + 'T00:00:00')
+  const fromDate = startOfMonth(monthStart).toISOString()
+  const toDate = endOfMonth(monthStart).toISOString()
+
+  const { data: rows = [], isLoading } = useMyAttendance({ fromDate, toDate, limit: 1000 })
 
   const groups = groupByDay(rows)
+  const monthLabel = format(monthStart, 'MMMM yyyy')
 
   return (
     <>
-      <PageHeader title="My attendance" description="This month" />
+      <PageHeader title="My attendance" description={monthLabel} />
+
+      <div className="mb-4 max-w-xs">
+        <Input
+          type="month"
+          value={periodMonth.slice(0, 7)}
+          onChange={(e) => setPeriodMonth(`${e.target.value}-01`)}
+        />
+      </div>
+
       {isLoading ? (
         <Card>
           <CardContent className="p-6">
@@ -22,9 +41,9 @@ export default function MyAttendancePage() {
       ) : rows.length === 0 ? (
         <Card>
           <CardContent className="p-6">
-            <CardTitle>No punches yet</CardTitle>
+            <CardTitle>No punches in {monthLabel}</CardTitle>
             <CardDescription className="mt-1">
-              Your attendance for this month will show up here.
+              Pick a different month above to see earlier attendance.
             </CardDescription>
           </CardContent>
         </Card>
