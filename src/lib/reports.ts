@@ -52,6 +52,42 @@ export function useAttendanceReport(filters: AttendanceReportFilters = {}) {
   })
 }
 
+export interface AttendanceDetailedRow extends Omit<AttendanceReportRow, 'grace_in_minutes'> {
+  early_departure_minutes: number | null
+  overtime_minutes: number | null
+  first_in_outlet_id: string | null
+  first_in_outlet_name: string | null
+  first_in_lat: number | null
+  first_in_lng: number | null
+  last_out_outlet_id: string | null
+  last_out_outlet_name: string | null
+  last_out_lat: number | null
+  last_out_lng: number | null
+}
+
+export function useAttendanceReportDetailed(filters: AttendanceReportFilters = {}) {
+  return useQuery<AttendanceDetailedRow[]>({
+    queryKey: ['attendance-report-detailed', filters],
+    staleTime: 30_000,
+    queryFn: async () => {
+      let q = supabase
+        .from('v_attendance_report_detailed')
+        .select(
+          'employee_id, employee_code, employee_name, designation_name, outlet_id, outlet_name, outlet_timezone, work_date, first_in_at, last_out_at, scheduled_start_at, scheduled_end_at, late_minutes, worked_minutes, status, early_departure_minutes, overtime_minutes, first_in_outlet_id, first_in_outlet_name, first_in_lat, first_in_lng, last_out_outlet_id, last_out_outlet_name, last_out_lat, last_out_lng',
+        )
+        .order('work_date', { ascending: false })
+        .order('employee_code', { ascending: true })
+        .limit(filters.limit ?? 2000)
+      if (filters.outletId) q = q.eq('outlet_id', filters.outletId)
+      if (filters.fromDate) q = q.gte('work_date', filters.fromDate)
+      if (filters.toDate) q = q.lte('work_date', filters.toDate)
+      const { data, error } = await q
+      if (error) throw error
+      return (data ?? []) as AttendanceDetailedRow[]
+    },
+  })
+}
+
 export interface EmployeeLeaveSummary {
   employee_id: string
   employee_code: string
