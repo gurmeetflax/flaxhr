@@ -2,7 +2,7 @@ import { useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { formatInTimeZone } from 'date-fns-tz'
 import { toast } from 'sonner'
-import { Plus } from 'lucide-react'
+import { Plus, Trash2 } from 'lucide-react'
 import { supabase } from '@/lib/supabase'
 import { PageHeader } from '@/components/layout/AppShell'
 import { Card, CardContent, CardDescription, CardTitle } from '@/components/ui/Card'
@@ -12,6 +12,7 @@ import { Label } from '@/components/ui/Label'
 import {
   useCards,
   useCardReasons,
+  useDeleteCard,
   useIssueCard,
   type CardColour,
   type CardRow,
@@ -103,6 +104,18 @@ export default function CardsPage() {
 
 function CardRowItem({ card }: { card: CardRow }) {
   const emoji = card.colour === 'red' ? '🔴' : card.colour === 'green' ? '🟢' : '🟡'
+  const del = useDeleteCard()
+
+  async function onDelete() {
+    if (!confirm(`Delete this ${card.colour} card for ${card.employee_name}? This cannot be undone.`)) return
+    try {
+      await del.mutateAsync(card.id)
+      toast.success('Card deleted')
+    } catch (err) {
+      toast.error(humanErr(err, 'Delete failed'))
+    }
+  }
+
   return (
     <li className="flex items-start justify-between gap-3 p-4 text-sm">
       <div className="flex flex-col gap-0.5">
@@ -120,9 +133,21 @@ function CardRowItem({ card }: { card: CardRow }) {
           <span className="text-xs text-muted-foreground">{card.notes}</span>
         ) : null}
       </div>
-      <span className="whitespace-nowrap text-xs text-muted-foreground">
-        {formatInTimeZone(new Date(card.issued_at), IST, 'dd/MM/yy')}
-      </span>
+      <div className="flex items-center gap-2 whitespace-nowrap">
+        <span className="text-xs text-muted-foreground">
+          {formatInTimeZone(new Date(card.issued_at), IST, 'dd/MM/yy')}
+        </span>
+        <Button
+          size="sm"
+          variant="ghost"
+          onClick={onDelete}
+          loading={del.isPending}
+          aria-label="Delete card"
+          className="text-muted-foreground hover:text-destructive"
+        >
+          <Trash2 className="h-4 w-4" />
+        </Button>
+      </div>
     </li>
   )
 }

@@ -15,6 +15,12 @@ import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.45.4'
 const SLACK_WEBHOOK_URL = Deno.env.get('SLACK_WEBHOOK_URL') ?? ''
 const RESEND_API_KEY = Deno.env.get('RESEND_API_KEY') ?? ''
 const RESEND_FROM = Deno.env.get('RESEND_FROM') ?? 'Flax HR <hr@flaxfoods.in>'
+const RESEND_CC = [
+  'hr@flaxitup.com',
+  'gurmeet@flaxitup.com',
+  'operations@flaxitup.com',
+  'am@flaxitup.com',
+]
 
 Deno.serve(async (req: Request) => {
   if (req.method !== 'POST') return json(405, { error: 'method_not_allowed' })
@@ -104,6 +110,7 @@ Deno.serve(async (req: Request) => {
       body: JSON.stringify({
         from: RESEND_FROM,
         to: [emp.personal_email],
+        cc: RESEND_CC,
         subject,
         html,
       }),

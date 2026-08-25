@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
-import { format, subDays } from 'date-fns'
+import { endOfMonth, format, startOfMonth, subDays, subMonths } from 'date-fns'
 import { formatInTimeZone } from 'date-fns-tz'
 import { Download } from 'lucide-react'
 import { supabase } from '@/lib/supabase'
@@ -88,6 +88,30 @@ export default function ReportsPage() {
         }
       />
 
+      <div className="mb-3 flex flex-wrap gap-2">
+        <PresetBtn label="This month" onClick={() => {
+          setFrom(format(startOfMonth(new Date()), 'yyyy-MM-dd'))
+          setTo(format(new Date(), 'yyyy-MM-dd'))
+        }} />
+        <PresetBtn label="Last month" onClick={() => {
+          const d = subMonths(new Date(), 1)
+          setFrom(format(startOfMonth(d), 'yyyy-MM-dd'))
+          setTo(format(endOfMonth(d), 'yyyy-MM-dd'))
+        }} />
+        <PresetBtn label="Last 7 days" onClick={() => {
+          setFrom(format(subDays(new Date(), 6), 'yyyy-MM-dd'))
+          setTo(format(new Date(), 'yyyy-MM-dd'))
+        }} />
+        <PresetBtn label="Last 30 days" onClick={() => {
+          setFrom(format(subDays(new Date(), 29), 'yyyy-MM-dd'))
+          setTo(format(new Date(), 'yyyy-MM-dd'))
+        }} />
+        <PresetBtn label="Last 90 days" onClick={() => {
+          setFrom(format(subDays(new Date(), 89), 'yyyy-MM-dd'))
+          setTo(format(new Date(), 'yyyy-MM-dd'))
+        }} />
+      </div>
+
       <div className="mb-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-6">
         <Input
           placeholder="Search employee"
@@ -117,8 +141,14 @@ export default function ReportsPage() {
           <option value="absent">Absent</option>
           <option value="on_leave">On leave</option>
         </select>
-        <Input type="date" value={from} onChange={(e) => setFrom(e.target.value)} />
-        <Input type="date" value={to} onChange={(e) => setTo(e.target.value)} />
+        <label className="flex flex-col gap-1 text-xs text-muted-foreground">
+          From
+          <Input type="date" value={from} max={to} onChange={(e) => setFrom(e.target.value)} />
+        </label>
+        <label className="flex flex-col gap-1 text-xs text-muted-foreground">
+          To
+          <Input type="date" value={to} min={from} onChange={(e) => setTo(e.target.value)} />
+        </label>
       </div>
 
       <Card>
@@ -186,6 +216,18 @@ function Row({
       <td className="px-3 py-2 tabular-nums">{summary ? summary.pending : '—'}</td>
       <td className="px-3 py-2 tabular-nums">{summary ? summary.used : '—'}</td>
     </tr>
+  )
+}
+
+function PresetBtn({ label, onClick }: { label: string; onClick: () => void }) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className="rounded-full border border-border bg-surface px-3 py-1 text-xs font-medium text-muted-foreground hover:bg-muted hover:text-foreground"
+    >
+      {label}
+    </button>
   )
 }
 

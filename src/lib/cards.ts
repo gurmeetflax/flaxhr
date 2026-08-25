@@ -106,6 +106,20 @@ export function useCards(filter?: {
   })
 }
 
+export function useDeleteCard() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: async (cardId: string) => {
+      const { error } = await supabase.rpc('delete_card', { p_card_id: cardId })
+      if (error) throw error
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['cards'] })
+      qc.invalidateQueries({ queryKey: ['employee-snapshot'] })
+    },
+  })
+}
+
 export function useIssueCard() {
   const qc = useQueryClient()
   return useMutation({
