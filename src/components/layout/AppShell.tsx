@@ -100,7 +100,7 @@ function Sidebar({
           <X className="h-5 w-5" />
         </button>
       </div>
-      <nav className="flex flex-1 flex-col gap-1 overflow-y-auto p-3">
+      <nav className="flex flex-1 flex-col gap-0.5 overflow-y-auto overscroll-contain p-2 [scrollbar-width:thin]">
         {nav.map((item) => (
           <NavLink
             key={item.to}
@@ -109,15 +109,15 @@ function Sidebar({
             onClick={onNavigate}
             className={({ isActive }) =>
               cn(
-                'flex items-center gap-2 rounded-lg px-3 py-2 text-sm transition-colors',
+                'flex items-center gap-2 rounded-md px-2.5 py-1.5 text-[13px] leading-tight transition-colors',
                 isActive
                   ? 'bg-primary/10 text-foreground font-medium'
                   : 'text-muted-foreground hover:bg-muted hover:text-foreground',
               )
             }
           >
-            <item.icon className="h-4 w-4" />
-            {item.label}
+            <item.icon className="h-4 w-4 shrink-0" />
+            <span className="truncate">{item.label}</span>
           </NavLink>
         ))}
       </nav>
