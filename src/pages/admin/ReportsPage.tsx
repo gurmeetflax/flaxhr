@@ -8,7 +8,7 @@ import { PageHeader } from '@/components/layout/AppShell'
 import { Card, CardContent } from '@/components/ui/Card'
 import { Input } from '@/components/ui/Input'
 import { Button } from '@/components/ui/Button'
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/Tabs'
+import { Tabs, TabsList, TabsTrigger } from '@/components/ui/Tabs'
 import {
   useAttendanceReport,
   useAttendanceReportDetailed,
