@@ -14,7 +14,16 @@
 
 const SLACK_WEBHOOK_URL = Deno.env.get('SLACK_WEBHOOK_URL') ?? ''
 
+const CORS_HEADERS = {
+  'access-control-allow-origin': '*',
+  'access-control-allow-headers': 'authorization, x-client-info, apikey, content-type',
+  'access-control-allow-methods': 'POST, OPTIONS',
+}
+
 Deno.serve(async (req) => {
+  if (req.method === 'OPTIONS') {
+    return new Response(null, { status: 204, headers: CORS_HEADERS })
+  }
   if (req.method !== 'POST') {
     return json({ ok: false, error: 'POST only' }, 405)
   }
@@ -47,7 +56,7 @@ function json(body: unknown, status = 200): Response {
     status,
     headers: {
       'content-type': 'application/json',
-      'access-control-allow-origin': '*',
+      ...CORS_HEADERS,
     },
   })
 }
