@@ -1,10 +1,13 @@
 import { useState } from 'react'
 import { endOfMonth, format, startOfMonth } from 'date-fns'
 import { formatInTimeZone } from 'date-fns-tz'
+import { MessageCircle } from 'lucide-react'
 import { PageHeader } from '@/components/layout/AppShell'
 import { Card, CardContent, CardDescription, CardTitle } from '@/components/ui/Card'
 import { Input } from '@/components/ui/Input'
+import { Button } from '@/components/ui/Button'
 import { useMyAttendance, type AttendanceRow } from '@/lib/attendance'
+import { useMyEmployee } from '@/lib/auth'
 
 export default function MyAttendancePage() {
   const [periodMonth, setPeriodMonth] = useState<string>(
@@ -16,13 +19,28 @@ export default function MyAttendancePage() {
   const toDate = endOfMonth(monthStart).toISOString()
 
   const { data: rows = [], isLoading } = useMyAttendance({ fromDate, toDate, limit: 1000 })
+  const { data: employee } = useMyEmployee()
 
   const groups = groupByDay(rows)
   const monthLabel = format(monthStart, 'MMMM yyyy')
 
+  const whatsappHref = buildWhatsappHref(employee?.full_name ?? null, monthLabel, groups)
+
   return (
     <>
-      <PageHeader title="My attendance" description={monthLabel} />
+      <PageHeader
+        title="My attendance"
+        description={monthLabel}
+        actions={
+          rows.length > 0 ? (
+            <a href={whatsappHref} target="_blank" rel="noopener noreferrer">
+              <Button size="sm" variant="outline">
+                <MessageCircle className="h-4 w-4" /> Send to WhatsApp
+              </Button>
+            </a>
+          ) : null
+        }
+      />
 
       <div className="mb-4 max-w-xs">
         <Input
@@ -96,6 +114,27 @@ function Pill({ children, tone }: { children: React.ReactNode; tone: 'positive' 
       ? 'bg-destructive/10 text-destructive'
       : 'bg-muted text-muted-foreground'
   return <span className={`rounded-full px-2 py-0.5 text-xs font-medium ${cls}`}>{children}</span>
+}
+
+function buildWhatsappHref(
+  name: string | null,
+  monthLabel: string,
+  groups: { dayKey: string; dayLabel: string; rows: AttendanceRow[] }[],
+): string {
+  const header = `📋 Attendance — ${monthLabel}${name ? `\n${name}` : ''}`
+  const body = groups
+    .slice()
+    .reverse()
+    .map((g) => {
+      const tz = g.rows[0].outlet_timezone ?? 'Asia/Kolkata'
+      const times = g.rows
+        .map((r) => `${r.type === 'in' ? 'In' : 'Out'} ${formatInTimeZone(r.punched_at, tz, 'h:mm a')}`)
+        .join(', ')
+      return `${g.dayLabel} — ${times}`
+    })
+    .join('\n')
+  const text = `${header}\n\n${body}`
+  return `https://wa.me/?text=${encodeURIComponent(text)}`
 }
 
 function groupByDay(rows: AttendanceRow[]): { dayKey: string; dayLabel: string; rows: AttendanceRow[] }[] {
