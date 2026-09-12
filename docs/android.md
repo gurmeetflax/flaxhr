@@ -82,16 +82,45 @@ line in `capacitor.config.ts` and re-sync.
 - `POST_NOTIFICATIONS` — punch reminders, card alerts, leave decisions
 - `USE_BIOMETRIC`, `USE_FINGERPRINT` — Face/Fingerprint unlock on relaunch
 
-## What's still to do
+## What's wired in the code
 
-- **Push notifications** — Firebase project + `google-services.json` +
-  `@capacitor/push-notifications` registration in `src/lib/push.ts`, plus a
-  `core.device_tokens` table so the DB can address the right device.
-- **Biometric unlock** — `capacitor-native-biometric` is installed; wire a
-  helper that stores the Supabase refresh token in the OS keychain and
-  restores it after a successful biometric prompt.
-- **Camera plugin swap** — punch-in currently uses the web `<input type="file"
-  capture="user">`; replace with `Camera.getPhoto({ source: CAMERA,
-  direction: FRONT })` for a snappier capture inside the app.
-- **Play Store assets** — 512×512 icon, feature graphic, 4+ phone
-  screenshots, privacy-policy URL.
+- **Native camera** — punch-in on the app calls `@capacitor/camera` with the
+  front camera; on web it still falls back to the file input.
+  (`src/lib/nativeCamera.ts`, `src/pages/me/PunchPage.tsx`)
+- **Native geolocation** — `getCurrentPosition` in `src/lib/geo.ts` routes
+  through `@capacitor/geolocation` on the native runtime for a much more
+  accurate outlet-geofence check than the WebView's HTML5 geolocation.
+- **Biometric unlock** — on successful login the Supabase refresh token is
+  written to the OS keychain via `capacitor-native-biometric`. On next
+  launch the app prompts for Face / Fingerprint and, on success, restores
+  the session so the login screen is skipped.
+  (`src/lib/biometric.ts`, `src/lib/auth.tsx`)
+- **Push notifications** — after login the app registers with FCM, then
+  upserts the token into `core.device_tokens` via the
+  `register_device_token` RPC. (`src/lib/push.ts`,
+  `supabase/migrations/20260514000017_device_tokens.sql`)
+- **Privacy policy** — served at `/privacy` on the web app. Use
+  `https://hr.flaxfoods.in/privacy` as the Play Store privacy policy URL.
+
+## What YOU still need to supply
+
+- **Firebase project + `google-services.json`** — required for push. Create
+  a Firebase project, add an Android app with package `in.flaxfoods.hr`,
+  download `google-services.json`, drop it in `android/app/`. Also add:
+  ```gradle
+  // android/build.gradle (top-level)
+  classpath 'com.google.gms:google-services:4.4.2'
+  // android/app/build.gradle (bottom of file)
+  apply plugin: 'com.google.gms.google-services'
+  ```
+  Nothing else changes — `@capacitor/push-notifications` picks it up from
+  there. Then implement a small worker (Edge Function) that reads
+  `core.device_tokens` and posts to the FCM HTTP v1 API.
+- **Adaptive launcher icon** — Capacitor left a placeholder mark. Generate
+  Flax-branded icons (Android Studio → Image Asset Studio, foreground SVG
+  1024×1024) and let it regenerate the `mipmap-*` folders. Adaptive
+  background is already set to Flax green (`#5B7C4A`).
+- **Play Store listing assets** — 512×512 hi-res icon, 1024×500 feature
+  graphic, minimum 4 phone screenshots (1080×1920 or similar).
+- **Signing keystore** — see "Building a signed release" above. Store the
+  `.jks` file + passwords in 1Password.

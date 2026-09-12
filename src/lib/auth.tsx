@@ -2,6 +2,9 @@ import { createContext, useContext, useEffect, useMemo, useState, type ReactNode
 import type { Session, User } from '@supabase/supabase-js'
 import { useQuery } from '@tanstack/react-query'
 import { supabase } from '@/lib/supabase'
+import { IS_NATIVE } from '@/lib/native'
+import { clearRefreshToken, saveRefreshToken, tryBiometricUnlock } from '@/lib/biometric'
+import { registerPushIfPossible } from '@/lib/push'
 
 export type Role = 'admin' | 'hr' | 'manager' | 'auditor' | 'employee' | 'service'
 
@@ -24,12 +27,33 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
-    supabase.auth.getSession().then(({ data }) => {
-      setSession(data.session)
-      setLoading(false)
-    })
-    const { data: sub } = supabase.auth.onAuthStateChange((_event, s) => {
+    // On the native shell, try biometric unlock first — if it succeeds
+    // the auth state listener below will hydrate the session automatically.
+    if (IS_NATIVE) {
+      tryBiometricUnlock().finally(() => {
+        supabase.auth.getSession().then(({ data }) => {
+          setSession(data.session)
+          setLoading(false)
+        })
+      })
+    } else {
+      supabase.auth.getSession().then(({ data }) => {
+        setSession(data.session)
+        setLoading(false)
+      })
+    }
+    const { data: sub } = supabase.auth.onAuthStateChange((event, s) => {
       setSession(s)
+      if (IS_NATIVE) {
+        if (event === 'SIGNED_IN' && s?.refresh_token) {
+          void saveRefreshToken(s.refresh_token)
+          void registerPushIfPossible()
+        } else if (event === 'TOKEN_REFRESHED' && s?.refresh_token) {
+          void saveRefreshToken(s.refresh_token)
+        } else if (event === 'SIGNED_OUT') {
+          void clearRefreshToken()
+        }
+      }
     })
     return () => sub.subscription.unsubscribe()
   }, [])

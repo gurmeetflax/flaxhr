@@ -18,6 +18,8 @@ import { GeoError, haversineMeters, watchPosition } from '@/lib/geo'
 import { useAppSetting } from '@/lib/appSettings'
 import { pickOutletForPunch, useMyOutlets } from '@/lib/employeeOutlets'
 import LocationPermissionBanner from '@/components/LocationPermissionBanner'
+import { IS_NATIVE } from '@/lib/native'
+import { captureNativeSelfie } from '@/lib/nativeCamera'
 
 type Step = 'idle' | 'selfie' | 'review'
 
@@ -215,7 +217,23 @@ export default function PunchPage() {
                 <Button
                   size="lg"
                   className="w-full"
-                  onClick={() => fileInputRef.current?.click()}
+                  onClick={async () => {
+                    if (IS_NATIVE) {
+                      // Native Android: skip the file-picker chrome and hit
+                      // the camera directly. Faster, no gallery option.
+                      try {
+                        const blob = await captureNativeSelfie()
+                        const file = new File([blob], `selfie-${Date.now()}.jpg`, {
+                          type: blob.type || 'image/jpeg',
+                        })
+                        onChooseSelfie(file)
+                      } catch (err) {
+                        toast.error(err instanceof Error ? err.message : 'Camera failed')
+                      }
+                      return
+                    }
+                    fileInputRef.current?.click()
+                  }}
                   disabled={!hasGeo || !inside || punch.isPending}
                   loading={punch.isPending}
                 >

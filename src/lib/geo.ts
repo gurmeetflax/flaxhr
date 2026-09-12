@@ -1,3 +1,6 @@
+import { Geolocation } from '@capacitor/geolocation'
+import { IS_NATIVE } from '@/lib/native'
+
 export interface GeoPosition {
   lat: number
   lng: number
@@ -22,7 +25,35 @@ const DEFAULT_OPTIONS: PositionOptions = {
   maximumAge: 5_000,
 }
 
-export function getCurrentPosition(options?: PositionOptions): Promise<GeoPosition> {
+export async function getCurrentPosition(options?: PositionOptions): Promise<GeoPosition> {
+  if (IS_NATIVE) {
+    // Native path — uses the OS location provider (much more accurate on
+    // Android, works even when the WebView doesn't have HTTPS geolocation).
+    try {
+      const perm = await Geolocation.checkPermissions()
+      if (perm.location !== 'granted' && perm.coarseLocation !== 'granted') {
+        const req = await Geolocation.requestPermissions({ permissions: ['location'] })
+        if (req.location !== 'granted' && req.coarseLocation !== 'granted') {
+          throw new GeoError('denied', 'Location permission was denied.')
+        }
+      }
+      const pos = await Geolocation.getCurrentPosition({
+        enableHighAccuracy: options?.enableHighAccuracy ?? true,
+        timeout: options?.timeout ?? DEFAULT_OPTIONS.timeout,
+        maximumAge: options?.maximumAge ?? DEFAULT_OPTIONS.maximumAge,
+      })
+      return {
+        lat: pos.coords.latitude,
+        lng: pos.coords.longitude,
+        accuracy: pos.coords.accuracy ?? 0,
+        timestamp: pos.timestamp,
+      }
+    } catch (e) {
+      if (e instanceof GeoError) throw e
+      const msg = e instanceof Error ? e.message : String(e)
+      throw new GeoError('unavailable', msg)
+    }
+  }
   return new Promise((resolve, reject) => {
     if (typeof navigator === 'undefined' || !navigator.geolocation) {
       reject(new GeoError('unsupported', 'Geolocation is not supported on this device.'))
