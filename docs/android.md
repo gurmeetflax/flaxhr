@@ -42,37 +42,46 @@ line in `capacitor.config.ts` and re-sync.
    ```
    Keep the `.jks` file and its passwords out of git — store in 1Password.
 
-2. **Configure signing** in `android/app/build.gradle` — add above `android { ... }`:
-   ```gradle
-   android {
-     signingConfigs {
-       release {
-         storeFile file(System.getenv('FLAX_HR_KEYSTORE'))
-         storePassword System.getenv('FLAX_HR_KEYSTORE_PASSWORD')
-         keyAlias 'flax-hr'
-         keyPassword System.getenv('FLAX_HR_KEY_PASSWORD')
-       }
-     }
-     buildTypes {
-       release {
-         signingConfig signingConfigs.release
-       }
-     }
-   }
+2. **Signing is already wired** in `android/app/build.gradle` — it reads
+   the keystore path + passwords from environment variables at build time,
+   so nothing sensitive lands in git. Set these before invoking Gradle:
+   ```bash
+   export FLAX_HR_KEYSTORE=~/keys/flax-hr-release.jks
+   export FLAX_HR_KEYSTORE_PASSWORD='...'
+   export FLAX_HR_KEY_PASSWORD='...'      # same as keystore password unless you set a different one
+   export FLAX_HR_KEY_ALIAS=flax-hr       # optional; defaults to flax-hr
    ```
 
 3. **Build AAB**:
    ```bash
    npm run android:sync
    cd android
-   FLAX_HR_KEYSTORE=~/keys/flax-hr-release.jks \
-   FLAX_HR_KEYSTORE_PASSWORD=... \
-   FLAX_HR_KEY_PASSWORD=... \
-     ./gradlew bundleRelease
+   ./gradlew bundleRelease
    ```
    Output lands at `android/app/build/outputs/bundle/release/app-release.aab`.
 
 4. Upload the AAB to **Google Play Console** → Production or Internal testing track.
+
+## Push notifications: server side
+
+Two Supabase secrets need to be set on the project:
+- **`FCM_PROJECT_ID`** — the Firebase project id (e.g. `flax-hr`)
+- **`FCM_SERVICE_ACCOUNT_JSON`** — paste the whole service-account JSON
+  from Firebase Console → **Project Settings** → **Service Accounts** →
+  **Generate new private key**
+
+Then deploy the sender:
+```bash
+supabase functions deploy push-send
+supabase functions deploy card-alert   # updated to also send a push
+```
+
+Test:
+```bash
+supabase functions invoke push-send \
+  --body '{"user_ids":["<your-auth-user-id>"],"title":"Ping","body":"Hello from Supabase"}'
+```
+Your device should buzz within a second.
 
 ## Permissions declared
 
