@@ -29,6 +29,7 @@ import AppShell from '@/components/layout/AppShell'
 import LoginPage from '@/pages/LoginPage'
 import NotFoundPage from '@/pages/NotFoundPage'
 import ForbiddenPage from '@/pages/ForbiddenPage'
+import PrivacyPage from '@/pages/PrivacyPage'
 import { IS_NATIVE } from '@/lib/native'
 import AdminDashboard from '@/pages/admin/AdminDashboard'
 import EmployeesListPage from '@/pages/admin/EmployeesListPage'
@@ -129,6 +130,7 @@ export default function App() {
       <Route path="/" element={<Navigate to="/login" replace />} />
       <Route path="/login" element={<LoginPage />} />
       <Route path="/forbidden" element={<ForbiddenPage />} />
+      <Route path="/privacy" element={<PrivacyPage />} />
 
       {/* On the native Android/iOS shell, admin routes are locked away:
           the mobile app is employee-only. Web users still see everything. */}
