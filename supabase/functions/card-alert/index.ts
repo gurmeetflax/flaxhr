@@ -53,7 +53,7 @@ Deno.serve(async (req: Request) => {
 
   const { data: emp } = await sb
     .from('v_employees')
-    .select('personal_email, phone')
+    .select('personal_email, phone, user_id')
     .eq('id', card.employee_id)
     .maybeSingle()
 
@@ -119,6 +119,31 @@ Deno.serve(async (req: Request) => {
     results.email = { ok: r.ok, status: r.status, to: emp.personal_email, body: respBody.slice(0, 200) }
   } else {
     results.email = { skipped: true, reason: emp?.personal_email ? 'disabled_or_no_key' : 'no_email' }
+  }
+
+  // Native push (Android / iOS) via the push-send edge function.
+  if (emp?.user_id) {
+    try {
+      const pushUrl = Deno.env.get('SUPABASE_URL')! + '/functions/v1/push-send'
+      const r = await fetch(pushUrl, {
+        method: 'POST',
+        headers: {
+          authorization: `Bearer ${Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!}`,
+          'content-type': 'application/json',
+        },
+        body: JSON.stringify({
+          user_ids: [emp.user_id],
+          title: `${emoji} ${colourLabel} card issued`,
+          body: card.reason_title,
+          data: { kind: 'card', card_id: card.id, path: '/me/overview' },
+        }),
+      })
+      results.push = { ok: r.ok, status: r.status }
+    } catch (e) {
+      results.push = { ok: false, error: e instanceof Error ? e.message : String(e) }
+    }
+  } else {
+    results.push = { skipped: true, reason: 'no_user_id' }
   }
 
   return json(200, { ok: true, card_id: cardId, ...results })
