@@ -8,6 +8,7 @@ import { Input } from '@/components/ui/Input'
 import { Label } from '@/components/ui/Label'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/Tabs'
 import { employeeCodeToEmail, isFlaxitupEmail, normaliseEmployeeCode } from '@/lib/identity'
+import { IS_NATIVE } from '@/lib/native'
 
 export default function LoginPage() {
   const { user } = useAuth()
@@ -19,7 +20,9 @@ export default function LoginPage() {
     if (!user || !roles) return
     const from = (location.state as { from?: string } | null)?.from
     const isAdminish = roles.some((r) => ['admin', 'hr', 'manager', 'auditor'].includes(r.role))
-    navigate(from ?? (isAdminish ? '/admin' : '/me'), { replace: true })
+    // Mobile shell is employee-only, even for admin accounts.
+    const target = IS_NATIVE ? '/me' : isAdminish ? '/admin' : '/me'
+    navigate(from ?? target, { replace: true })
   }, [user, roles, navigate, location.state])
 
   return (
