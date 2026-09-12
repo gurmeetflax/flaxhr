@@ -31,6 +31,15 @@ export async function biometricStatus(): Promise<BiometricStatus> {
 
 export async function saveRefreshToken(token: string): Promise<void> {
   if (!IS_NATIVE) return
+  // Skip when the device has no secure lock or no enrolled biometric —
+  // setCredentials otherwise fails to generate a hardware-backed key
+  // and, on some Android builds, throws a native exception that
+  // crashes the whole app before the try/catch below can catch it.
+  const status = await biometricStatus()
+  if (!status.available) {
+    console.info('biometric unavailable, skipping token save:', status.reason)
+    return
+  }
   try {
     // Overwrite any prior credential first — API errors if a duplicate
     // already exists on Android.
