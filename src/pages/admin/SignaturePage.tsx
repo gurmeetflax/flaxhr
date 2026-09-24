@@ -10,7 +10,7 @@ import { Button } from '@/components/ui/Button'
 
 // Company defaults — hardcoded because they change rarely.
 const COMPANY = {
-  logo: 'https://pub-fe96f9d958ff4417b2ec076058fc91a1.r2.dev/Flax-logo-transparent.png',
+  logo: 'https://hr.flaxfoods.in/flax-logo.png',
   name: 'Health & Beyond Food Pvt. Ltd',
   address: 'Lower Parel (West), Mumbai',
   cities: 'Mumbai · Bangalore · Goa',
