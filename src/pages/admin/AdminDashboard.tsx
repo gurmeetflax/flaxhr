@@ -66,12 +66,13 @@ export default function AdminDashboard() {
     : allOutlets.filter((o) => o.city === cityFilter)
 
   const outletId = outletFilter === ALL_OUTLETS ? null : outletFilter
-  const summary = useAdminDashboardSummary(periodMonth, outletId)
+  const city = cityFilter === ALL_CITIES ? null : cityFilter
+  const summary = useAdminDashboardSummary(periodMonth, outletId, city)
   const rosterCheck = useRosterVsAttendance(today, outletId)
   const todayPunches = useTodayPunches(outletId)
 
-  // City-scope filtering on the cards (KPI summary still renders for the
-  // selected outlet OR all outlets; city-only narrows the today/roster view).
+  // KPIs now narrow by city too (via admin_dashboard_summary p_city). The
+  // today/roster cards below still client-filter to the picked city.
   const cityOutletIds = useMemo(
     () => new Set(filteredOutlets.map((o) => o.id)),
     [filteredOutlets],
@@ -186,7 +187,11 @@ export default function AdminDashboard() {
         />
         <Kpi
           label="Present today"
-          value={summary.data?.present_today}
+          value={
+            summary.data
+              ? `${summary.data.present_today} / ${summary.data.headcount}`
+              : undefined
+          }
           icon={CheckCircle2}
         />
         <Kpi label="Late today" value={summary.data?.late_today} icon={Clock4} />

@@ -5,6 +5,7 @@ import { useAuth } from '@/lib/auth'
 export interface AdminDashboardSummary {
   period_month: string
   outlet_id: string | null
+  city: string | null
   headcount: number
   joiners: number
   leavers: number
@@ -18,14 +19,19 @@ export interface AdminDashboardSummary {
   on_leave_today: number
 }
 
-export function useAdminDashboardSummary(periodMonth: string, outletId: string | null) {
+export function useAdminDashboardSummary(
+  periodMonth: string,
+  outletId: string | null,
+  city: string | null = null,
+) {
   return useQuery<AdminDashboardSummary | null>({
-    queryKey: ['admin-dashboard-summary', periodMonth, outletId],
+    queryKey: ['admin-dashboard-summary', periodMonth, outletId, city],
     staleTime: 30_000,
     queryFn: async () => {
       const { data, error } = await supabase.rpc('admin_dashboard_summary', {
         p_period_month: periodMonth,
         p_outlet_id: outletId,
+        p_city: city,
       })
       if (error) throw error
       const row = Array.isArray(data) ? data[0] : data
