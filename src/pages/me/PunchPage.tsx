@@ -93,6 +93,7 @@ export default function PunchPage() {
         selfie: selfieBlob,
         lat,
         lng,
+        accuracy: coords?.accuracy ?? null,
         outletId: useOutlet?.outlet_id ?? null,
       })
       toast.success(
