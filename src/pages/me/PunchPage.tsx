@@ -78,6 +78,12 @@ export default function PunchPage() {
 
   const radius = useOutlet?.geofence_radius_m ?? outlet?.geofence_radius_m ?? 200
   const inside = distance !== null && distance <= radius
+  // GPS error so big the distance measurement is meaningless — covers the
+  // "approximate location" permission (Android 12+ default), battery-saver
+  // throttling, and indoor wifi-only fixes. Anything above radius × 2
+  // (clamped to a floor of 150 m) is treated as too imprecise to trust.
+  const accuracyPoor =
+    coords !== null && coords.accuracy > Math.max(radius * 2, 150)
   const tz = outlet?.timezone ?? 'Asia/Kolkata'
   const showOutletPicker = myOutlets.length > 1
 
@@ -87,6 +93,7 @@ export default function PunchPage() {
         selfie: selfieBlob,
         lat,
         lng,
+        accuracy: coords?.accuracy ?? null,
         outletId: useOutlet?.outlet_id ?? null,
       })
       toast.success(
@@ -205,13 +212,25 @@ export default function PunchPage() {
               {geoError ? (
                 <p className="text-sm text-destructive">{geoError}</p>
               ) : (
-                <p className="flex items-center gap-2 text-sm text-muted-foreground">
+                <p className={`flex items-center gap-2 text-sm ${accuracyPoor ? 'text-amber-600' : 'text-muted-foreground'}`}>
                   <MapPin className="h-4 w-4" />
                   {hasGeo
-                    ? `Accuracy ±${Math.round(coords!.accuracy)} m`
+                    ? `Accuracy ±${Math.round(coords!.accuracy)} m${accuracyPoor ? ' · low GPS accuracy' : ''}`
                     : 'Locating you…'}
                 </p>
               )}
+
+              {accuracyPoor ? (
+                <div className="rounded-lg border border-amber-200 bg-amber-50 p-3 text-xs text-amber-900">
+                  <div className="font-medium">Can't verify your location.</div>
+                  <div className="mt-1 text-amber-800">
+                    Your phone is reporting a ±{Math.round(coords!.accuracy)} m fix — far wider than
+                    the {radius} m geofence. Try: step outside / near a window, turn on
+                    high-accuracy / precise location, and switch off battery saver. Wait 10–20 s
+                    for the fix to tighten.
+                  </div>
+                </div>
+              ) : null}
 
               {step === 'idle' && selfieRequired ? (
                 <Button
@@ -241,7 +260,9 @@ export default function PunchPage() {
                   {hasGeo
                     ? inside
                       ? `Take selfie to ${nextType === 'in' ? 'punch in' : 'punch out'}`
-                      : 'Move closer to the outlet'
+                      : accuracyPoor
+                        ? 'Low GPS accuracy — waiting for a better fix'
+                        : 'Move closer to the outlet'
                     : 'Waiting for location…'}
                 </Button>
               ) : null}
@@ -272,7 +293,9 @@ export default function PunchPage() {
                       ? nextType === 'in'
                         ? 'Punch in'
                         : 'Punch out'
-                      : 'Move closer to the outlet'
+                      : accuracyPoor
+                        ? 'Low GPS accuracy — waiting for a better fix'
+                        : 'Move closer to the outlet'
                     : 'Waiting for location…'}
                 </Button>
               ) : null}

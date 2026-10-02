@@ -161,6 +161,9 @@ interface PunchInput {
   selfie?: Blob
   lat: number
   lng: number
+  /** GPS accuracy in metres (lower is better). Server rejects fixes
+   * wider than the configured threshold. */
+  accuracy?: number | null
   /** When the user covers multiple outlets, pass the picked one
    * (closest by GPS that they're inside the geofence of). When null,
    * the server falls back to the employee's home outlet. */
@@ -172,7 +175,7 @@ export function usePunch() {
   const qc = useQueryClient()
 
   return useMutation<PunchResult, Error, PunchInput>({
-    mutationFn: async ({ selfie, lat, lng, outletId }) => {
+    mutationFn: async ({ selfie, lat, lng, accuracy, outletId }) => {
       if (!user) throw new Error('Not signed in')
 
       // When the selfie_required setting is off, the client may omit the
@@ -204,6 +207,7 @@ export function usePunch() {
         p_user_agent:
           typeof navigator !== 'undefined' ? navigator.userAgent.slice(0, 256) : null,
         p_outlet_id: outletId ?? null,
+        p_accuracy_m: accuracy == null ? null : Math.round(accuracy),
       })
 
       if (error) throw mapPunchError(error.message)
@@ -253,6 +257,15 @@ function mapPunchError(message: string): Error {
       dist && radius
         ? `Outside geofence — you're ${dist} m away (allowed: ${radius} m). Move closer to the outlet.`
         : 'You are outside the outlet geofence. Move closer to punch.',
+    )
+  }
+  if (m.includes('LOW_GPS_ACCURACY')) {
+    const acc = /accuracy_m=(\d+)/.exec(m)?.[1]
+    const max = /max_m=(\d+)/.exec(m)?.[1]
+    return new Error(
+      acc && max
+        ? `GPS too imprecise (±${acc} m, max ±${max} m). Enable precise location, step near a window, and wait 10–20 s.`
+        : 'GPS is too imprecise to verify your location. Enable precise location and try again.',
     )
   }
   if (m.includes('SELFIE_REQUIRED')) return new Error('Selfie is required.')

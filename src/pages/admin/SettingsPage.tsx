@@ -24,6 +24,7 @@ export default function SettingsPage() {
       />
       <div className="flex flex-col gap-4">
         <SelfieRequiredCard />
+        <PunchAccuracyCard />
         <NotificationEmailCard />
         <HrWhatsAppCard />
         <CitiesCard />
@@ -69,6 +70,76 @@ function SelfieRequiredCard() {
           onChange={onToggle}
           ariaLabel="Toggle selfie requirement"
         />
+      </CardContent>
+    </Card>
+  )
+}
+
+function PunchAccuracyCard() {
+  const { data: current = 100, isLoading } = useAppSetting<number>(
+    'punch_max_accuracy_m',
+    100,
+  )
+  const setting = useSetAppSetting()
+  const [draft, setDraft] = useState<string>('')
+
+  const effective = draft === '' ? String(current ?? 100) : draft
+
+  const save = async () => {
+    const n = Number(effective)
+    if (!Number.isFinite(n) || n < 0 || n > 10000) {
+      toast.error('Enter a number between 0 and 10000 (0 disables the check).')
+      return
+    }
+    try {
+      await setting.mutateAsync({ key: 'punch_max_accuracy_m', value: Math.round(n) })
+      toast.success(
+        n === 0
+          ? 'Accuracy check disabled'
+          : `Punches with worse than ±${Math.round(n)} m will be rejected`,
+      )
+      setDraft('')
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : 'Could not save')
+    }
+  }
+
+  return (
+    <Card>
+      <CardContent className="flex items-start gap-4 p-6">
+        <span className="grid h-10 w-10 place-items-center rounded-lg bg-primary/10 text-primary">
+          <MapPin className="h-5 w-5" />
+        </span>
+        <div className="flex-1">
+          <CardTitle>Punch — max GPS accuracy</CardTitle>
+          <CardDescription className="mt-1">
+            Reject punches whose GPS fix is wider than this threshold. Default
+            100 m. Set to <b>0</b> to disable the check (not recommended —
+            devices often report ±2000 m wifi-only fixes that let employees
+            punch from blocks away).
+          </CardDescription>
+          <div className="mt-3 flex items-center gap-2">
+            <Input
+              type="number"
+              min={0}
+              max={10000}
+              value={effective}
+              disabled={isLoading}
+              onChange={(e) => setDraft(e.target.value)}
+              className="w-28"
+              aria-label="Max GPS accuracy in metres"
+            />
+            <span className="text-sm text-muted-foreground">metres</span>
+            <Button
+              size="sm"
+              onClick={save}
+              loading={setting.isPending}
+              disabled={isLoading || draft === '' || Number(draft) === Number(current)}
+            >
+              Save
+            </Button>
+          </div>
+        </div>
       </CardContent>
     </Card>
   )
