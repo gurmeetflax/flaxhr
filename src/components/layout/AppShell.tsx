@@ -52,7 +52,6 @@ export default function AppShell({ nav, title }: { nav: NavItem[]; title: string
         <main
           className="mx-auto w-full max-w-6xl px-4 py-6 md:px-6 md:py-8"
           style={{
-            paddingTop: 'max(1.5rem, env(safe-area-inset-top))',
             paddingBottom: 'max(1.5rem, env(safe-area-inset-bottom))',
             paddingLeft: 'max(1rem, env(safe-area-inset-left))',
             paddingRight: 'max(1rem, env(safe-area-inset-right))',
@@ -82,7 +81,10 @@ function Sidebar({
         drawerOpen ? 'translate-x-0' : '-translate-x-full md:translate-x-0',
       )}
     >
-      <div className="flex h-16 shrink-0 items-center justify-between border-b border-border px-5">
+      <div
+        className="box-content flex h-16 shrink-0 items-center justify-between border-b border-border px-5"
+        style={{ paddingTop: 'env(safe-area-inset-top)' }}
+      >
         <div className="flex items-center gap-2">
           <span className="grid h-8 w-8 place-items-center rounded-lg bg-primary/15 text-primary">
             <Leaf className="h-4 w-4" />
@@ -137,7 +139,10 @@ function Header({
   onOpenDrawer: () => void
 }) {
   return (
-    <header className="flex h-16 items-center justify-between gap-3 border-b border-border bg-surface px-4 md:justify-end md:px-6">
+    <header
+      className="sticky top-0 z-30 box-content flex h-16 items-center justify-between gap-3 border-b border-border bg-surface px-4 md:justify-end md:px-6"
+      style={{ paddingTop: 'env(safe-area-inset-top)' }}
+    >
       <button
         aria-label="Open menu"
         onClick={onOpenDrawer}
