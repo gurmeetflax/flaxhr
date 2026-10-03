@@ -165,7 +165,9 @@ export default function PunchPage() {
               : undefined
         }
       />
-      <LocationPermissionBanner />
+      {/* iOS Safari can report the permission as 'denied' while
+          watchPosition is delivering fixes — trust the live fix. */}
+      {hasGeo ? null : <LocationPermissionBanner />}
 
       {!outletLoading && !outlet ? (
         <Card>
