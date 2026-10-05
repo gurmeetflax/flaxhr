@@ -14,7 +14,13 @@ import {
   useNextPunchType,
   usePunch,
 } from '@/lib/attendance'
-import { GeoError, haversineMeters, watchPosition } from '@/lib/geo'
+import {
+  ensureNativeLocationPermission,
+  GeoError,
+  haversineMeters,
+  watchPosition,
+  type LocationPrecision,
+} from '@/lib/geo'
 import { useAppSetting } from '@/lib/appSettings'
 import { pickOutletForPunch, useMyOutlets } from '@/lib/employeeOutlets'
 import LocationPermissionBanner from '@/components/LocationPermissionBanner'
@@ -37,6 +43,9 @@ export default function PunchPage() {
 
   const [coords, setCoords] = useState<{ lat: number; lng: number; accuracy: number } | null>(null)
   const [geoError, setGeoError] = useState<string | null>(null)
+  const [precision, setPrecision] = useState<LocationPrecision | null>(null)
+  // Bumped to restart the location watch after a permission upgrade.
+  const [watchKey, setWatchKey] = useState(0)
   const [step, setStep] = useState<Step>('idle')
   const [selfie, setSelfie] = useState<{ blob: Blob; preview: string } | null>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
@@ -52,9 +61,11 @@ export default function PunchPage() {
         setGeoError(null)
       },
       (err) => setGeoError(geoMessage(err)),
+      undefined,
+      setPrecision,
     )
     return stop
-  }, [])
+  }, [watchKey])
 
   useEffect(() => {
     return () => {
@@ -82,6 +93,10 @@ export default function PunchPage() {
   // "approximate location" permission (Android 12+ default), battery-saver
   // throttling, and indoor wifi-only fixes. Anything above radius × 2
   // (clamped to a floor of 150 m) is treated as too imprecise to trust.
+  // Approximate-only permission pins fixes at ~±2 km. The app knows it
+  // from the permission; in a browser a ~2 km reading is the giveaway.
+  const approximateOnly =
+    precision === 'approximate' || (!IS_NATIVE && coords !== null && coords.accuracy >= 1500)
   const accuracyPoor =
     coords !== null && coords.accuracy > Math.max(radius * 2, 150)
   const tz = outlet?.timezone ?? 'Asia/Kolkata'
@@ -224,13 +239,57 @@ export default function PunchPage() {
 
               {accuracyPoor ? (
                 <div className="rounded-lg border border-amber-200 bg-amber-50 p-3 text-xs text-amber-900">
-                  <div className="font-medium">Can't verify your location.</div>
-                  <div className="mt-1 text-amber-800">
-                    Your phone is reporting a ±{Math.round(coords!.accuracy)} m fix — far wider than
-                    the {radius} m geofence. Try: step outside / near a window, turn on
-                    high-accuracy / precise location, and switch off battery saver. Wait 10–20 s
-                    for the fix to tighten.
-                  </div>
+                  {approximateOnly ? (
+                    <>
+                      <div className="font-medium">Your phone is only sharing approximate location.</div>
+                      {IS_NATIVE ? (
+                        <>
+                          <div className="mt-1 text-amber-800">
+                            Precise location is off for Flax HR, so the reading can't get better than
+                            ±2 km. Tap the button and choose <b>Precise</b>. If no prompt appears, open
+                            phone <b>Settings → Apps → Flax HR → Permissions → Location</b> and turn on{' '}
+                            <b>Use precise location</b>.
+                          </div>
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            className="mt-2 border-amber-300 bg-white"
+                            onClick={async () => {
+                              try {
+                                const p = await ensureNativeLocationPermission()
+                                setPrecision(p)
+                                if (p === 'precise') {
+                                  setWatchKey((k) => k + 1)
+                                  toast.success('Precise location on — getting a better fix…')
+                                }
+                              } catch {
+                                toast.error('Location permission is off. Turn it on in phone Settings.')
+                              }
+                            }}
+                          >
+                            Turn on precise location
+                          </Button>
+                        </>
+                      ) : (
+                        <div className="mt-1 text-amber-800">
+                          Chrome only has approximate location, so the reading can't get better than
+                          ±2 km. Fix: phone <b>Settings → Apps → Chrome → Permissions → Location</b> → turn
+                          on <b>Use precise location</b>. Then in Chrome tap <b>⋮ → Settings → Site
+                          settings → Location</b> and allow hr.flaxfoods.in. Reload this page.
+                        </div>
+                      )}
+                    </>
+                  ) : (
+                    <>
+                      <div className="font-medium">Can't verify your location.</div>
+                      <div className="mt-1 text-amber-800">
+                        Your phone is reporting a ±{Math.round(coords!.accuracy)} m fix — far wider than
+                        the {radius} m geofence. Try: step outside / near a window, turn on
+                        high-accuracy / precise location, and switch off battery saver. Wait 10–20 s
+                        for the fix to tighten.
+                      </div>
+                    </>
+                  )}
                 </div>
               ) : null}
 
