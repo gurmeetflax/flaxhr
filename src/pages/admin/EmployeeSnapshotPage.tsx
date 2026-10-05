@@ -19,6 +19,7 @@ import {
   UserRound,
 } from 'lucide-react'
 import { supabase } from '@/lib/supabase'
+import EmployeeHoursCard from './EmployeeHoursCard'
 import { PageHeader } from '@/components/layout/AppShell'
 import { Card, CardContent, CardDescription, CardTitle } from '@/components/ui/Card'
 import { Button } from '@/components/ui/Button'
@@ -145,6 +146,8 @@ export default function EmployeeSnapshotPage() {
           </div>
         </CardContent>
       </Card>
+
+      <EmployeeHoursCard employeeId={id} />
 
       {/* Period picker */}
       <div className="mb-3 flex flex-wrap items-center gap-2">
