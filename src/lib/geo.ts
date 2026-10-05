@@ -19,6 +19,22 @@ export class GeoError extends Error {
   }
 }
 
+export type LocationPrecision = 'precise' | 'approximate'
+
+// Android 12+ lets the user grant only "approximate" location, which
+// pins every fix at ~±2000 m. Asking for 'location' again while only
+// coarse is granted shows the system "Change to precise location?"
+// dialog, so we always ask rather than accepting coarse.
+export async function ensureNativeLocationPermission(): Promise<LocationPrecision> {
+  let perm = await Geolocation.checkPermissions()
+  if (perm.location !== 'granted') {
+    perm = await Geolocation.requestPermissions({ permissions: ['location'] })
+  }
+  if (perm.location === 'granted') return 'precise'
+  if (perm.coarseLocation === 'granted') return 'approximate'
+  throw new GeoError('denied', 'Location permission was denied.')
+}
+
 const DEFAULT_OPTIONS: PositionOptions = {
   enableHighAccuracy: true,
   timeout: 15_000,
@@ -30,13 +46,7 @@ export async function getCurrentPosition(options?: PositionOptions): Promise<Geo
     // Native path — uses the OS location provider (much more accurate on
     // Android, works even when the WebView doesn't have HTTPS geolocation).
     try {
-      const perm = await Geolocation.checkPermissions()
-      if (perm.location !== 'granted' && perm.coarseLocation !== 'granted') {
-        const req = await Geolocation.requestPermissions({ permissions: ['location'] })
-        if (req.location !== 'granted' && req.coarseLocation !== 'granted') {
-          throw new GeoError('denied', 'Location permission was denied.')
-        }
-      }
+      await ensureNativeLocationPermission()
       const pos = await Geolocation.getCurrentPosition({
         enableHighAccuracy: options?.enableHighAccuracy ?? true,
         timeout: options?.timeout ?? DEFAULT_OPTIONS.timeout,
@@ -85,7 +95,9 @@ export function watchPosition(
   onUpdate: (pos: GeoPosition) => void,
   onError?: (err: GeoError) => void,
   options?: PositionOptions,
+  onPrecision?: (p: LocationPrecision) => void,
 ): () => void {
+  if (IS_NATIVE) return watchNative(onUpdate, onError, options, onPrecision)
   if (typeof navigator === 'undefined' || !navigator.geolocation) {
     onError?.(new GeoError('unsupported', 'Geolocation is not supported on this device.'))
     return () => {}
@@ -110,6 +122,53 @@ export function watchPosition(
     { ...DEFAULT_OPTIONS, ...options },
   )
   return () => navigator.geolocation.clearWatch(id)
+}
+
+// Inside the app: the OS location provider (GPS) instead of the
+// WebView's browser geolocation, which is often wifi-only.
+function watchNative(
+  onUpdate: (pos: GeoPosition) => void,
+  onError?: (err: GeoError) => void,
+  options?: PositionOptions,
+  onPrecision?: (p: LocationPrecision) => void,
+): () => void {
+  let stopped = false
+  let watchId: string | null = null
+  ;(async () => {
+    try {
+      const precision = await ensureNativeLocationPermission()
+      onPrecision?.(precision)
+      if (stopped) return
+      const id = await Geolocation.watchPosition(
+        {
+          enableHighAccuracy: true,
+          timeout: options?.timeout ?? DEFAULT_OPTIONS.timeout,
+          maximumAge: options?.maximumAge ?? DEFAULT_OPTIONS.maximumAge,
+        },
+        (pos, err) => {
+          if (err || !pos) {
+            const msg = err instanceof Error ? err.message : String(err ?? 'unavailable')
+            onError?.(new GeoError(/denied|permission/i.test(msg) ? 'denied' : 'unavailable', msg))
+            return
+          }
+          onUpdate({
+            lat: pos.coords.latitude,
+            lng: pos.coords.longitude,
+            accuracy: pos.coords.accuracy ?? 0,
+            timestamp: pos.timestamp,
+          })
+        },
+      )
+      if (stopped) void Geolocation.clearWatch({ id })
+      else watchId = id
+    } catch (e) {
+      onError?.(e instanceof GeoError ? e : new GeoError('unavailable', String(e)))
+    }
+  })()
+  return () => {
+    stopped = true
+    if (watchId) void Geolocation.clearWatch({ id: watchId })
+  }
 }
 
 const EARTH_RADIUS_M = 6_371_000
