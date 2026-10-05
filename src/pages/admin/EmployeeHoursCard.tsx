@@ -1,14 +1,11 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
-import { useQuery } from '@tanstack/react-query'
-import { addDays, format, parseISO, subDays } from 'date-fns'
+import { format, parseISO, subDays } from 'date-fns'
 import { formatInTimeZone } from 'date-fns-tz'
-import { supabase } from '@/lib/supabase'
 import { Card, CardContent, CardDescription, CardTitle } from '@/components/ui/Card'
+import { useAttendanceDays, type Day, type DayStatus } from '@/lib/attendanceDays'
 
 const IST = 'Asia/Kolkata'
 const SHIFT_HOURS = 9
-// Leaving within this many minutes of the rostered end isn't flagged.
-const EARLY_TOLERANCE_MIN = 10
 
 const COLOR = {
   good: '#16a34a',
@@ -16,18 +13,6 @@ const COLOR = {
   bad: '#ef4444',
   neutral: '#a1a1aa',
 }
-
-type DayStatus =
-  | 'on_time'
-  | 'late'
-  | 'early'
-  | 'no_out'
-  | 'no_show'
-  | 'unrostered'
-  | 'leave'
-  | 'off'
-  | 'pending'
-  | 'none'
 
 const STATUS_LABEL: Record<DayStatus, string> = {
   on_time: 'On time',
@@ -42,37 +27,6 @@ const STATUS_LABEL: Record<DayStatus, string> = {
   none: 'No shift',
 }
 
-interface ReportRow {
-  work_date: string
-  worked_minutes: number | null
-  first_in_at: string | null
-  last_out_at: string | null
-  scheduled_start_at: string | null
-  scheduled_end_at: string | null
-  late_minutes: number | null
-  early_departure_minutes: number | null
-}
-
-interface RosterRow {
-  work_date: string
-  status: string
-  starts_at: string | null
-  ends_at: string | null
-}
-
-interface LeaveRow {
-  start_date: string
-  end_date: string
-}
-
-interface Day {
-  date: string
-  status: DayStatus
-  hours: number | null
-  report: ReportRow | null
-  roster: RosterRow | null
-}
-
 const RANGES = [14, 30, 60] as const
 
 export default function EmployeeHoursCard({ employeeId }: { employeeId: string }) {
@@ -80,61 +34,8 @@ export default function EmployeeHoursCard({ employeeId }: { employeeId: string }
   const today = format(new Date(), 'yyyy-MM-dd')
   const from = format(subDays(new Date(), range - 1), 'yyyy-MM-dd')
 
-  const q = useQuery({
-    queryKey: ['employee-hours-discipline', employeeId, from, today],
-    queryFn: async () => {
-      const [rep, ros, lv] = await Promise.all([
-        supabase
-          .from('v_attendance_report_detailed')
-          .select(
-            'work_date, worked_minutes, first_in_at, last_out_at, scheduled_start_at, scheduled_end_at, late_minutes, early_departure_minutes',
-          )
-          .eq('employee_id', employeeId)
-          .gte('work_date', from)
-          .lte('work_date', today),
-        supabase
-          .schema('core')
-          .from('roster_entries')
-          .select('work_date, status, starts_at, ends_at')
-          .eq('employee_id', employeeId)
-          .gte('work_date', from)
-          .lte('work_date', today),
-        supabase
-          .schema('core')
-          .from('leave_requests')
-          .select('start_date, end_date')
-          .eq('employee_id', employeeId)
-          .eq('status', 'approved')
-          .lte('start_date', today)
-          .gte('end_date', from),
-      ])
-      if (rep.error) throw rep.error
-      if (ros.error) throw ros.error
-      if (lv.error) throw lv.error
-      return {
-        report: (rep.data ?? []) as ReportRow[],
-        roster: (ros.data ?? []) as RosterRow[],
-        leaves: (lv.data ?? []) as LeaveRow[],
-      }
-    },
-  })
-
-  const days = useMemo<Day[]>(() => {
-    if (!q.data) return []
-    const repBy = new Map(q.data.report.map((r) => [r.work_date, r]))
-    const rosBy = new Map(q.data.roster.map((r) => [r.work_date, r]))
-    const out: Day[] = []
-    for (let d = parseISO(from); format(d, 'yyyy-MM-dd') <= today; d = addDays(d, 1)) {
-      const date = format(d, 'yyyy-MM-dd')
-      const report = repBy.get(date) ?? null
-      const roster = rosBy.get(date) ?? null
-      const onLeave = q.data.leaves.some((l) => l.start_date <= date && l.end_date >= date)
-      const hours =
-        report?.worked_minutes != null ? Math.round((report.worked_minutes / 60) * 10) / 10 : null
-      out.push({ date, report, roster, hours, status: grade(date, today, report, roster, onLeave) })
-    }
-    return out
-  }, [q.data, from, today])
+  const q = useAttendanceDays(employeeId, from, today)
+  const days = useMemo<Day[]>(() => q.data ?? [], [q.data])
 
   const summary = useMemo(() => {
     const count = (s: DayStatus) => days.filter((d) => d.status === s).length
@@ -251,24 +152,6 @@ export default function EmployeeHoursCard({ employeeId }: { employeeId: string }
       </CardContent>
     </Card>
   )
-}
-
-function grade(
-  date: string,
-  today: string,
-  report: ReportRow | null,
-  roster: RosterRow | null,
-  onLeave: boolean,
-): DayStatus {
-  if (onLeave) return 'leave'
-  const punchedIn = !!report?.first_in_at
-  if (!roster || roster.status === 'planned') return punchedIn ? 'unrostered' : 'none'
-  if (roster.status === 'off') return punchedIn ? 'unrostered' : 'off'
-  if (!punchedIn) return date < today ? 'no_show' : 'pending'
-  if ((report?.late_minutes ?? 0) > 0) return 'late'
-  if (!report?.last_out_at) return date < today ? 'no_out' : 'pending'
-  if ((report?.early_departure_minutes ?? 0) > EARLY_TOLERANCE_MIN) return 'early'
-  return 'on_time'
 }
 
 function t(ts: string | null | undefined): string {
