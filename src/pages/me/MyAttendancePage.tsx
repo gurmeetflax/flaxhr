@@ -8,6 +8,7 @@ import { Input } from '@/components/ui/Input'
 import { Button } from '@/components/ui/Button'
 import { useMyAttendance, type AttendanceRow } from '@/lib/attendance'
 import { useMyEmployee } from '@/lib/auth'
+import AttendanceCalendar from './AttendanceCalendar'
 
 export default function MyAttendancePage() {
   const [periodMonth, setPeriodMonth] = useState<string>(
@@ -49,6 +50,8 @@ export default function MyAttendancePage() {
           onChange={(e) => setPeriodMonth(`${e.target.value}-01`)}
         />
       </div>
+
+      <AttendanceCalendar employeeId={employee?.id} monthStart={monthStart} />
 
       {isLoading ? (
         <Card>
