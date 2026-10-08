@@ -8,7 +8,9 @@ import { PageHeader } from '@/components/layout/AppShell'
 import { Card, CardContent } from '@/components/ui/Card'
 import { Input } from '@/components/ui/Input'
 import { Button } from '@/components/ui/Button'
+import { Tabs, TabsList, TabsTrigger } from '@/components/ui/Tabs'
 import { useAttendance, getSignedSelfieUrl, type AttendanceRow } from '@/lib/attendance'
+import AppUsagePanel from './AppUsagePanel'
 
 interface OutletOption {
   id: string
@@ -16,6 +18,7 @@ interface OutletOption {
 }
 
 export default function AttendancePage() {
+  const [tab, setTab] = useState<'punches' | 'usage'>('punches')
   const [outletId, setOutletId] = useState('')
   const [type, setType] = useState<'' | 'in' | 'out'>('')
   const [source, setSource] = useState<'' | 'self' | 'regularised'>('')
@@ -49,8 +52,7 @@ export default function AttendancePage() {
   const filtered = needle
     ? rows.filter(
         (r) =>
-          r.employee_name.toLowerCase().includes(needle) ||
-          r.employee_code.toLowerCase().includes(needle),
+          r.employee_name.toLowerCase().includes(needle) || r.employee_code.toLowerCase().includes(needle),
       )
     : rows
 
@@ -58,86 +60,107 @@ export default function AttendancePage() {
     <>
       <PageHeader
         title="Attendance"
-        description={isLoading ? 'Loading…' : `${filtered.length} punches`}
+        description={
+          tab === 'usage'
+            ? "Who's punching in the app"
+            : isLoading
+              ? 'Loading…'
+              : `${filtered.length} punches`
+        }
         actions={
-          <Button
-            size="sm"
-            variant="outline"
-            onClick={() => downloadCsv(filtered)}
-            disabled={filtered.length === 0}
-          >
-            <Download className="h-4 w-4" /> Export CSV
-          </Button>
+          tab === 'usage' ? null : (
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={() => downloadCsv(filtered)}
+              disabled={filtered.length === 0}
+            >
+              <Download className="h-4 w-4" /> Export CSV
+            </Button>
+          )
         }
       />
 
-      <div className="mb-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-6">
-        <Input placeholder="Search employee" value={search} onChange={(e) => setSearch(e.target.value)} />
-        <select
-          className="h-10 rounded-lg border border-border bg-surface px-3 text-sm"
-          value={outletId}
-          onChange={(e) => setOutletId(e.target.value)}
-        >
-          <option value="">All outlets</option>
-          {outletsQ.data?.map((o) => (
-            <option key={o.id} value={o.id}>
-              {o.display_name ?? o.id}
-            </option>
-          ))}
-        </select>
-        <select
-          className="h-10 rounded-lg border border-border bg-surface px-3 text-sm"
-          value={type}
-          onChange={(e) => setType(e.target.value as '' | 'in' | 'out')}
-        >
-          <option value="">In + Out</option>
-          <option value="in">In only</option>
-          <option value="out">Out only</option>
-        </select>
-        <select
-          className="h-10 rounded-lg border border-border bg-surface px-3 text-sm"
-          value={source}
-          onChange={(e) => setSource(e.target.value as '' | 'self' | 'regularised')}
-        >
-          <option value="">Any source</option>
-          <option value="self">Self-punch</option>
-          <option value="regularised">Regularised</option>
-        </select>
-        <Input type="date" value={from} onChange={(e) => setFrom(e.target.value)} />
-        <Input type="date" value={to} onChange={(e) => setTo(e.target.value)} />
-      </div>
+      <Tabs value={tab} onValueChange={(v) => setTab(v as 'punches' | 'usage')} className="mb-4">
+        <TabsList>
+          <TabsTrigger value="punches">Punches</TabsTrigger>
+          <TabsTrigger value="usage">Who's punching</TabsTrigger>
+        </TabsList>
+      </Tabs>
 
-      <Card>
-        <CardContent className="p-0">
-          <div className="overflow-x-auto">
-            <table className="min-w-full text-sm">
-              <thead className="bg-muted/40 text-left text-xs uppercase tracking-wide text-muted-foreground">
-                <tr>
-                  <th className="px-4 py-3">Employee</th>
-                  <th className="px-4 py-3">Outlet</th>
-                  <th className="px-4 py-3">Type</th>
-                  <th className="px-4 py-3">Time</th>
-                  <th className="px-4 py-3">Distance</th>
-                  <th className="px-4 py-3">Status</th>
-                  <th className="px-4 py-3">Selfie</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-border">
-                {filtered.map((r) => (
-                  <AttendanceRowItem key={r.id} row={r} />
-                ))}
-                {filtered.length === 0 && !isLoading ? (
-                  <tr>
-                    <td colSpan={7} className="px-4 py-8 text-center text-muted-foreground">
-                      No punches in this range.
-                    </td>
-                  </tr>
-                ) : null}
-              </tbody>
-            </table>
+      {tab === 'usage' ? (
+        <AppUsagePanel outlets={outletsQ.data ?? []} />
+      ) : (
+        <>
+          <div className="mb-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-6">
+            <Input placeholder="Search employee" value={search} onChange={(e) => setSearch(e.target.value)} />
+            <select
+              className="h-10 rounded-lg border border-border bg-surface px-3 text-sm"
+              value={outletId}
+              onChange={(e) => setOutletId(e.target.value)}
+            >
+              <option value="">All outlets</option>
+              {outletsQ.data?.map((o) => (
+                <option key={o.id} value={o.id}>
+                  {o.display_name ?? o.id}
+                </option>
+              ))}
+            </select>
+            <select
+              className="h-10 rounded-lg border border-border bg-surface px-3 text-sm"
+              value={type}
+              onChange={(e) => setType(e.target.value as '' | 'in' | 'out')}
+            >
+              <option value="">In + Out</option>
+              <option value="in">In only</option>
+              <option value="out">Out only</option>
+            </select>
+            <select
+              className="h-10 rounded-lg border border-border bg-surface px-3 text-sm"
+              value={source}
+              onChange={(e) => setSource(e.target.value as '' | 'self' | 'regularised')}
+            >
+              <option value="">Any source</option>
+              <option value="self">Self-punch</option>
+              <option value="regularised">Regularised</option>
+            </select>
+            <Input type="date" value={from} onChange={(e) => setFrom(e.target.value)} />
+            <Input type="date" value={to} onChange={(e) => setTo(e.target.value)} />
           </div>
-        </CardContent>
-      </Card>
+
+          <Card>
+            <CardContent className="p-0">
+              <div className="overflow-x-auto">
+                <table className="min-w-full text-sm">
+                  <thead className="bg-muted/40 text-left text-xs uppercase tracking-wide text-muted-foreground">
+                    <tr>
+                      <th className="px-4 py-3">Employee</th>
+                      <th className="px-4 py-3">Outlet</th>
+                      <th className="px-4 py-3">Type</th>
+                      <th className="px-4 py-3">Time</th>
+                      <th className="px-4 py-3">Distance</th>
+                      <th className="px-4 py-3">Status</th>
+                      <th className="px-4 py-3">Selfie</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-border">
+                    {filtered.map((r) => (
+                      <AttendanceRowItem key={r.id} row={r} />
+                    ))}
+                    {filtered.length === 0 && !isLoading ? (
+                      <tr>
+                        <td colSpan={7} className="px-4 py-8 text-center text-muted-foreground">
+                          No punches in this range.
+                        </td>
+                      </tr>
+                    ) : null}
+                  </tbody>
+                </table>
+              </div>
+            </CardContent>
+          </Card>
+        </>
+      )}
     </>
   )
 }
@@ -156,9 +179,7 @@ function AttendanceRowItem({ row }: { row: AttendanceRow }) {
       <td className="px-4 py-3">{row.distance_m != null ? `${row.distance_m} m` : '—'}</td>
       <td className="px-4 py-3">
         {row.source === 'regularised' ? (
-          <span className="rounded-full bg-amber-500/10 px-2 py-0.5 text-xs text-amber-600">
-            Regularised
-          </span>
+          <span className="rounded-full bg-amber-500/10 px-2 py-0.5 text-xs text-amber-600">Regularised</span>
         ) : row.is_within_geofence === false ? (
           <span className="rounded-full bg-destructive/10 px-2 py-0.5 text-xs text-destructive">
             Off-site
@@ -167,9 +188,7 @@ function AttendanceRowItem({ row }: { row: AttendanceRow }) {
           <span className="rounded-full bg-primary/10 px-2 py-0.5 text-xs text-primary">On-site</span>
         )}
       </td>
-      <td className="px-4 py-3">
-        {row.selfie_path ? <SelfieThumb path={row.selfie_path} /> : '—'}
-      </td>
+      <td className="px-4 py-3">{row.selfie_path ? <SelfieThumb path={row.selfie_path} /> : '—'}</td>
     </tr>
   )
 }
