@@ -2,10 +2,9 @@
 //
 // Called by pg_cron (job attendance-daily-slack, 16:00 UTC == 21:30 IST)
 // through public.fire_attendance_daily_slack(). Lists active employees
-// who haven't used the app to punch, in three groups that don't overlap:
-//   🔴 no punch in the last 7 days (or never)
-//   🟠 no punch in the last 3 days
-//   🟡 no punch today
+// who haven't used the app to punch, in three groups that don't overlap
+// (🔴 none in 7+ days or never, 🟠 none in 3 days, 🟡 none today), as
+// totals plus a per-outlet count table. Only the 🟠 group is named.
 // People on approved leave today are left out. Regularised punches don't
 // count as using the app.
 //
@@ -68,16 +67,22 @@ Deno.serve(async (req: Request) => {
     timeZone: IST,
   })
 
+  // Kept short on purpose: totals, one row per outlet, and names only for
+  // people who stopped recently. The full list lives in the app.
   const lines: string[] = [
     `⚠️ *Not punching on the app — ${dateHuman}*`,
     `${people.length - week.length - three.length - day.length} of ${people.length} punched today` +
       (onLeave ? ` · ${onLeave} on leave` : ''),
+    `🔴 7+ days: *${week.length}*   🟠 3 days: *${three.length}*   🟡 today: *${day.length}*`,
+    '',
+    outletTable(week, three, day),
   ]
-  section(lines, '🔴', 'No punch in 7+ days', week, true)
-  section(lines, '🟠', 'No punch in the last 3 days', three, true)
-  section(lines, '🟡', 'Not punched today', day, false)
+  if (three.length) {
+    lines.push('')
+    lines.push(`🟠 *Stopped in the last 3 days:* ${three.map((r) => r.full_name).join(', ')}`)
+  }
   lines.push('')
-  lines.push('_Full list with call / WhatsApp buttons: hr.flaxfoods.in → Attendance → Who\'s punching_')
+  lines.push("<https://hr.flaxfoods.in/admin/attendance|Full list with call / WhatsApp buttons →>")
 
   const text = lines.join('\n').slice(0, 39000)
 
@@ -97,32 +102,35 @@ Deno.serve(async (req: Request) => {
   })
 })
 
-// Adds one group, broken down by outlet.
-function section(lines: string[], emoji: string, title: string, rows: any[], showLast: boolean) {
-  lines.push('')
-  lines.push(`${emoji} *${title} (${rows.length})*`)
-  if (rows.length === 0) {
-    lines.push('  None 🎉')
-    return
+// Monospace table: one row per outlet with 🔴 / 🟠 / 🟡 counts.
+function outletTable(week: any[], three: any[], day: any[]): string {
+  const counts = new Map<string, [number, number, number]>()
+  const add = (rows: any[], i: number) => {
+    for (const r of rows) {
+      const k = shortName(r.outlet_name ?? 'Unassigned')
+      const c = counts.get(k) ?? [0, 0, 0]
+      c[i]++
+      counts.set(k, c)
+    }
   }
-  const byOutlet = new Map<string, any[]>()
-  for (const r of rows) {
-    const k = r.outlet_name ?? 'Unassigned'
-    if (!byOutlet.has(k)) byOutlet.set(k, [])
-    byOutlet.get(k)!.push(r)
-  }
-  for (const outlet of [...byOutlet.keys()].sort()) {
-    const names = byOutlet
-      .get(outlet)!
-      .sort((a, b) => a.full_name.localeCompare(b.full_name))
-      .map((r) => (showLast ? `${r.full_name} (${lastSeen(r.last_punch_at)})` : r.full_name))
-    lines.push(`  • *${outlet}:* ${names.join(', ')}`)
-  }
+  add(week, 0)
+  add(three, 1)
+  add(day, 2)
+  if (counts.size === 0) return 'Everyone punched 🎉'
+  const names = [...counts.keys()].sort((a, b) => sum(counts.get(b)!) - sum(counts.get(a)!) || a.localeCompare(b))
+  const w = Math.max(6, ...names.map((n) => n.length))
+  const row = (n: string, c: (number | string)[]) =>
+    n.padEnd(w) + c.map((x) => String(x === 0 ? '·' : x).padStart(6)).join('')
+  return '```' + [row('Outlet', ['7d+', '3d', 'Today']), ...names.map((n) => row(n, counts.get(n)!))].join('\n') + '```'
 }
 
-function lastSeen(at: string | null): string {
-  if (!at) return 'never'
-  return new Date(at).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', timeZone: IST })
+function sum(c: number[]): number {
+  return c[0] + c[1] + c[2]
+}
+
+// "Indiranagar - Flax Cafe" → "Indiranagar", "Andheri East / Marol" → "Andheri East".
+function shortName(n: string): string {
+  return n.split(/ [-/] /)[0].slice(0, 16)
 }
 
 // Date `daysAgo` days before today in IST, as YYYY-MM-DD.
