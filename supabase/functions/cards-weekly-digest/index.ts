@@ -6,7 +6,9 @@
 // @ts-nocheck
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.45.4'
 
-const SLACK_WEBHOOK_URL = Deno.env.get('SLACK_WEBHOOK_URL') ?? ''
+// HR messages go to #hr; falls back to the shared webhook until it's set.
+const SLACK_WEBHOOK_URL =
+  Deno.env.get('SLACK_HR_WEBHOOK_URL') || Deno.env.get('SLACK_WEBHOOK_URL') || ''
 
 Deno.serve(async (_req: Request) => {
   const sb = createClient(

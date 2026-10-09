@@ -12,7 +12,9 @@
 // Uses the caller's JWT for auth (verify_jwt is on by default) so only
 // signed-in users can invoke.
 
-const SLACK_WEBHOOK_URL = Deno.env.get('SLACK_WEBHOOK_URL') ?? ''
+// HR messages go to #hr; falls back to the shared webhook until it's set.
+const SLACK_WEBHOOK_URL =
+  Deno.env.get('SLACK_HR_WEBHOOK_URL') || Deno.env.get('SLACK_WEBHOOK_URL') || ''
 
 const CORS_HEADERS = {
   'access-control-allow-origin': '*',

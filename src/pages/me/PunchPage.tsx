@@ -26,6 +26,7 @@ import { pickOutletForPunch, useMyOutlets } from '@/lib/employeeOutlets'
 import LocationPermissionBanner from '@/components/LocationPermissionBanner'
 import { IS_NATIVE } from '@/lib/native'
 import { captureNativeSelfie } from '@/lib/nativeCamera'
+import MeetingCard from './MeetingCard'
 
 type Step = 'idle' | 'selfie' | 'review'
 
@@ -89,6 +90,9 @@ export default function PunchPage() {
 
   const radius = useOutlet?.geofence_radius_m ?? outlet?.geofence_radius_m ?? 200
   const inside = distance !== null && distance <= radius
+  // Field staff (sales) punch from wherever they are; location is still sent.
+  const fieldStaff = employee?.field_staff === true
+  const canPunch = fieldStaff ? coords !== null : inside
   // GPS error so big the distance measurement is meaningless — covers the
   // "approximate location" permission (Android 12+ default), battery-saver
   // throttling, and indoor wifi-only fixes. Anything above radius × 2
@@ -134,7 +138,7 @@ export default function PunchPage() {
       setStep('review')
       return
     }
-    if (!inside) {
+    if (!canPunch) {
       toast.error(`Outside geofence — you're ${distance} m away (allowed: ${radius} m).`)
       setStep('review')
       return
@@ -148,7 +152,7 @@ export default function PunchPage() {
       toast.error('Waiting for your location. Please allow location access.')
       return
     }
-    if (!inside) {
+    if (!canPunch) {
       toast.error(`Outside geofence — you're ${distance} m away (allowed: ${radius} m).`)
       return
     }
@@ -314,12 +318,12 @@ export default function PunchPage() {
                     }
                     fileInputRef.current?.click()
                   }}
-                  disabled={!hasGeo || !inside || punch.isPending}
+                  disabled={!hasGeo || !canPunch || punch.isPending}
                   loading={punch.isPending}
                 >
                   <Camera className="h-4 w-4" />
                   {hasGeo
-                    ? inside
+                    ? canPunch
                       ? `Take selfie to ${nextType === 'in' ? 'punch in' : 'punch out'}`
                       : accuracyPoor
                         ? 'Low GPS accuracy — waiting for a better fix'
@@ -337,7 +341,7 @@ export default function PunchPage() {
                       toast.error('Waiting for your location.')
                       return
                     }
-                    if (!inside) {
+                    if (!canPunch) {
                       toast.error(
                         `Outside geofence — you're ${distance} m away (allowed: ${radius} m).`,
                       )
@@ -346,11 +350,11 @@ export default function PunchPage() {
                     void submitWith(undefined, coords.lat, coords.lng)
                   }}
                   loading={punch.isPending}
-                  disabled={!hasGeo || !inside}
+                  disabled={!hasGeo || !canPunch}
                 >
                   <Send className="h-4 w-4" />
                   {hasGeo
-                    ? inside
+                    ? canPunch
                       ? nextType === 'in'
                         ? 'Punch in'
                         : 'Punch out'
@@ -373,7 +377,7 @@ export default function PunchPage() {
                       <RotateCcw className="h-4 w-4" />
                       Retake
                     </Button>
-                    <Button onClick={onSubmit} loading={punch.isPending} disabled={!inside}>
+                    <Button onClick={onSubmit} loading={punch.isPending} disabled={!canPunch}>
                       <Send className="h-4 w-4" />
                       Submit {nextType === 'in' ? 'punch in' : 'punch out'}
                     </Button>
@@ -395,6 +399,8 @@ export default function PunchPage() {
               />
             </CardContent>
           </Card>
+
+          {fieldStaff && employee ? <MeetingCard employeeId={employee.id} coords={coords} /> : null}
 
           <Card>
             <CardContent className="flex flex-col gap-3 p-6">

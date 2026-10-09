@@ -23,6 +23,7 @@ import {
   TrendingDown,
   Users,
   Wallet,
+  Briefcase,
 } from 'lucide-react'
 import ProtectedRoute from '@/components/ProtectedRoute'
 import AppShell from '@/components/layout/AppShell'
@@ -41,6 +42,7 @@ import OutletsPage from '@/pages/admin/OutletsPage'
 import NewOutletPage from '@/pages/admin/NewOutletPage'
 import EditOutletPage from '@/pages/admin/EditOutletPage'
 import AttendancePage from '@/pages/admin/AttendancePage'
+import FieldVisitsPage from '@/pages/admin/FieldVisitsPage'
 import RegularisationsPage from '@/pages/admin/RegularisationsPage'
 import ShiftsPage from '@/pages/admin/ShiftsPage'
 import RosterPage from '@/pages/admin/RosterPage'
@@ -87,6 +89,7 @@ const adminNav = [
   { to: '/admin/outlets', label: 'Outlets', icon: Store },
   { to: '/admin/employees', label: 'Employees', icon: Users },
   { to: '/admin/attendance', label: 'Attendance', icon: ClipboardList },
+  { to: '/admin/field-visits', label: 'Field visits', icon: Briefcase },
   { to: '/admin/reports', label: 'Reports', icon: FileBarChart },
   { to: '/admin/regularisations', label: 'Regularisations', icon: CheckSquare },
   { to: '/admin/shifts', label: 'Shifts', icon: Clock },
@@ -155,6 +158,7 @@ export default function App() {
         <Route path="/admin/employees/bulk" element={<BulkEmployeesPage />} />
         <Route path="/admin/employees/:id" element={<EditEmployeePage />} />
         <Route path="/admin/attendance" element={<AttendancePage />} />
+        <Route path="/admin/field-visits" element={<FieldVisitsPage />} />
         <Route path="/admin/reports" element={<ReportsPage />} />
         <Route path="/admin/regularisations" element={<RegularisationsPage />} />
         <Route path="/admin/shifts" element={<ShiftsPage />} />
