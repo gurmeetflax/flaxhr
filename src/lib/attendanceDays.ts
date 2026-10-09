@@ -26,6 +26,9 @@ export interface ReportRow {
   scheduled_end_at: string | null
   late_minutes: number | null
   early_departure_minutes: number | null
+  outlet_name?: string | null
+  first_in_outlet_name?: string | null
+  last_out_outlet_name?: string | null
 }
 
 export interface RosterRow {
@@ -41,6 +44,8 @@ export interface Day {
   hours: number | null
   report: ReportRow | null
   roster: RosterRow | null
+  // Outlets punched at that day, in order (managers move between outlets).
+  outlets: string[]
 }
 
 export function grade(
@@ -92,6 +97,20 @@ function mergeByDate(rows: ReportRow[]): Map<string, ReportRow> {
   return out
 }
 
+// Outlet names per day in punch order, without repeats.
+function outletsByDate(rows: ReportRow[]): Map<string, string[]> {
+  const out = new Map<string, string[]>()
+  const sorted = [...rows].sort((a, b) => (a.first_in_at ?? '').localeCompare(b.first_in_at ?? ''))
+  for (const r of sorted) {
+    const list = out.get(r.work_date) ?? []
+    for (const n of [r.first_in_outlet_name ?? r.outlet_name, r.last_out_outlet_name]) {
+      if (n && !list.includes(n)) list.push(n)
+    }
+    out.set(r.work_date, list)
+  }
+  return out
+}
+
 function minTs(a: string | null, b: string | null) {
   if (!a) return b
   if (!b) return a
@@ -116,7 +135,7 @@ export function useAttendanceDays(employeeId: string | undefined, from: string, 
         supabase
           .from('v_attendance_report_detailed')
           .select(
-            'work_date, worked_minutes, first_in_at, last_out_at, scheduled_start_at, scheduled_end_at, late_minutes, early_departure_minutes',
+            'work_date, worked_minutes, first_in_at, last_out_at, scheduled_start_at, scheduled_end_at, late_minutes, early_departure_minutes, outlet_name, first_in_outlet_name, last_out_outlet_name',
           )
           .eq('employee_id', employeeId!)
           .gte('work_date', from)
@@ -141,7 +160,9 @@ export function useAttendanceDays(employeeId: string | undefined, from: string, 
       if (ros.error) throw ros.error
       if (lv.error) throw lv.error
 
-      const repBy = mergeByDate((rep.data ?? []) as ReportRow[])
+      const repRows = (rep.data ?? []) as ReportRow[]
+      const repBy = mergeByDate(repRows)
+      const outletsBy = outletsByDate(repRows)
       const rosBy = new Map(((ros.data ?? []) as RosterRow[]).map((r) => [r.work_date, r]))
       const leaves = (lv.data ?? []) as { start_date: string; end_date: string }[]
       const last = to < today ? to : today
@@ -154,7 +175,14 @@ export function useAttendanceDays(employeeId: string | undefined, from: string, 
         const onLeave = leaves.some((l) => l.start_date <= date && l.end_date >= date)
         const hours =
           report?.worked_minutes != null ? Math.round((report.worked_minutes / 60) * 10) / 10 : null
-        days.push({ date, report, roster, hours, status: grade(date, today, report, roster, onLeave) })
+        days.push({
+          date,
+          report,
+          roster,
+          hours,
+          outlets: outletsBy.get(date) ?? [],
+          status: grade(date, today, report, roster, onLeave),
+        })
       }
       return days
     },
