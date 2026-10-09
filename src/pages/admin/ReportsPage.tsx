@@ -17,6 +17,8 @@ import {
   type AttendanceReportRow,
   type AttendanceStatus,
 } from '@/lib/reports'
+import MonthlySheetPanel from './MonthlySheetPanel'
+import ScoresPanel from './ScoresPanel'
 
 interface OutletOption {
   id: string
@@ -25,8 +27,10 @@ interface OutletOption {
 
 const IST = 'Asia/Kolkata'
 
+type Tab = 'standard' | 'detailed' | 'scores' | 'monthly'
+
 export default function ReportsPage() {
-  const [tab, setTab] = useState<'standard' | 'detailed'>('standard')
+  const [tab, setTab] = useState<Tab>('standard')
   const [outletId, setOutletId] = useState('')
   const [search, setSearch] = useState('')
   const [statusFilter, setStatusFilter] = useState<AttendanceStatus | ''>('')
@@ -98,12 +102,16 @@ export default function ReportsPage() {
       <PageHeader
         title="Reports"
         description={
-          tab === 'standard'
-            ? isLoading ? 'Loading…' : `${filtered.length} rows`
-            : detailedLoading ? 'Loading…' : `${detailedFiltered.length} rows`
+          tab === 'scores'
+            ? 'Attendance score per employee, lowest first'
+            : tab === 'monthly'
+              ? 'Monthly attendance sheet per employee'
+              : tab === 'standard'
+                ? isLoading ? 'Loading…' : `${filtered.length} rows`
+                : detailedLoading ? 'Loading…' : `${detailedFiltered.length} rows`
         }
         actions={
-          tab === 'standard' ? (
+          tab === 'scores' || tab === 'monthly' ? null : tab === 'standard' ? (
             <Button
               size="sm"
               variant="outline"
@@ -125,12 +133,19 @@ export default function ReportsPage() {
         }
       />
 
-      <Tabs value={tab} onValueChange={(v) => setTab(v as 'standard' | 'detailed')} className="mb-4">
+      <Tabs value={tab} onValueChange={(v) => setTab(v as Tab)} className="mb-4">
         <TabsList>
           <TabsTrigger value="standard">Standard</TabsTrigger>
           <TabsTrigger value="detailed">Detailed report</TabsTrigger>
+          <TabsTrigger value="scores">Attendance scores</TabsTrigger>
+          <TabsTrigger value="monthly">Monthly sheet (Excel)</TabsTrigger>
         </TabsList>
       </Tabs>
+
+      {tab === 'monthly' ? (
+        <MonthlySheetPanel outlets={outletsQ.data ?? []} />
+      ) : (
+      <>
 
       <div className="mb-3 flex flex-wrap gap-2">
         <PresetBtn label="This month" onClick={() => {
@@ -195,7 +210,9 @@ export default function ReportsPage() {
         </label>
       </div>
 
-      {tab === 'standard' ? (
+      {tab === 'scores' ? (
+        <ScoresPanel from={from} to={to} outletId={outletId} search={search} />
+      ) : tab === 'standard' ? (
         <Card>
           <CardContent className="p-0">
             <div className="overflow-x-auto">
@@ -272,6 +289,8 @@ export default function ReportsPage() {
             </div>
           </CardContent>
         </Card>
+      )}
+      </>
       )}
     </>
   )

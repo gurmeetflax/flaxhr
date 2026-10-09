@@ -43,6 +43,7 @@ import NewOutletPage from '@/pages/admin/NewOutletPage'
 import EditOutletPage from '@/pages/admin/EditOutletPage'
 import AttendancePage from '@/pages/admin/AttendancePage'
 import FieldVisitsPage from '@/pages/admin/FieldVisitsPage'
+import EmployeeReportPage from '@/pages/admin/EmployeeReportPage'
 import RegularisationsPage from '@/pages/admin/RegularisationsPage'
 import ShiftsPage from '@/pages/admin/ShiftsPage'
 import RosterPage from '@/pages/admin/RosterPage'
@@ -140,6 +141,18 @@ export default function App() {
       {IS_NATIVE ? (
         <Route path="/admin/*" element={<Navigate to="/me" replace />} />
       ) : null}
+
+      {/* Printable report: outside the app shell so the PDF is just the report. */}
+      {IS_NATIVE ? null : (
+        <Route
+          path="/admin/employees/:id/report"
+          element={
+            <ProtectedRoute roles={['admin', 'hr']}>
+              <EmployeeReportPage />
+            </ProtectedRoute>
+          }
+        />
+      )}
 
       <Route
         element={
