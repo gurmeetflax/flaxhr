@@ -40,6 +40,7 @@ export default function EmployeesListPage() {
   const [q, setQ] = useState('')
   const [outletFilter, setOutletFilter] = useState<string>('')
   const [inactiveVisible, setInactiveVisible] = useState(false)
+  const [show, setShow] = useState<'' | 'unmapped' | 'no_login' | 'never_used'>('')
 
   const outletsQ = useQuery<OutletOption[]>({
     queryKey: ['outlets-filter'],
@@ -68,11 +69,32 @@ export default function EmployeesListPage() {
     },
   })
 
+  // Login + last app punch per active employee, for the app-usage filters.
+  const usageQ = useQuery<{ employee_id: string; has_login: boolean; last_punch_at: string | null }[]>({
+    queryKey: ['employees-app-usage'],
+    enabled: show === 'no_login' || show === 'never_used',
+    queryFn: async () => {
+      const { data, error } = await supabase.rpc('attendance_app_usage', {})
+      if (error) throw error
+      return data ?? []
+    },
+  })
+  const usage = useMemo(
+    () => new Map((usageQ.data ?? []).map((u) => [u.employee_id, u])),
+    [usageQ.data],
+  )
+
   const filtered = useMemo(() => {
     const needle = q.trim().toLowerCase()
     return (employeesQ.data ?? []).filter((e) => {
       if (!inactiveVisible && !e.is_active) return false
       if (outletFilter && e.outlet_id !== outletFilter) return false
+      if (show === 'unmapped' && e.outlet_id) return false
+      if (show === 'no_login' && usage.get(e.id)?.has_login !== false) return false
+      if (show === 'never_used') {
+        const u = usage.get(e.id)
+        if (!u || u.last_punch_at) return false
+      }
       if (!needle) return true
       return (
         e.employee_code.toLowerCase().includes(needle) ||
@@ -81,7 +103,7 @@ export default function EmployeesListPage() {
         (e.personal_email ?? '').toLowerCase().includes(needle)
       )
     })
-  }, [employeesQ.data, q, outletFilter, inactiveVisible])
+  }, [employeesQ.data, q, outletFilter, inactiveVisible, show, usage])
 
   return (
     <>
@@ -113,7 +135,7 @@ export default function EmployeesListPage() {
         }
       />
 
-      <div className="mb-4 grid gap-3 sm:grid-cols-[1fr_200px_auto]">
+      <div className="mb-4 grid gap-3 sm:grid-cols-[1fr_200px_200px_auto]">
         <div className="relative">
           <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
           <Input
@@ -134,6 +156,16 @@ export default function EmployeesListPage() {
               {o.display_name ?? o.id}
             </option>
           ))}
+        </select>
+        <select
+          value={show}
+          onChange={(e) => setShow(e.target.value as typeof show)}
+          className="flex h-10 w-full rounded-lg border border-input bg-surface px-3 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+        >
+          <option value="">All employees</option>
+          <option value="unmapped">Unmapped (no outlet)</option>
+          <option value="no_login">No app login</option>
+          <option value="never_used">Never used the app</option>
         </select>
         <label className="flex h-10 items-center gap-2 rounded-lg border border-border bg-surface px-3 text-xs text-muted-foreground">
           <input

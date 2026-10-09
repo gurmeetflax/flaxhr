@@ -48,6 +48,7 @@ interface Employee {
   kyc_verified_at: string | null
   kyc_notes: string | null
   selfie_required: boolean | null
+  field_staff: boolean | null
   pf_enabled: boolean
   pt_enabled: boolean
   esic_enabled: boolean
@@ -70,7 +71,7 @@ export default function EditEmployeePage() {
       const { data, error } = await supabase
         .from('v_employees')
         .select(
-          'id, employee_code, first_name, last_name, full_name, phone, personal_email, outlet_id, is_active, hired_on, monthly_salary, exit_date, exit_reason, designation_code, date_of_birth, address, emergency_contact_name, emergency_contact_phone, home_lat, home_lng, aadhaar_last4, pan_last4, kyc_status, kyc_verified_at, kyc_notes, selfie_required, pf_enabled, pt_enabled, esic_enabled',
+          'id, employee_code, first_name, last_name, full_name, phone, personal_email, outlet_id, is_active, hired_on, monthly_salary, exit_date, exit_reason, designation_code, date_of_birth, address, emergency_contact_name, emergency_contact_phone, home_lat, home_lng, aadhaar_last4, pan_last4, kyc_status, kyc_verified_at, kyc_notes, selfie_required, field_staff, pf_enabled, pt_enabled, esic_enabled',
         )
         .eq('id', id)
         .maybeSingle()
@@ -112,6 +113,7 @@ export default function EditEmployeePage() {
   const [homeLng, setHomeLng] = useState('')
   // 'inherit' = null, 'always' = true, 'never' = false
   const [selfieMode, setSelfieMode] = useState<'inherit' | 'always' | 'never'>('inherit')
+  const [fieldStaff, setFieldStaff] = useState(false)
   const [pfEnabled, setPfEnabled] = useState(false)
   const [ptEnabled, setPtEnabled] = useState(false)
   const [esicEnabled, setEsicEnabled] = useState(false)
@@ -136,6 +138,7 @@ export default function EditEmployeePage() {
     setEmergencyPhone(e.emergency_contact_phone ?? '')
     setHomeLat(e.home_lat != null ? String(e.home_lat) : '')
     setHomeLng(e.home_lng != null ? String(e.home_lng) : '')
+    setFieldStaff(e.field_staff === true)
     setSelfieMode(
       e.selfie_required === true ? 'always' :
       e.selfie_required === false ? 'never' : 'inherit'
@@ -177,6 +180,7 @@ export default function EditEmployeePage() {
         selfie_required:
           selfieMode === 'always' ? true :
           selfieMode === 'never' ? false : null,
+        field_staff: fieldStaff,
         pf_enabled: pfEnabled,
         pt_enabled: ptEnabled,
         esic_enabled: esicEnabled,
@@ -445,6 +449,22 @@ export default function EditEmployeePage() {
                   </button>
                 ))}
               </div>
+            </div>
+
+            <div className="sm:col-span-2 grid gap-2 rounded-lg border border-border bg-muted/30 p-3">
+              <Label>Field staff</Label>
+              <label className="flex items-start gap-2 text-sm">
+                <input
+                  type="checkbox"
+                  className="mt-0.5"
+                  checked={fieldStaff}
+                  onChange={(e) => setFieldStaff(e.target.checked)}
+                />
+                <span>
+                  Works on the field (e.g. sales). Can punch the day from anywhere and gets meeting
+                  check-in / check-out on the Punch screen. Location is still recorded.
+                </span>
+              </label>
             </div>
 
             <div className="sm:col-span-2 grid gap-2 rounded-lg border border-border bg-muted/30 p-3">

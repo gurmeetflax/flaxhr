@@ -23,7 +23,7 @@ interface UsageRow {
   on_leave_today: boolean
 }
 
-type Show = 'not' | 'yes' | 'all'
+type Show = 'not' | 'yes' | 'never' | 'all'
 
 const PRESETS: { label: string; days: number }[] = [
   { label: 'Today', days: 0 },
@@ -64,6 +64,7 @@ export default function AppUsagePanel({
   const filtered = scoped.filter((r) => {
     if (show === 'not' && r.punches_since > 0) return false
     if (show === 'yes' && r.punches_since === 0) return false
+    if (show === 'never' && r.last_punch_at) return false
     if (hideLeave && show !== 'yes' && r.on_leave_today && r.punches_since === 0) return false
     if (
       needle &&
@@ -125,6 +126,7 @@ export default function AppUsagePanel({
         >
           <option value="not">Not punched {sinceLabel}</option>
           <option value="yes">Punched {sinceLabel}</option>
+          <option value="never">Never used the app</option>
           <option value="all">Everyone</option>
         </select>
         <label className="flex h-10 items-center gap-2 text-sm">
@@ -197,7 +199,7 @@ export default function AppUsagePanel({
                             <Phone className="h-4 w-4" />
                           </a>
                           <a
-                            href={whatsappHref(r)}
+                            href={whatsappHref(r, sinceLabel)}
                             target="_blank"
                             rel="noopener noreferrer"
                             className="text-muted-foreground hover:text-foreground"
@@ -266,10 +268,19 @@ function Stat({ label, value, tone }: { label: string; value: number | string; t
   )
 }
 
-function whatsappHref(r: UsageRow): string {
+function whatsappHref(r: UsageRow, sinceLabel: string): string {
   const digits = (r.phone ?? '').replace(/\D/g, '')
   const num = digits.length === 10 ? `91${digits}` : digits
-  const text = `Hi ${r.full_name.split(' ')[0]}, please remember to punch in and out on the Flax HR app (hr.flaxfoods.in) every shift.`
+  const name = r.full_name.split(' ')[0]
+  const missed = !r.last_punch_at
+    ? "you haven't used the Flax HR app to punch yet"
+    : r.punches_since === 0
+      ? `you haven't punched on the Flax HR app ${sinceLabel}`
+      : 'please keep punching on the Flax HR app'
+  const text =
+    `⚠️ Hi ${name}, ${missed}.\n\n` +
+    'Please punch in and out on the app at the start and end of every shift: hr.flaxfoods.in\n\n' +
+    '⚠️ Days without an app punch will be treated as absent and may lead to a deduction in salary.'
   return `https://wa.me/${num}?text=${encodeURIComponent(text)}`
 }
 
