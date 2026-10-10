@@ -26,6 +26,7 @@ import {
   Briefcase,
 } from 'lucide-react'
 import ProtectedRoute from '@/components/ProtectedRoute'
+import { useHasRole } from '@/lib/auth'
 import AppShell from '@/components/layout/AppShell'
 import LoginPage from '@/pages/LoginPage'
 import NotFoundPage from '@/pages/NotFoundPage'
@@ -43,6 +44,7 @@ import NewOutletPage from '@/pages/admin/NewOutletPage'
 import EditOutletPage from '@/pages/admin/EditOutletPage'
 import AttendancePage from '@/pages/admin/AttendancePage'
 import FieldVisitsPage from '@/pages/admin/FieldVisitsPage'
+import EmployeeReportPage from '@/pages/admin/EmployeeReportPage'
 import RegularisationsPage from '@/pages/admin/RegularisationsPage'
 import ShiftsPage from '@/pages/admin/ShiftsPage'
 import RosterPage from '@/pages/admin/RosterPage'
@@ -127,6 +129,15 @@ const employeeNav = [
   { to: '/me/overview', label: 'My space', icon: Home },
 ]
 
+// Managers (area managers) also get the team roster in their own menu,
+// which works inside the phone app too.
+const managerNav = [{ to: '/me/team-roster', label: 'Team roster', icon: CalendarRange }]
+
+function EmployeeShell() {
+  const isManager = useHasRole('manager')
+  return <AppShell nav={isManager ? [...employeeNav.slice(0, 4), ...managerNav, ...employeeNav.slice(4)] : employeeNav} title="Employee" />
+}
+
 export default function App() {
   return (
     <Routes>
@@ -140,6 +151,18 @@ export default function App() {
       {IS_NATIVE ? (
         <Route path="/admin/*" element={<Navigate to="/me" replace />} />
       ) : null}
+
+      {/* Printable report: outside the app shell so the PDF is just the report. */}
+      {IS_NATIVE ? null : (
+        <Route
+          path="/admin/employees/:id/report"
+          element={
+            <ProtectedRoute roles={['admin', 'hr']}>
+              <EmployeeReportPage />
+            </ProtectedRoute>
+          }
+        />
+      )}
 
       <Route
         element={
@@ -198,7 +221,7 @@ export default function App() {
       <Route
         element={
           <ProtectedRoute>
-            <AppShell nav={employeeNav} title="Employee" />
+            <EmployeeShell />
           </ProtectedRoute>
         }
       >
@@ -206,6 +229,14 @@ export default function App() {
         <Route path="/me/history" element={<MyAttendancePage />} />
         <Route path="/me/regularise" element={<RegularisePage />} />
         <Route path="/me/roster" element={<MyRosterPage />} />
+        <Route
+          path="/me/team-roster"
+          element={
+            <ProtectedRoute roles={['manager', 'admin', 'hr']}>
+              <RosterPage />
+            </ProtectedRoute>
+          }
+        />
         <Route path="/me/leave" element={<LeavePage />} />
         <Route path="/me/overview" element={<MyDashboard />} />
         <Route path="/me/payslips" element={<PayslipPage />} />

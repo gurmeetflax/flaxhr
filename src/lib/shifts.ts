@@ -28,7 +28,7 @@ export interface EmployeeShift {
   shift_name: string
   start_time: string
   end_time: string
-  outlet_id: string
+  outlet_id: string | null
   outlet_name: string | null
 }
 
@@ -105,13 +105,37 @@ export function useEmployeeShifts(employeeId?: string | null) {
   })
 }
 
+// An employee can hold several shifts at once (rotating staff). Late /
+// early is graded against the roster entry, else the assigned shift whose
+// start is closest to the first punch-in.
 export function useAssignShift() {
   const qc = useQueryClient()
   return useMutation({
-    mutationFn: async (input: { employee_id: string; shift_id: string; effective_from: string; effective_to?: string | null }) => {
+    mutationFn: async (
+      input:
+        | { employee_id: string; shift_id: string; effective_from: string; effective_to?: string | null }
+        | { employee_id: string; shift_id: string; effective_from: string; effective_to?: string | null }[],
+    ) => {
       const { error } = await supabase.schema('core').from('employee_shifts').upsert(input, {
-        onConflict: 'employee_id,effective_from',
+        onConflict: 'employee_id,shift_id,effective_from',
       })
+      if (error) throw error
+    },
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['employee-shifts'] }),
+  })
+}
+
+export function useRemoveEmployeeShift() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: async (k: { employee_id: string; shift_id: string; effective_from: string }) => {
+      const { error } = await supabase
+        .schema('core')
+        .from('employee_shifts')
+        .delete()
+        .eq('employee_id', k.employee_id)
+        .eq('shift_id', k.shift_id)
+        .eq('effective_from', k.effective_from)
       if (error) throw error
     },
     onSuccess: () => qc.invalidateQueries({ queryKey: ['employee-shifts'] }),

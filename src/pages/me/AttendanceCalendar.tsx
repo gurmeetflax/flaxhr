@@ -183,6 +183,12 @@ export default function AttendanceCalendar({
               </span>
             </div>
             <dl className="mt-2 grid grid-cols-[auto_1fr] gap-x-4 gap-y-1 text-xs">
+              {sel.outlets.length ? (
+                <>
+                  <dt className="text-muted-foreground">Outlet</dt>
+                  <dd>{sel.outlets.join(' → ')}</dd>
+                </>
+              ) : null}
               <dt className="text-muted-foreground">Shift</dt>
               <dd>{shiftLabel(sel)}</dd>
               <dt className="text-muted-foreground">In – Out</dt>

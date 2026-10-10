@@ -126,6 +126,7 @@ export default function EmployeeHoursCard({ employeeId }: { employeeId: string }
                     <tr>
                       <th className="py-1 pr-3 font-medium">Date</th>
                       <th className="py-1 pr-3 font-medium">Status</th>
+                      <th className="py-1 pr-3 font-medium">Outlet</th>
                       <th className="py-1 pr-3 font-medium">Rostered</th>
                       <th className="py-1 pr-3 font-medium">In – Out</th>
                       <th className="py-1 pr-3 text-right font-medium">Hours</th>
@@ -136,6 +137,7 @@ export default function EmployeeHoursCard({ employeeId }: { employeeId: string }
                       <tr key={d.date}>
                         <td className="py-1 pr-3 whitespace-nowrap">{format(parseISO(d.date), 'EEE dd MMM')}</td>
                         <td className="py-1 pr-3">{detailLabel(d)}</td>
+                        <td className="py-1 pr-3 text-muted-foreground">{outletLabel(d)}</td>
                         <td className="py-1 pr-3 whitespace-nowrap text-muted-foreground">{rosterLabel(d)}</td>
                         <td className="py-1 pr-3 whitespace-nowrap text-muted-foreground">
                           {t(d.report?.first_in_at)} – {t(d.report?.last_out_at)}
@@ -156,6 +158,10 @@ export default function EmployeeHoursCard({ employeeId }: { employeeId: string }
 
 function t(ts: string | null | undefined): string {
   return ts ? formatInTimeZone(ts, IST, 'h:mm a') : '—'
+}
+
+function outletLabel(d: Day): string {
+  return d.outlets.length ? d.outlets.join(' → ') : '—'
 }
 
 function rosterLabel(d: Day): string {
@@ -310,6 +316,8 @@ function HoursChart({ days }: { days: Day[] }) {
           <div className="font-semibold text-foreground">{format(parseISO(hovered.date), 'EEE, dd MMM yyyy')}</div>
           <div className="mt-1 text-foreground">{detailLabel(hovered)}</div>
           <div className="mt-2 grid grid-cols-[auto_1fr] gap-x-3 gap-y-0.5 text-muted-foreground">
+            <span>Outlet</span>
+            <span className="text-foreground">{outletLabel(hovered)}</span>
             <span>Rostered</span>
             <span className="text-foreground">{rosterLabel(hovered)}</span>
             <span>In – Out</span>

@@ -15,6 +15,7 @@ import {
   type Shift,
   type ShiftOutletFilter,
 } from '@/lib/shifts'
+import BulkAssignShiftCard from './BulkAssignShiftCard'
 
 interface OutletOption {
   id: string
@@ -38,6 +39,7 @@ export default function ShiftsPage() {
     },
   })
   const { data: shifts = [] } = useShifts(filter)
+  const { data: allShifts = [] } = useShifts(null)
   const upsert = useUpsertShift()
   const del = useDeleteShift()
 
@@ -256,6 +258,8 @@ export default function ShiftsPage() {
           </CardContent>
         </Card>
       </div>
+
+      <BulkAssignShiftCard shifts={allShifts} outlets={outletsQ.data ?? []} />
     </>
   )
 }

@@ -110,9 +110,14 @@ export default function EmployeeSnapshotPage() {
           s ? `${s.employee_code} · ${s.outlet_name ?? 'No outlet'} · ${s.designation_name ?? '—'}` : 'Loading…'
         }
         actions={
-          <Button variant="ghost" size="sm" onClick={() => navigate('/admin/employees')}>
-            Back
-          </Button>
+          <div className="flex gap-2">
+            <Button variant="outline" size="sm" onClick={() => navigate(`/admin/employees/${id}/report`)}>
+              <FileText className="h-4 w-4" /> PDF report
+            </Button>
+            <Button variant="ghost" size="sm" onClick={() => navigate('/admin/employees')}>
+              Back
+            </Button>
+          </div>
         }
       />
 

@@ -34,6 +34,9 @@ export default defineConfig({
       },
       workbox: {
         globPatterns: ['**/*.{js,css,html,svg,png,woff2}'],
+        // Excel export library is admin-only and loaded on demand; don't
+        // make every phone download it on install.
+        globIgnores: ['**/exceljs*.js'],
         // Never cache Supabase API or auth — punch must always hit the network.
         navigateFallbackDenylist: [/^\/api/, /^\/auth/],
         runtimeCaching: [
