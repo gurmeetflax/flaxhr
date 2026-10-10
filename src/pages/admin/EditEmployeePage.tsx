@@ -20,6 +20,7 @@ import {
   type KycStatus,
 } from '@/lib/kyc'
 import { useEmployeeOutlets, useSetEmployeeOutlets } from '@/lib/employeeOutlets'
+import EmployeeShiftsCard from './EmployeeShiftsCard'
 
 interface Employee {
   id: string
@@ -426,6 +427,7 @@ export default function EditEmployeePage() {
                 allOutlets={outletsQ.data ?? []}
               />
             ) : null}
+            {employeeQ.data ? <EmployeeShiftsCard employeeId={employeeQ.data.id} /> : null}
 
             <div className="sm:col-span-2 grid gap-2 rounded-lg border border-border bg-muted/30 p-3">
               <Label>Selfie on punch</Label>
