@@ -1,6 +1,6 @@
 import { useState, type FormEvent } from 'react'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
-import { useNavigate } from 'react-router-dom'
+import { useNavigate, useSearchParams } from 'react-router-dom'
 import { toast } from 'sonner'
 import { createEphemeralClient, supabase } from '@/lib/supabase'
 import { PageHeader } from '@/components/layout/AppShell'
@@ -22,6 +22,10 @@ interface Outlet {
 export default function CreateEmployeePage() {
   const navigate = useNavigate()
   const qc = useQueryClient()
+  // Prefill from Hiring → "Create employee" on a selected candidate.
+  const [params] = useSearchParams()
+  const candidateId = params.get('candidate')
+  const prefillName = (params.get('name') ?? '').trim().split(/\s+/)
 
   const outletsQ = useQuery<Outlet[]>({
     queryKey: ['outlets'],
@@ -38,12 +42,12 @@ export default function CreateEmployeePage() {
 
   const designationsQ = useDesignations({ activeOnly: true })
 
-  const [firstName, setFirstName] = useState('')
-  const [lastName, setLastName] = useState('')
-  const [phone, setPhone] = useState('')
-  const [personalEmail, setPersonalEmail] = useState('')
+  const [firstName, setFirstName] = useState(prefillName[0] ?? '')
+  const [lastName, setLastName] = useState(prefillName.slice(1).join(' '))
+  const [phone, setPhone] = useState((params.get('phone') ?? '').replace(/\D/g, '').slice(-10))
+  const [personalEmail, setPersonalEmail] = useState(params.get('email') ?? '')
   const [outletId, setOutletId] = useState('')
-  const [designationCode, setDesignationCode] = useState('')
+  const [designationCode, setDesignationCode] = useState(params.get('designation') ?? '')
   const [pin, setPin] = useState('')
   const [dob, setDob] = useState('')
   const [hiredOn, setHiredOn] = useState('')
@@ -250,6 +254,13 @@ export default function CreateEmployeePage() {
 
       // 6. Best-effort KYC uploads. Failures don't block creation.
       const newId = empRow?.id as string | undefined
+      if (candidateId && newId) {
+        await supabase
+          .schema('core' as never)
+          .from('candidates')
+          .update({ employee_id: newId, status: 'selected' })
+          .eq('id', candidateId)
+      }
       const kycErrors: string[] = []
       if (newId && aadhaarFile) {
         try {
