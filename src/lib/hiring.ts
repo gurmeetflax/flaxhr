@@ -125,12 +125,20 @@ export function useCandidates(roleId: string | null) {
   })
 }
 
+// When this browser started scoring each candidate, for the elapsed timer.
+export const scoringSince = new Map<string, number>()
+
 export async function scoreCandidate(candidateId: string): Promise<void> {
-  const { error } = await supabase.functions.invoke('cv-score', { body: { candidate_id: candidateId } })
-  if (error) {
-    const ctx = (error as { context?: Response }).context
-    const body = ctx ? await ctx.json().catch(() => null) : null
-    throw new Error(body?.error ?? error.message)
+  scoringSince.set(candidateId, Date.now())
+  try {
+    const { error } = await supabase.functions.invoke('cv-score', { body: { candidate_id: candidateId } })
+    if (error) {
+      const ctx = (error as { context?: Response }).context
+      const body = ctx ? await ctx.json().catch(() => null) : null
+      throw new Error(body?.error ?? error.message)
+    }
+  } finally {
+    scoringSince.delete(candidateId)
   }
 }
 
@@ -139,8 +147,19 @@ export async function scoreCandidate(candidateId: string): Promise<void> {
 export function useUploadCvs() {
   const qc = useQueryClient()
   return useMutation({
-    mutationFn: async ({ roleId, files }: { roleId: string; files: File[] }) => {
-      const ids: string[] = []
+    mutationFn: async ({
+      roleId,
+      files,
+      onProgress,
+      onScoreError,
+    }: {
+      roleId: string
+      files: File[]
+      onProgress?: (done: number, total: number) => void
+      onScoreError?: (fileName: string, message: string) => void
+    }) => {
+      const ids: { id: string; name: string }[] = []
+      onProgress?.(0, files.length)
       for (const f of files) {
         const path = `${roleId}/${crypto.randomUUID()}-${f.name.replace(/[^\w.-]+/g, '_')}`
         const { error: upErr } = await supabase.storage.from('cvs').upload(path, f, {
@@ -154,9 +173,13 @@ export function useUploadCvs() {
           .select('id')
           .single()
         if (error) throw error
-        ids.push(data.id as string)
+        ids.push({ id: data.id as string, name: f.name })
+        onProgress?.(ids.length, files.length)
       }
-      for (const id of ids) void scoreCandidate(id).catch(() => qc.invalidateQueries({ queryKey: ['candidates'] }))
+      for (const { id, name } of ids)
+        void scoreCandidate(id)
+          .catch((e) => onScoreError?.(name, e instanceof Error ? e.message : String(e)))
+          .finally(() => qc.invalidateQueries({ queryKey: ['candidates'] }))
       return ids.length
     },
     onSuccess: () => {
@@ -186,7 +209,9 @@ export function useUpdateCandidate() {
 }
 
 export async function sendInterviewInvite(candidateId: string): Promise<void> {
-  const { error } = await supabase.functions.invoke('interview-invite', { body: { candidate_id: candidateId } })
+  const { error } = await supabase.functions.invoke('interview-invite', {
+    body: { candidate_id: candidateId },
+  })
   if (error) {
     const ctx = (error as { context?: Response }).context
     const body = ctx ? await ctx.json().catch(() => null) : null
@@ -205,8 +230,13 @@ export function downloadIcs(c: Candidate, director = { name: 'Gurmeet', email: '
   if (!c.interview_at) return
   const start = new Date(c.interview_at)
   const end = new Date(start.getTime() + (c.interview_minutes || 30) * 60_000)
-  const fmt = (d: Date) => d.toISOString().replace(/[-:]/g, '').replace(/\.\d{3}/, '')
-  const txt = (s: string) => s.replace(/\\/g, '\\\\').replace(/;/g, '\\;').replace(/,/g, '\\,').replace(/\n/g, '\\n')
+  const fmt = (d: Date) =>
+    d
+      .toISOString()
+      .replace(/[-:]/g, '')
+      .replace(/\.\d{3}/, '')
+  const txt = (s: string) =>
+    s.replace(/\\/g, '\\\\').replace(/;/g, '\\;').replace(/,/g, '\\,').replace(/\n/g, '\\n')
   const title = `Flax interview: ${c.full_name ?? 'Candidate'} — ${c.role_title}`
   const lines = [
     'BEGIN:VCALENDAR',

@@ -1,4 +1,4 @@
-import { useRef, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { format } from 'date-fns'
 import { formatInTimeZone } from 'date-fns-tz'
@@ -8,6 +8,7 @@ import {
   Download,
   ExternalLink,
   FileText,
+  Loader2,
   Mail,
   Pencil,
   RefreshCw,
@@ -25,6 +26,7 @@ import {
   cvUrl,
   downloadIcs,
   scoreCandidate,
+  scoringSince,
   sendInterviewInvite,
   STATUS_LABEL,
   useCandidates,
@@ -65,11 +67,19 @@ export default function HiringPage() {
 
   return (
     <>
-      <PageHeader title="Hiring" description="Upload CVs, get them scored against Flax's requirements, and schedule interviews." />
+      <PageHeader
+        title="Hiring"
+        description="Upload CVs, get them scored against Flax's requirements, and schedule interviews."
+      />
 
       <div className="mb-4 flex flex-wrap gap-2">
         {DEPTS.map((d) => (
-          <Button key={d.key} size="sm" variant={dept === d.key ? 'primary' : 'outline'} onClick={() => setDept(d.key)}>
+          <Button
+            key={d.key}
+            size="sm"
+            variant={dept === d.key ? 'primary' : 'outline'}
+            onClick={() => setDept(d.key)}
+          >
             {d.label}
           </Button>
         ))}
@@ -97,7 +107,9 @@ export default function HiringPage() {
                       <span className={r.is_open ? '' : 'text-muted-foreground line-through'}>{r.title}</span>
                       <span className="flex gap-1 text-[11px]">
                         {r.new_candidates ? (
-                          <span className="rounded-full bg-amber-500/15 px-1.5 text-amber-700">{r.new_candidates} new</span>
+                          <span className="rounded-full bg-amber-500/15 px-1.5 text-amber-700">
+                            {r.new_candidates} new
+                          </span>
                         ) : null}
                         {r.candidates ? <span className="text-muted-foreground">{r.candidates}</span> : null}
                       </span>
@@ -130,6 +142,7 @@ export default function HiringPage() {
                       ))}
                     </select>
                   </div>
+                  <ScoringProgress candidates={candidates} />
                   {shown.length ? (
                     <ul className="flex flex-col divide-y divide-border">
                       {shown.map((c) => (
@@ -141,11 +154,17 @@ export default function HiringPage() {
                           >
                             <ScoreBadge c={c} />
                             <span className="min-w-0 flex-1">
-                              <span className="block truncate font-medium">{c.full_name || c.cv_filename || 'Unnamed'}</span>
+                              <span className="block truncate font-medium">
+                                {c.full_name || c.cv_filename || 'Unnamed'}
+                              </span>
                               <span className="block truncate text-xs text-muted-foreground">
-                                {[c.score_detail?.current_role, c.score_detail ? `${c.score_detail.years_experience} yrs` : null, c.city]
+                                {[
+                                  c.score_detail?.current_role,
+                                  c.score_detail ? `${c.score_detail.years_experience} yrs` : null,
+                                  c.city,
+                                ]
                                   .filter(Boolean)
-                                  .join(' · ') || (c.score_error ? c.score_error : 'Reading CV…')}
+                                  .join(' · ') || (c.score_error ? c.score_error : <ScoringElapsed c={c} />)}
                               </span>
                             </span>
                             <StatusChip s={c.status} />
@@ -263,7 +282,11 @@ function RequirementsEditor({
   const [minYears, setMinYears] = useState(String(value.min_experience_years ?? 0))
   const [languages, setLanguages] = useState((value.languages ?? []).join(', '))
   const [location, setLocation] = useState(value.location ?? '')
-  const split = (s: string) => s.split('\n').map((x) => x.trim()).filter(Boolean)
+  const split = (s: string) =>
+    s
+      .split('\n')
+      .map((x) => x.trim())
+      .filter(Boolean)
 
   return (
     <div className="grid gap-3 text-sm">
@@ -302,7 +325,10 @@ function RequirementsEditor({
               nice_to_have: split(nice),
               red_flags: split(flags),
               min_experience_years: Number(minYears) || 0,
-              languages: languages.split(',').map((x) => x.trim()).filter(Boolean),
+              languages: languages
+                .split(',')
+                .map((x) => x.trim())
+                .filter(Boolean),
               location: location.trim(),
             })
           }
@@ -318,16 +344,23 @@ function UploadCard({ role }: { role: HiringRole }) {
   const upload = useUploadCvs()
   const input = useRef<HTMLInputElement>(null)
   const [drag, setDrag] = useState(false)
+  const [progress, setProgress] = useState<{ done: number; total: number } | null>(null)
 
   const onFiles = async (list: FileList | null) => {
     const files = Array.from(list ?? [])
     if (!files.length) return
     try {
-      const n = await upload.mutateAsync({ roleId: role.id, files })
+      const n = await upload.mutateAsync({
+        roleId: role.id,
+        files,
+        onProgress: (done, total) => setProgress({ done, total }),
+        onScoreError: (name, msg) => toast.error(`${name}: ${msg}`),
+      })
       toast.success(`${n} CV${n === 1 ? '' : 's'} uploaded — scoring now`)
     } catch (e) {
       toast.error(e instanceof Error ? e.message : 'Upload failed')
     } finally {
+      setProgress(null)
       if (input.current) input.current.value = ''
     }
   }
@@ -352,10 +385,26 @@ function UploadCard({ role }: { role: HiringRole }) {
       <div>
         Drop CVs here for <b>{role.title}</b>, or
       </div>
-      <Button size="sm" onClick={() => input.current?.click()} loading={upload.isPending} disabled={!role.is_open}>
+      <Button
+        size="sm"
+        onClick={() => input.current?.click()}
+        loading={upload.isPending}
+        disabled={!role.is_open}
+      >
         Choose files
       </Button>
-      <div className="text-xs text-muted-foreground">PDF, Word (.docx) or a photo of a paper CV · several at once</div>
+      {progress ? (
+        <div className="flex w-full max-w-xs flex-col gap-1">
+          <ProgressBar value={progress.done / Math.max(progress.total, 1)} />
+          <span className="text-xs text-muted-foreground">
+            Uploading {Math.min(progress.done + 1, progress.total)} of {progress.total}…
+          </span>
+        </div>
+      ) : (
+        <div className="text-xs text-muted-foreground">
+          PDF, Word (.docx) or a photo of a paper CV · several at once
+        </div>
+      )}
       <input
         ref={input}
         type="file"
@@ -377,7 +426,9 @@ function CandidateCard({ c, onClose }: { c: Candidate; onClose: () => void }) {
     email: c.email ?? '',
     city: c.city ?? '',
   })
-  const [when, setWhen] = useState(c.interview_at ? formatInTimeZone(c.interview_at, IST, "yyyy-MM-dd'T'HH:mm") : '')
+  const [when, setWhen] = useState(
+    c.interview_at ? formatInTimeZone(c.interview_at, IST, "yyyy-MM-dd'T'HH:mm") : '',
+  )
   const [minutes, setMinutes] = useState(c.interview_minutes || 30)
   const [meet, setMeet] = useState(c.meet_link ?? '')
   const [notes, setNotes] = useState(c.interview_notes ?? '')
@@ -434,15 +485,26 @@ function CandidateCard({ c, onClose }: { c: Candidate; onClose: () => void }) {
         </div>
 
         <div className="flex flex-wrap gap-2">
-          <Button size="sm" variant="outline" onClick={() => run('cv', async () => void window.open(await cvUrl(c.cv_path), '_blank'))}>
+          <Button
+            size="sm"
+            variant="outline"
+            onClick={() => run('cv', async () => void window.open(await cvUrl(c.cv_path), '_blank'))}
+          >
             <FileText className="h-4 w-4" /> View CV
           </Button>
-          <Button size="sm" variant="outline" loading={busy === 'score'} onClick={() => run('score', () => scoreCandidate(c.id), 'Re-scored')}>
+          <Button
+            size="sm"
+            variant="outline"
+            loading={busy === 'score'}
+            onClick={() => run('score', () => scoreCandidate(c.id), 'Re-scored')}
+          >
             <RefreshCw className="h-4 w-4" /> Re-score
           </Button>
         </div>
 
-        {c.score_error ? <p className="rounded-md bg-destructive/10 p-2 text-sm text-destructive">{c.score_error}</p> : null}
+        {c.score_error ? (
+          <p className="rounded-md bg-destructive/10 p-2 text-sm text-destructive">{c.score_error}</p>
+        ) : null}
 
         {d ? (
           <div className="flex flex-col gap-3 text-sm">
@@ -464,7 +526,11 @@ function CandidateCard({ c, onClose }: { c: Candidate; onClose: () => void }) {
                       <td className="py-1.5 pr-2">
                         {k.requirement}
                         <span className="block text-[10px] text-muted-foreground">
-                          {k.kind === 'must_have' ? 'Must have' : k.kind === 'nice_to_have' ? 'Nice to have' : 'Red flag'}
+                          {k.kind === 'must_have'
+                            ? 'Must have'
+                            : k.kind === 'nice_to_have'
+                              ? 'Nice to have'
+                              : 'Red flag'}
                         </span>
                       </td>
                       <td className="py-1.5 pr-2">
@@ -482,15 +548,33 @@ function CandidateCard({ c, onClose }: { c: Candidate; onClose: () => void }) {
             </div>
           </div>
         ) : !c.score_error ? (
-          <p className="text-sm text-muted-foreground">Reading and scoring the CV… this takes about a minute.</p>
+          <p className="text-sm text-muted-foreground">
+            <ScoringElapsed c={c} /> Usually 20–60 seconds.
+          </p>
         ) : null}
 
         <Section title="Contact">
           <div className="grid gap-2 sm:grid-cols-4">
-            <Input placeholder="Name" value={contact.full_name} onChange={(e) => setContact({ ...contact, full_name: e.target.value })} />
-            <Input placeholder="Phone" value={contact.phone} onChange={(e) => setContact({ ...contact, phone: e.target.value })} />
-            <Input placeholder="Email" value={contact.email} onChange={(e) => setContact({ ...contact, email: e.target.value })} />
-            <Input placeholder="City" value={contact.city} onChange={(e) => setContact({ ...contact, city: e.target.value })} />
+            <Input
+              placeholder="Name"
+              value={contact.full_name}
+              onChange={(e) => setContact({ ...contact, full_name: e.target.value })}
+            />
+            <Input
+              placeholder="Phone"
+              value={contact.phone}
+              onChange={(e) => setContact({ ...contact, phone: e.target.value })}
+            />
+            <Input
+              placeholder="Email"
+              value={contact.email}
+              onChange={(e) => setContact({ ...contact, email: e.target.value })}
+            />
+            <Input
+              placeholder="City"
+              value={contact.city}
+              onChange={(e) => setContact({ ...contact, city: e.target.value })}
+            />
           </div>
           <div className="mt-2">
             <Button
@@ -535,8 +619,17 @@ function CandidateCard({ c, onClose }: { c: Candidate; onClose: () => void }) {
             </select>
           </div>
           <div className="mt-2 flex gap-2">
-            <Input placeholder="Google Meet link (paste here)" value={meet} onChange={(e) => setMeet(e.target.value)} />
-            <a href="https://meet.google.com/new" target="_blank" rel="noopener noreferrer" className="shrink-0">
+            <Input
+              placeholder="Google Meet link (paste here)"
+              value={meet}
+              onChange={(e) => setMeet(e.target.value)}
+            />
+            <a
+              href="https://meet.google.com/new"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="shrink-0"
+            >
               <Button size="sm" variant="outline" className="h-10">
                 <Video className="h-4 w-4" /> New Meet <ExternalLink className="h-3 w-3" />
               </Button>
@@ -558,7 +651,9 @@ function CandidateCard({ c, onClose }: { c: Candidate; onClose: () => void }) {
               variant="outline"
               disabled={!c.interview_at}
               loading={busy === 'invite'}
-              onClick={() => run('invite', () => sendInterviewInvite(c.id), 'Invite emailed to the candidate and Gurmeet')}
+              onClick={() =>
+                run('invite', () => sendInterviewInvite(c.id), 'Invite emailed to the candidate and Gurmeet')
+              }
             >
               <Mail className="h-4 w-4" /> Email invite
             </Button>
@@ -576,7 +671,11 @@ function CandidateCard({ c, onClose }: { c: Candidate; onClose: () => void }) {
         {c.status === 'selected' ? (
           <Section title="Hire">
             {c.employee_id ? (
-              <Button size="sm" variant="outline" onClick={() => navigate(`/admin/employees/${c.employee_id}`)}>
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={() => navigate(`/admin/employees/${c.employee_id}`)}
+              >
                 Open employee record
               </Button>
             ) : (
@@ -623,17 +722,91 @@ function Section({ title, children }: { title: string; children: React.ReactNode
   )
 }
 
+function ProgressBar({ value }: { value: number }) {
+  return (
+    <div className="h-1.5 w-full overflow-hidden rounded-full bg-muted">
+      <div
+        className="h-full rounded-full bg-primary transition-all duration-500"
+        style={{ width: `${Math.round(Math.min(1, Math.max(0, value)) * 100)}%` }}
+      />
+    </div>
+  )
+}
+
+function useNow(active: boolean) {
+  const [now, setNow] = useState(() => Date.now())
+  useEffect(() => {
+    if (!active) return
+    const t = setInterval(() => setNow(Date.now()), 1000)
+    return () => clearInterval(t)
+  }, [active])
+  return now
+}
+
+const isScoring = (c: Candidate) => c.score == null && !c.score_error
+
+// "Scoring… 0:42" for one CV; flags ones that look stuck.
+function ScoringElapsed({ c }: { c: Candidate }) {
+  const now = useNow(isScoring(c))
+  const since = scoringSince.get(c.id) ?? new Date(c.created_at).getTime()
+  const secs = Math.max(0, Math.round((now - since) / 1000))
+  const clock = `${Math.floor(secs / 60)}:${String(secs % 60).padStart(2, '0')}`
+  if (secs > 180 && !scoringSince.has(c.id)) return <>Not scored — open it and press Re-score</>
+  return <>Reading and scoring CV… {clock}</>
+}
+
+// Batch progress across the CVs currently being scored for this role.
+function ScoringProgress({ candidates }: { candidates: Candidate[] }) {
+  const now = useNow(candidates.some(isScoring))
+  const recent = candidates.filter(
+    (c) => now - new Date(c.created_at).getTime() < 30 * 60_000 || scoringSince.has(c.id),
+  )
+  const pending = recent.filter(isScoring)
+  if (!pending.length) return null
+  const done = recent.length - pending.length
+  return (
+    <div className="flex flex-col gap-1.5 rounded-lg bg-primary/5 p-3 text-sm">
+      <div className="flex items-center justify-between gap-2">
+        <span className="flex items-center gap-2">
+          <Loader2 className="h-4 w-4 animate-spin text-primary" />
+          Scoring {pending.length} CV{pending.length === 1 ? '' : 's'} with AI…
+        </span>
+        <span className="text-xs text-muted-foreground tabular-nums">
+          {done} of {recent.length} done
+        </span>
+      </div>
+      <ProgressBar value={done / Math.max(recent.length, 1)} />
+      <span className="text-xs text-muted-foreground">
+        Each CV takes about 20–60 seconds. You can leave this page — scores appear when ready.
+      </span>
+    </div>
+  )
+}
+
 function ScoreBadge({ c, large }: { c: Candidate; large?: boolean }) {
   const size = large ? 'h-12 w-12 text-lg' : 'h-9 w-9 text-sm'
   if (c.score == null) {
     return (
-      <span className={`${size} grid shrink-0 place-items-center rounded-full bg-muted text-xs text-muted-foreground`}>
-        {c.score_error ? '!' : '…'}
+      <span
+        className={`${size} grid shrink-0 place-items-center rounded-full text-xs ${c.score_error ? 'bg-destructive/10 text-destructive' : 'bg-muted text-muted-foreground'}`}
+      >
+        {c.score_error ? '!' : <Loader2 className="h-4 w-4 animate-spin" />}
       </span>
     )
   }
-  const cls = c.score >= 70 ? 'bg-primary/15 text-primary' : c.score >= 50 ? 'bg-amber-500/15 text-amber-700' : 'bg-destructive/10 text-destructive'
-  return <span className={`${size} ${cls} grid shrink-0 place-items-center rounded-full font-semibold tabular-nums`}>{c.score}</span>
+  const cls =
+    c.score >= 70
+      ? 'bg-primary/15 text-primary'
+      : c.score >= 50
+        ? 'bg-amber-500/15 text-amber-700'
+        : 'bg-destructive/10 text-destructive'
+  return (
+    <span
+      className={`${size} ${cls} grid shrink-0 place-items-center rounded-full font-semibold tabular-nums`}
+    >
+      {c.score}
+    </span>
+  )
 }
 
 function StatusChip({ s }: { s: CandidateStatus }) {
@@ -647,19 +820,36 @@ function StatusChip({ s }: { s: CandidateStatus }) {
           : s === 'shortlisted'
             ? 'bg-amber-500/10 text-amber-700'
             : 'bg-muted text-foreground'
-  return <span className={`shrink-0 rounded-full px-2 py-0.5 text-xs font-medium ${cls}`}>{STATUS_LABEL[s]}</span>
+  return (
+    <span className={`shrink-0 rounded-full px-2 py-0.5 text-xs font-medium ${cls}`}>{STATUS_LABEL[s]}</span>
+  )
 }
 
 function RecChip({ r }: { r: 'interview' | 'maybe' | 'reject' }) {
-  const m = { interview: ['Interview', 'bg-primary/10 text-primary'], maybe: ['Maybe', 'bg-amber-500/10 text-amber-700'], reject: ['Not a fit', 'bg-destructive/10 text-destructive'] }[r]
+  const m = {
+    interview: ['Interview', 'bg-primary/10 text-primary'],
+    maybe: ['Maybe', 'bg-amber-500/10 text-amber-700'],
+    reject: ['Not a fit', 'bg-destructive/10 text-destructive'],
+  }[r]
   return <span className={`mr-1 rounded-full px-2 py-0.5 text-xs font-medium ${m[1]}`}>{m[0]}</span>
 }
 
 function Verdict({ k, v }: { k: string; v: string }) {
   const good = k === 'red_flag' ? v === 'absent' : v === 'met'
   const bad = k === 'red_flag' ? v === 'present' : v === 'missing'
-  const label = k === 'red_flag' ? (v === 'present' ? 'Found' : v === 'absent' ? 'Not found' : 'Unclear') : v[0].toUpperCase() + v.slice(1)
+  const label =
+    k === 'red_flag'
+      ? v === 'present'
+        ? 'Found'
+        : v === 'absent'
+          ? 'Not found'
+          : 'Unclear'
+      : v[0].toUpperCase() + v.slice(1)
   return (
-    <span className={`whitespace-nowrap font-medium ${good ? 'text-primary' : bad ? 'text-destructive' : 'text-amber-700'}`}>{label}</span>
+    <span
+      className={`whitespace-nowrap font-medium ${good ? 'text-primary' : bad ? 'text-destructive' : 'text-amber-700'}`}
+    >
+      {label}
+    </span>
   )
 }
