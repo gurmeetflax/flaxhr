@@ -130,7 +130,9 @@ export function useTemplates() {
 export function useSaveTemplate() {
   const qc = useQueryClient()
   return useMutation({
-    mutationFn: async (t: Pick<DocTemplate, 'id' | 'title' | 'body' | 'sign_method' | 'is_active' | 'version'>) => {
+    mutationFn: async (
+      t: Pick<DocTemplate, 'id' | 'title' | 'body' | 'sign_method' | 'is_active' | 'version'>,
+    ) => {
       const { error } = await supabase
         .schema('core')
         .from('doc_templates')
@@ -178,7 +180,9 @@ export function useSaveEntity() {
 
 export async function uploadDirectorSignature(entityIds: string[], file: File): Promise<void> {
   const path = `director/${crypto.randomUUID()}.png`
-  const { error } = await supabase.storage.from('signatures').upload(path, file, { contentType: file.type || 'image/png' })
+  const { error } = await supabase.storage
+    .from('signatures')
+    .upload(path, file, { contentType: file.type || 'image/png' })
   if (error) throw error
   const { error: uErr } = await supabase
     .schema('core')
@@ -239,7 +243,11 @@ export function useCancelRequest() {
   const qc = useQueryClient()
   return useMutation({
     mutationFn: async (id: string) => {
-      const { error } = await supabase.schema('core').from('sign_requests').update({ status: 'cancelled' }).eq('id', id)
+      const { error } = await supabase
+        .schema('core')
+        .from('sign_requests')
+        .update({ status: 'cancelled' })
+        .eq('id', id)
       if (error) throw error
     },
     onSuccess: () => qc.invalidateQueries({ queryKey: ['sign-requests'] }),
@@ -393,7 +401,10 @@ export function mergeData(ctx: MergeContext): Record<string, string> {
 const esc = (s: string) => s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
 
 // Fills {{placeholders}}. Blank values are flagged so HR spots them in preview.
-export function fillTemplate(body: string, data: Record<string, string>): { html: string; missing: string[] } {
+export function fillTemplate(
+  body: string,
+  data: Record<string, string>,
+): { html: string; missing: string[] } {
   const missing = new Set<string>()
   const html = body.replace(/\{\{\s*(\w+)\s*\}\}/g, (_, key: string) => {
     const v = data[key]
@@ -478,11 +489,16 @@ export async function loadDocContext(employeeId: string) {
   const [empR, entR, ratesR, uniR] = await Promise.all([
     supabase
       .from('v_employees')
-      .select('id, employee_code, full_name, designation_code, designation_name, outlet_city, hired_on, monthly_salary, pf_enabled, pt_enabled, esic_enabled')
+      .select(
+        'id, employee_code, full_name, designation_code, designation_name, outlet_city, hired_on, monthly_salary, pf_enabled, pt_enabled, esic_enabled',
+      )
       .eq('id', employeeId)
       .single(),
     supabase.schema('core').from('legal_entities').select('*'),
-    supabase.from('v_app_settings').select('key, value').in('key', ['pf_rate_pct', 'esic_rate_pct', 'esic_max_gross', 'pt_amount']),
+    supabase
+      .from('v_app_settings')
+      .select('key, value')
+      .in('key', ['pf_rate_pct', 'esic_rate_pct', 'esic_max_gross', 'pt_amount']),
     supabase
       .schema('core')
       .from('deductions')
@@ -500,7 +516,12 @@ export async function loadDocContext(employeeId: string) {
     if (typeof r.value === 'number') rates[r.key] = r.value
   }
   const { data: terms } = employee.designation_code
-    ? await supabase.schema('core').from('position_terms').select('*').eq('designation_code', employee.designation_code).maybeSingle()
+    ? await supabase
+        .schema('core')
+        .from('position_terms')
+        .select('*')
+        .eq('designation_code', employee.designation_code)
+        .maybeSingle()
     : { data: null }
   const entity = entityForCity((entR.data ?? []) as LegalEntity[], employee.outlet_city)
   const u = (uniR.data ?? [])[0] as MergeContext['uniform'] | undefined
@@ -526,6 +547,18 @@ export function renderForEmployee(
   return { html, data, missing }
 }
 
+// Opens a signed PDF from the private signed-docs bucket.
+export async function openSignedPdf(path: string) {
+  const { data, error } = await supabase.storage.from('signed-docs').createSignedUrl(path, 300)
+  if (error) throw error
+  window.open(data.signedUrl, '_blank')
+}
+
+async function sha256Hex(text: string): Promise<string> {
+  const buf = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(text))
+  return [...new Uint8Array(buf)].map((b) => b.toString(16).padStart(2, '0')).join('')
+}
+
 export function useSendDocuments() {
   const qc = useQueryClient()
   return useMutation({
@@ -540,23 +573,46 @@ export function useSendDocuments() {
     }) => {
       const ctx = await loadDocContext(employeeId)
       const sig = await directorSignatureDataUrl(ctx.entity)
-      const rows = templates.map((t) => {
-        const r = renderForEmployee(t, ctx, sig, joiningDate)
-        return {
-          employee_id: employeeId,
-          template_id: t.id,
-          kind: t.kind,
-          title: t.title,
-          template_version: t.version,
-          rendered_html: r.html,
-          merge_data: r.data,
-          sign_method: t.sign_method,
-        }
-      })
+      const rows = await Promise.all(
+        templates.map(async (t) => {
+          const r = renderForEmployee(t, ctx, sig, joiningDate)
+          return {
+            content_sha256: await sha256Hex(r.html),
+            employee_id: employeeId,
+            template_id: t.id,
+            kind: t.kind,
+            title: t.title,
+            template_version: t.version,
+            rendered_html: r.html,
+            merge_data: r.data,
+            sign_method: t.sign_method,
+          }
+        }),
+      )
       const { error } = await supabase.schema('core').from('sign_requests').insert(rows)
       if (error) {
-        if (error.code === '23505') throw new Error('One of these documents is already waiting for this employee to sign.')
+        if (error.code === '23505')
+          throw new Error('One of these documents is already waiting for this employee to sign.')
         throw error
+      }
+      // Best-effort phone notification; the document is already sent.
+      const { data: u } = await supabase
+        .schema('core')
+        .from('employees')
+        .select('user_id')
+        .eq('id', employeeId)
+        .single()
+      if (u?.user_id) {
+        void supabase.functions
+          .invoke('push-send', {
+            body: {
+              user_ids: [u.user_id],
+              title: rows.length === 1 ? `Please sign: ${rows[0].title}` : `${rows.length} documents to sign`,
+              body: 'Open Flax HR → Documents to read and sign.',
+              data: { path: '/me/documents' },
+            },
+          })
+          .catch(() => undefined)
       }
       return rows.length
     },

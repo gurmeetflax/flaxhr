@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { format } from 'date-fns'
-import { Check, Eye, Upload, X } from 'lucide-react'
+import { Check, Download, Eye, Upload, X } from 'lucide-react'
 import { toast } from 'sonner'
 import { supabase } from '@/lib/supabase'
 import { PageHeader } from '@/components/layout/AppShell'
@@ -10,6 +10,7 @@ import { Input } from '@/components/ui/Input'
 import { Button } from '@/components/ui/Button'
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/Tabs'
 import {
+  openSignedPdf,
   directorSignatureDataUrl,
   KIND_LABEL,
   loadDocContext,
@@ -37,7 +38,10 @@ export default function DocumentsPage() {
   const [tab, setTab] = useState<Tab>('sent')
   return (
     <>
-      <PageHeader title="Documents" description="Letters and policies employees sign — Aadhaar eSign or in the app" />
+      <PageHeader
+        title="Documents"
+        description="Letters and policies employees sign — Aadhaar eSign or in the app"
+      />
       <Tabs value={tab} onValueChange={(v) => setTab(v as Tab)} className="mb-4">
         <TabsList>
           <TabsTrigger value="sent">Sent</TabsTrigger>
@@ -46,7 +50,15 @@ export default function DocumentsPage() {
           <TabsTrigger value="terms">Position terms</TabsTrigger>
         </TabsList>
       </Tabs>
-      {tab === 'sent' ? <SentTab /> : tab === 'templates' ? <TemplatesTab /> : tab === 'companies' ? <CompaniesTab /> : <TermsTab />}
+      {tab === 'sent' ? (
+        <SentTab />
+      ) : tab === 'templates' ? (
+        <TemplatesTab />
+      ) : tab === 'companies' ? (
+        <CompaniesTab />
+      ) : (
+        <TermsTab />
+      )}
     </>
   )
 }
@@ -56,7 +68,10 @@ function SentTab() {
   const [status, setStatus] = useState<SignStatus | ''>('')
   const { data: rows = [], isLoading } = useSignRequests({ status })
   const cancel = useCancelRequest()
-  const counts = rows.reduce<Record<string, number>>((m, r) => ((m[r.status] = (m[r.status] ?? 0) + 1), m), {})
+  const counts = rows.reduce<Record<string, number>>(
+    (m, r) => ((m[r.status] = (m[r.status] ?? 0) + 1), m),
+    {},
+  )
   return (
     <Card>
       <CardContent className="flex flex-col gap-3 p-4 sm:p-6">
@@ -97,13 +112,30 @@ function SentTab() {
                     <div className="text-xs text-muted-foreground">{r.employee_code}</div>
                   </td>
                   <td className="px-3 py-2">{r.title}</td>
-                  <td className="px-3 py-2 text-xs">{r.sign_method === 'aadhaar' ? 'Aadhaar eSign' : 'In-app'}</td>
-                  <td className="px-3 py-2 whitespace-nowrap text-xs">{format(new Date(r.sent_at), 'd MMM yyyy')}</td>
+                  <td className="px-3 py-2 text-xs">
+                    {r.sign_method === 'aadhaar' ? 'Aadhaar eSign' : 'In-app'}
+                  </td>
+                  <td className="px-3 py-2 whitespace-nowrap text-xs">
+                    {format(new Date(r.sent_at), 'd MMM yyyy')}
+                  </td>
                   <td className="px-3 py-2 capitalize">
                     {r.status}
-                    {r.signed_at ? <span className="block text-xs text-muted-foreground">{format(new Date(r.signed_at), 'd MMM, h:mm a')}</span> : null}
+                    {r.signed_at ? (
+                      <span className="block text-xs text-muted-foreground">
+                        {format(new Date(r.signed_at), 'd MMM, h:mm a')}
+                      </span>
+                    ) : null}
                   </td>
                   <td className="px-3 py-2 text-right">
+                    {r.signed_pdf_path ? (
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        onClick={() => openSignedPdf(r.signed_pdf_path!).catch((e) => toast.error(e.message))}
+                      >
+                        <Download className="h-4 w-4" /> PDF
+                      </Button>
+                    ) : null}
                     {r.status === 'sent' || r.status === 'viewed' ? (
                       <Button size="sm" variant="ghost" onClick={() => cancel.mutate(r.id)}>
                         Cancel
@@ -169,7 +201,11 @@ function TemplateEditor({ tpl }: { tpl: DocTemplate }) {
   const emps = useQuery<{ id: string; full_name: string; employee_code: string }[]>({
     queryKey: ['doc-preview-employees'],
     queryFn: async () => {
-      const { data, error } = await supabase.from('v_employees').select('id, full_name, employee_code').eq('is_active', true).order('full_name')
+      const { data, error } = await supabase
+        .from('v_employees')
+        .select('id, full_name, employee_code')
+        .eq('is_active', true)
+        .order('full_name')
       if (error) throw error
       return data ?? []
     },
@@ -242,16 +278,23 @@ function TemplateEditor({ tpl }: { tpl: DocTemplate }) {
           onChange={(e) => setBody(e.target.value)}
         />
         <p className="text-xs text-muted-foreground">
-          Text uses simple HTML (&lt;p&gt;, &lt;b&gt;, &lt;h3&gt;, &lt;ul&gt;&lt;li&gt;). The letterhead, date, your
-          signature and the employee's signature block are added automatically. Documents already sent keep the
-          wording they were sent with.
+          Text uses simple HTML (&lt;p&gt;, &lt;b&gt;, &lt;h3&gt;, &lt;ul&gt;&lt;li&gt;). The letterhead,
+          date, your signature and the employee's signature block are added automatically. Documents already
+          sent keep the wording they were sent with.
         </p>
         <div className="flex flex-wrap items-center gap-2">
           <Button
             loading={save.isPending}
             onClick={async () => {
               try {
-                await save.mutateAsync({ id: tpl.id, title, body, sign_method: method, is_active: active, version: tpl.version })
+                await save.mutateAsync({
+                  id: tpl.id,
+                  title,
+                  body,
+                  sign_method: method,
+                  is_active: active,
+                  version: tpl.version,
+                })
                 toast.success(`Saved as version ${tpl.version + 1}`)
               } catch (e) {
                 toast.error(e instanceof Error ? e.message : 'Save failed')
@@ -315,12 +358,16 @@ function CompaniesTab() {
         <CardContent className="flex flex-col gap-3 p-4 sm:p-6">
           <CardTitle>Authorised signatory</CardTitle>
           <CardDescription>
-            Your signature is printed on every letter as the company's authorised signatory. Use a clear photo or scan
-            of your signature on white paper (PNG with a transparent or white background works best).
+            Your signature is printed on every letter as the company's authorised signatory. Use a clear photo
+            or scan of your signature on white paper (PNG with a transparent or white background works best).
           </CardDescription>
           <div className="flex flex-wrap items-center gap-4">
             <div className="grid h-20 w-56 place-items-center rounded-lg border border-dashed border-border bg-white">
-              {sigUrl ? <img src={sigUrl} alt="Signature" className="max-h-16" /> : <span className="text-xs text-muted-foreground">No signature yet</span>}
+              {sigUrl ? (
+                <img src={sigUrl} alt="Signature" className="max-h-16" />
+              ) : (
+                <span className="text-xs text-muted-foreground">No signature yet</span>
+              )}
             </div>
             <Button variant="outline" loading={uploading} onClick={() => input.current?.click()}>
               <Upload className="h-4 w-4" /> {sigUrl ? 'Replace signature' : 'Upload signature'}
@@ -335,7 +382,10 @@ function CompaniesTab() {
                 if (!f) return
                 setUploading(true)
                 try {
-                  await uploadDirectorSignature(entities.map((x) => x.id), f)
+                  await uploadDirectorSignature(
+                    entities.map((x) => x.id),
+                    f,
+                  )
                   toast.success('Signature saved')
                   void refetch()
                 } catch (err) {
@@ -370,16 +420,42 @@ function EntityCard({ e }: { e: LegalEntity }) {
       <CardContent className="flex flex-col gap-3 p-4 sm:p-6">
         <div className="flex items-center justify-between">
           <CardTitle>
-            {e.state} <span className="text-sm font-normal text-muted-foreground">· {e.cities.join(', ')}</span>
+            {e.state}{' '}
+            <span className="text-sm font-normal text-muted-foreground">· {e.cities.join(', ')}</span>
           </CardTitle>
-          {e.is_pending ? <span className="rounded-full bg-amber-500/10 px-2 py-0.5 text-xs text-amber-700">Details pending</span> : null}
+          {e.is_pending ? (
+            <span className="rounded-full bg-amber-500/10 px-2 py-0.5 text-xs text-amber-700">
+              Details pending
+            </span>
+          ) : null}
         </div>
         <div className="grid gap-2 sm:grid-cols-2">
-          <Input placeholder="Legal name" value={f.legal_name} onChange={(x) => setF({ ...f, legal_name: x.target.value })} />
-          <Input placeholder="GSTIN" value={f.gstin} onChange={(x) => setF({ ...f, gstin: x.target.value })} />
-          <Input className="sm:col-span-2" placeholder="Registered address" value={f.address} onChange={(x) => setF({ ...f, address: x.target.value })} />
-          <Input placeholder="Signatory name" value={f.signatory_name} onChange={(x) => setF({ ...f, signatory_name: x.target.value })} />
-          <Input placeholder="Signatory title" value={f.signatory_title} onChange={(x) => setF({ ...f, signatory_title: x.target.value })} />
+          <Input
+            placeholder="Legal name"
+            value={f.legal_name}
+            onChange={(x) => setF({ ...f, legal_name: x.target.value })}
+          />
+          <Input
+            placeholder="GSTIN"
+            value={f.gstin}
+            onChange={(x) => setF({ ...f, gstin: x.target.value })}
+          />
+          <Input
+            className="sm:col-span-2"
+            placeholder="Registered address"
+            value={f.address}
+            onChange={(x) => setF({ ...f, address: x.target.value })}
+          />
+          <Input
+            placeholder="Signatory name"
+            value={f.signatory_name}
+            onChange={(x) => setF({ ...f, signatory_name: x.target.value })}
+          />
+          <Input
+            placeholder="Signatory title"
+            value={f.signatory_title}
+            onChange={(x) => setF({ ...f, signatory_title: x.target.value })}
+          />
         </div>
         <div>
           <Button

@@ -1,11 +1,12 @@
 import { useState } from 'react'
 import { format } from 'date-fns'
-import { Eye, FileSignature, Send, X } from 'lucide-react'
+import { Download, Eye, FileSignature, Send, X } from 'lucide-react'
 import { toast } from 'sonner'
 import { Label } from '@/components/ui/Label'
 import { Input } from '@/components/ui/Input'
 import { Button } from '@/components/ui/Button'
 import {
+  openSignedPdf,
   directorSignatureDataUrl,
   loadDocContext,
   renderForEmployee,
@@ -37,7 +38,9 @@ export default function EmployeeDocumentsCard({ employeeId }: { employeeId: stri
   const [preview, setPreview] = useState<{ title: string; html: string; missing: string[] } | null>(null)
 
   const active = templates.filter((t) => t.is_active)
-  const open = new Set(requests.filter((r) => r.status === 'sent' || r.status === 'viewed').map((r) => r.kind))
+  const open = new Set(
+    requests.filter((r) => r.status === 'sent' || r.status === 'viewed').map((r) => r.kind),
+  )
   const chosen = active.filter((t) => picked.has(t.id))
 
   const toggle = (id: string) =>
@@ -90,9 +93,30 @@ export default function EmployeeDocumentsCard({ employeeId }: { employeeId: stri
                 </span>
               </span>
               <span className="flex items-center gap-2">
-                <span className={`rounded-full px-2 py-0.5 text-xs font-medium capitalize ${STATUS_STYLE[r.status]}`}>{r.status}</span>
+                <span
+                  className={`rounded-full px-2 py-0.5 text-xs font-medium capitalize ${STATUS_STYLE[r.status]}`}
+                >
+                  {r.status}
+                </span>
+                {r.signed_pdf_path ? (
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant="ghost"
+                    aria-label="Download signed PDF"
+                    onClick={() => openSignedPdf(r.signed_pdf_path!).catch((e) => toast.error(e.message))}
+                  >
+                    <Download className="h-4 w-4" />
+                  </Button>
+                ) : null}
                 {r.status === 'sent' || r.status === 'viewed' ? (
-                  <Button type="button" size="sm" variant="ghost" aria-label="Cancel" onClick={() => cancel.mutate(r.id)}>
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant="ghost"
+                    aria-label="Cancel"
+                    onClick={() => cancel.mutate(r.id)}
+                  >
                     <X className="h-4 w-4" />
                   </Button>
                 ) : null}
@@ -108,9 +132,17 @@ export default function EmployeeDocumentsCard({ employeeId }: { employeeId: stri
         {active.map((t) => {
           const isOpen = open.has(t.kind)
           return (
-            <label key={t.id} className={`flex items-center justify-between gap-2 text-sm ${isOpen ? 'opacity-50' : ''}`}>
+            <label
+              key={t.id}
+              className={`flex items-center justify-between gap-2 text-sm ${isOpen ? 'opacity-50' : ''}`}
+            >
               <span className="flex items-center gap-2">
-                <input type="checkbox" disabled={isOpen} checked={picked.has(t.id)} onChange={() => toggle(t.id)} />
+                <input
+                  type="checkbox"
+                  disabled={isOpen}
+                  checked={picked.has(t.id)}
+                  onChange={() => toggle(t.id)}
+                />
                 {t.title}
                 <span className="text-xs text-muted-foreground">
                   {t.sign_method === 'aadhaar' ? 'Aadhaar eSign' : 'in-app'}
@@ -144,7 +176,9 @@ export default function EmployeeDocumentsCard({ employeeId }: { employeeId: stri
             <span className="text-sm font-medium">
               Preview: {preview.title}
               {preview.missing.length ? (
-                <span className="ml-2 text-xs text-amber-700">Missing details: {preview.missing.join(', ')}</span>
+                <span className="ml-2 text-xs text-amber-700">
+                  Missing details: {preview.missing.join(', ')}
+                </span>
               ) : null}
             </span>
             <Button type="button" size="sm" variant="ghost" onClick={() => setPreview(null)}>
