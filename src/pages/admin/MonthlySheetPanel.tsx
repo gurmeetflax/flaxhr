@@ -9,25 +9,32 @@ import { Input } from '@/components/ui/Input'
 import { Button } from '@/components/ui/Button'
 import { loadPeriod } from '@/lib/periodAttendance'
 import { downloadMonthlySheet } from '@/lib/monthlySheet'
+import { EmployeeSelect } from '@/components/ui/EmployeeSelect'
 
-export default function MonthlySheetPanel({ outlets }: { outlets: { id: string; display_name: string | null }[] }) {
+export default function MonthlySheetPanel({
+  outlets,
+}: {
+  outlets: { id: string; display_name: string | null }[]
+}) {
   const [month, setMonth] = useState(format(subMonths(new Date(), 1), 'yyyy-MM'))
   const [outletId, setOutletId] = useState('')
   const [employeeId, setEmployeeId] = useState('')
   const [busy, setBusy] = useState(false)
 
-  const empQ = useQuery<{ id: string; employee_code: string; full_name: string; outlet_id: string | null }[]>({
-    queryKey: ['report-employee-options'],
-    queryFn: async () => {
-      const { data, error } = await supabase
-        .from('v_employees')
-        .select('id, employee_code, full_name, outlet_id')
-        .eq('is_active', true)
-        .order('full_name')
-      if (error) throw error
-      return data ?? []
+  const empQ = useQuery<{ id: string; employee_code: string; full_name: string; outlet_id: string | null }[]>(
+    {
+      queryKey: ['report-employee-options'],
+      queryFn: async () => {
+        const { data, error } = await supabase
+          .from('v_employees')
+          .select('id, employee_code, full_name, outlet_id')
+          .eq('is_active', true)
+          .order('full_name')
+        if (error) throw error
+        return data ?? []
+      },
     },
-  })
+  )
   const options = (empQ.data ?? []).filter((e) => !outletId || e.outlet_id === outletId)
 
   const onDownload = async () => {
@@ -56,8 +63,8 @@ export default function MonthlySheetPanel({ outlets }: { outlets: { id: string; 
         <div>
           <CardTitle>Monthly attendance sheet (Excel)</CardTitle>
           <CardDescription className="mt-1">
-            One sheet per employee with every date of the month — status, hours, late, early
-            departure, overtime, notes, punch times, shift and punch outlets — plus a summary.
+            One sheet per employee with every date of the month — status, hours, late, early departure,
+            overtime, notes, punch times, shift and punch outlets — plus a summary.
           </CardDescription>
         </div>
         <div className="grid gap-3 sm:grid-cols-3">
@@ -85,18 +92,12 @@ export default function MonthlySheetPanel({ outlets }: { outlets: { id: string; 
           </label>
           <label className="flex flex-col gap-1 text-xs text-muted-foreground">
             Employee
-            <select
-              className="h-10 rounded-lg border border-border bg-surface px-3 text-sm text-foreground"
+            <EmployeeSelect
+              options={options}
               value={employeeId}
-              onChange={(e) => setEmployeeId(e.target.value)}
-            >
-              <option value="">Everyone ({options.length})</option>
-              {options.map((e) => (
-                <option key={e.id} value={e.id}>
-                  {e.full_name} · {e.employee_code}
-                </option>
-              ))}
-            </select>
+              onChange={setEmployeeId}
+              emptyLabel={`Everyone (${options.length})`}
+            />
           </label>
         </div>
         <div>

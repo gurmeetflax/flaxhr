@@ -22,6 +22,7 @@ import {
   type Question,
   type QuestionKind,
 } from '@/lib/evaluations'
+import { EmployeeSelect } from '@/components/ui/EmployeeSelect'
 
 interface EmployeeOption {
   id: string
@@ -110,28 +111,16 @@ function NewRun() {
             </div>
             <div className="space-y-2">
               <Label>Employee</Label>
-              <select
-                className="flex h-10 w-full rounded-lg border border-input bg-surface px-3 text-sm"
+              <EmployeeSelect
+                options={(employeesQ.data ?? []).map((emp) => ({ ...emp, hint: emp.outlet_name }))}
                 value={employeeId}
-                onChange={(e) => setEmployeeId(e.target.value)}
+                onChange={setEmployeeId}
                 required
-              >
-                <option value="">Select…</option>
-                {(employeesQ.data ?? []).map((emp) => (
-                  <option key={emp.id} value={emp.id}>
-                    {emp.full_name} · {emp.employee_code}
-                    {emp.outlet_name ? ` · ${emp.outlet_name}` : ''}
-                  </option>
-                ))}
-              </select>
+              />
             </div>
             <div className="space-y-2">
               <Label>Evaluated on</Label>
-              <Input
-                type="date"
-                value={evaluatedAt}
-                onChange={(e) => setEvaluatedAt(e.target.value)}
-              />
+              <Input type="date" value={evaluatedAt} onChange={(e) => setEvaluatedAt(e.target.value)} />
             </div>
             <div className="space-y-2 sm:col-span-2">
               <Label>Notes (optional)</Label>
@@ -145,11 +134,7 @@ function NewRun() {
               <Button type="submit" loading={create.isPending}>
                 Start evaluation
               </Button>
-              <Button
-                type="button"
-                variant="ghost"
-                onClick={() => navigate('/admin/evaluations')}
-              >
+              <Button type="button" variant="ghost" onClick={() => navigate('/admin/evaluations')}>
                 Cancel
               </Button>
             </div>
@@ -251,11 +236,7 @@ function ExistingRun({ id }: { id: string }) {
           </>
         }
         actions={
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={() => navigate('/admin/evaluations')}
-          >
+          <Button variant="ghost" size="sm" onClick={() => navigate('/admin/evaluations')}>
             Back
           </Button>
         }
@@ -293,9 +274,7 @@ function ExistingRun({ id }: { id: string }) {
               onChange={(v) => saveAnswer(q.id, v)}
               disabled={isLocked}
               earnedScore={
-                isLocked
-                  ? answersQ.data?.find((a) => a.question_id === q.id)?.earned_score ?? null
-                  : null
+                isLocked ? (answersQ.data?.find((a) => a.question_id === q.id)?.earned_score ?? null) : null
               }
             />
           ))}
@@ -321,8 +300,7 @@ function ExistingRun({ id }: { id: string }) {
                 <Send className="h-4 w-4" /> Submit evaluation
               </Button>
               <span className="text-xs text-muted-foreground">
-                Auto-saves answers as you go. Submit locks the evaluation and
-                computes the score.
+                Auto-saves answers as you go. Submit locks the evaluation and computes the score.
               </span>
             </div>
           ) : null}
@@ -354,11 +332,7 @@ function QuestionField({
         {q.required ? <span className="text-destructive"> *</span> : null}
       </div>
       <div className="text-xs text-muted-foreground">
-        {earnedScore != null
-          ? `${earnedScore} / ${q.weight} pts`
-          : q.weight
-            ? `${q.weight} pts`
-            : null}
+        {earnedScore != null ? `${earnedScore} / ${q.weight} pts` : q.weight ? `${q.weight} pts` : null}
       </div>
     </div>
   )
@@ -468,11 +442,7 @@ function KindInput({
               key={opt.value}
               selected={selected}
               disabled={disabled}
-              onClick={() =>
-                onChange(
-                  selected ? arr.filter((v) => v !== opt.value) : [...arr, opt.value],
-                )
-              }
+              onClick={() => onChange(selected ? arr.filter((v) => v !== opt.value) : [...arr, opt.value])}
             >
               {opt.label}
             </ChoiceButton>
@@ -502,9 +472,7 @@ function ChoiceButton({
       onClick={onClick}
       className={
         'rounded-lg border px-3 py-1.5 text-sm transition-colors ' +
-        (selected
-          ? 'border-primary bg-primary/10 text-primary'
-          : 'border-border bg-surface hover:bg-muted') +
+        (selected ? 'border-primary bg-primary/10 text-primary' : 'border-border bg-surface hover:bg-muted') +
         ' disabled:opacity-60'
       }
     >

@@ -31,6 +31,7 @@ import {
   type SignStatus,
 } from '@/lib/documents'
 import LetterPreview from './LetterPreview'
+import { EmployeeSelect } from '@/components/ui/EmployeeSelect'
 
 type Tab = 'sent' | 'templates' | 'companies' | 'terms'
 
@@ -66,7 +67,15 @@ export default function DocumentsPage() {
 // ── Sent ──────────────────────────────────────────────────────────────
 function SentTab() {
   const [status, setStatus] = useState<SignStatus | ''>('')
-  const { data: rows = [], isLoading } = useSignRequests({ status })
+  const [search, setSearch] = useState('')
+  const { data: all = [], isLoading } = useSignRequests({ status })
+  const words = search.toLowerCase().split(/\s+/).filter(Boolean)
+  const rows = words.length
+    ? all.filter((r) => {
+        const hay = `${r.employee_name} ${r.employee_code} ${r.title}`.toLowerCase()
+        return words.every((w) => hay.includes(w))
+      })
+    : all
   const cancel = useCancelRequest()
   const counts = rows.reduce<Record<string, number>>(
     (m, r) => ((m[r.status] = (m[r.status] ?? 0) + 1), m),
@@ -79,6 +88,12 @@ function SentTab() {
           <CardDescription>
             Send documents from an employee's profile (Employees → Edit → Documents to sign).
           </CardDescription>
+          <Input
+            className="h-9 w-56"
+            placeholder="Search name, code or document"
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+          />
           <select
             className="h-9 rounded-lg border border-border bg-surface px-2 text-sm"
             value={status}
@@ -196,6 +211,7 @@ function TemplateEditor({ tpl }: { tpl: DocTemplate }) {
   const [active, setActive] = useState(tpl.is_active)
   const [previewFor, setPreviewFor] = useState('')
   const [preview, setPreview] = useState<string | null>(null)
+  const [missing, setMissing] = useState<string[]>([])
   const ta = useRef<HTMLTextAreaElement>(null)
 
   const emps = useQuery<{ id: string; full_name: string; employee_code: string }[]>({
@@ -229,7 +245,9 @@ function TemplateEditor({ tpl }: { tpl: DocTemplate }) {
     try {
       const ctx = await loadDocContext(id)
       const sig = await directorSignatureDataUrl(ctx.entity)
-      setPreview(renderForEmployee({ ...tpl, title, body }, ctx, sig).html)
+      const r = renderForEmployee({ ...tpl, title, body }, ctx, sig)
+      setPreview(r.html)
+      setMissing(r.missing)
     } catch (e) {
       toast.error(e instanceof Error ? e.message : 'Preview failed')
     }
@@ -303,18 +321,13 @@ function TemplateEditor({ tpl }: { tpl: DocTemplate }) {
           >
             <Check className="h-4 w-4" /> Save
           </Button>
-          <select
-            className="h-9 rounded-lg border border-border bg-surface px-2 text-sm"
+          <EmployeeSelect
+            className="w-64"
+            options={emps.data ?? []}
             value={previewFor}
-            onChange={(e) => setPreviewFor(e.target.value)}
-          >
-            <option value="">Preview with…</option>
-            {(emps.data ?? []).map((e) => (
-              <option key={e.id} value={e.id}>
-                {e.full_name} · {e.employee_code}
-              </option>
-            ))}
-          </select>
+            onChange={setPreviewFor}
+            placeholder="Preview with… (search)"
+          />
           <Button variant="outline" onClick={doPreview}>
             <Eye className="h-4 w-4" /> Preview
           </Button>
@@ -324,6 +337,12 @@ function TemplateEditor({ tpl }: { tpl: DocTemplate }) {
             </Button>
           ) : null}
         </div>
+        {preview && missing.length ? (
+          <p className="rounded-md bg-amber-50 px-3 py-2 text-xs text-amber-800">
+            Not on this employee's record yet: {missing.join(', ')}. Fill these in on their profile before
+            sending.
+          </p>
+        ) : null}
         {preview ? <LetterPreview html={preview} /> : null}
         <p className="text-xs text-muted-foreground">
           {KIND_LABEL[tpl.kind]} · starter wording — have it reviewed by your lawyer before relying on it.
