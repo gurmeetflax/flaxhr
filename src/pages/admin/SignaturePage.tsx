@@ -7,6 +7,7 @@ import { PageHeader } from '@/components/layout/AppShell'
 import { Card, CardContent, CardDescription, CardTitle } from '@/components/ui/Card'
 import { Input } from '@/components/ui/Input'
 import { Button } from '@/components/ui/Button'
+import { EmployeeSelect } from '@/components/ui/EmployeeSelect'
 
 // Company defaults — hardcoded because they change rarely.
 const COMPANY = {
@@ -141,20 +142,15 @@ export default function SignaturePage() {
       <div className="mb-4 grid gap-3 sm:grid-cols-[1fr_1fr]">
         <label className="flex flex-col gap-1 text-xs font-medium text-muted-foreground">
           Employee
-          <select
-            className="h-10 rounded-lg border border-border bg-surface px-3 text-sm"
+          <EmployeeSelect
+            options={(employeesQ.data ?? []).map((e) => ({
+              ...e,
+              full_name: e.full_name ?? '',
+              hint: e.designation_name,
+            }))}
             value={employeeId}
-            onChange={(e) => onPickEmployee(e.target.value)}
-          >
-            <option value="">— select an employee —</option>
-            {(employeesQ.data ?? []).map((e) => (
-              <option key={e.id} value={e.id}>
-                {e.employee_code ? `${e.employee_code} · ` : ''}
-                {e.full_name}
-                {e.designation_name ? ` — ${e.designation_name}` : ''}
-              </option>
-            ))}
-          </select>
+            onChange={onPickEmployee}
+          />
         </label>
       </div>
 
@@ -178,10 +174,9 @@ export default function SignaturePage() {
               <CardContent className="p-6">
                 <CardTitle>How to install</CardTitle>
                 <CardDescription className="mt-2 text-sm">
-                  Copy for Gmail → open Gmail → <b>Settings</b> → <b>See all settings</b> →{' '}
-                  <b>General</b> → scroll to <b>Signature</b> → create a new one and paste. Save at
-                  the bottom. Ask the employee to select this signature as default for new mails and
-                  replies.
+                  Copy for Gmail → open Gmail → <b>Settings</b> → <b>See all settings</b> → <b>General</b> →
+                  scroll to <b>Signature</b> → create a new one and paste. Save at the bottom. Ask the
+                  employee to select this signature as default for new mails and replies.
                 </CardDescription>
               </CardContent>
             </Card>
@@ -195,8 +190,7 @@ export default function SignaturePage() {
               <Field label="Phone" value={phoneOverride} onChange={setPhoneOverride} />
               <Field label="Email" value={emailOverride} onChange={setEmailOverride} />
               <div className="mt-2 text-xs text-muted-foreground">
-                Overrides here only affect the copied signature. They don't save back to the
-                employee record.
+                Overrides here only affect the copied signature. They don't save back to the employee record.
               </div>
             </CardContent>
           </Card>
@@ -212,15 +206,7 @@ export default function SignaturePage() {
   )
 }
 
-function Field({
-  label,
-  value,
-  onChange,
-}: {
-  label: string
-  value: string
-  onChange: (v: string) => void
-}) {
+function Field({ label, value, onChange }: { label: string; value: string; onChange: (v: string) => void }) {
   return (
     <label className="flex flex-col gap-1 text-xs font-medium text-muted-foreground">
       {label}
@@ -232,8 +218,7 @@ function Field({
 function formatPhone(raw: string): string {
   const digits = raw.replace(/\D/g, '')
   if (digits.length === 10) return `+91 ${digits.slice(0, 5)} ${digits.slice(5)}`
-  if (digits.length === 12 && digits.startsWith('91'))
-    return `+91 ${digits.slice(2, 7)} ${digits.slice(7)}`
+  if (digits.length === 12 && digits.startsWith('91')) return `+91 ${digits.slice(2, 7)} ${digits.slice(7)}`
   return raw
 }
 
@@ -258,12 +243,7 @@ function escapeHtml(s: string): string {
   })
 }
 
-function buildSignature(fields: {
-  name: string
-  title: string
-  phone: string
-  email: string
-}): string {
+function buildSignature(fields: { name: string; title: string; phone: string; email: string }): string {
   const s = {
     name: escapeHtml(fields.name),
     title: escapeHtml(fields.title),

@@ -18,9 +18,17 @@ import {
   type CardRow,
 } from '@/lib/cards'
 import { humanErr } from '@/lib/humanErr'
+import { EmployeeSelect } from '@/components/ui/EmployeeSelect'
 
-interface OutletOption { id: string; display_name: string | null }
-interface EmployeeOption { id: string; employee_code: string; full_name: string }
+interface OutletOption {
+  id: string
+  display_name: string | null
+}
+interface EmployeeOption {
+  id: string
+  employee_code: string
+  full_name: string
+}
 
 const IST = 'Asia/Kolkata'
 
@@ -78,7 +86,9 @@ export default function CardsPage() {
         >
           <option value="">All outlets</option>
           {outletsQ.data?.map((o) => (
-            <option key={o.id} value={o.id}>{o.display_name ?? o.id}</option>
+            <option key={o.id} value={o.id}>
+              {o.display_name ?? o.id}
+            </option>
           ))}
         </select>
       </div>
@@ -91,7 +101,9 @@ export default function CardsPage() {
             </div>
           ) : (
             <ul className="divide-y divide-border">
-              {rows.map((c) => <CardRowItem key={c.id} card={c} />)}
+              {rows.map((c) => (
+                <CardRowItem key={c.id} card={c} />
+              ))}
             </ul>
           )}
         </CardContent>
@@ -122,16 +134,15 @@ function CardRowItem({ card }: { card: CardRow }) {
         <span className="font-medium">
           {emoji} {card.reason_title}
           {card.source === 'auto' ? (
-            <span className="ml-2 rounded-full bg-muted px-2 py-0.5 text-[10px] text-muted-foreground">auto</span>
+            <span className="ml-2 rounded-full bg-muted px-2 py-0.5 text-[10px] text-muted-foreground">
+              auto
+            </span>
           ) : null}
         </span>
         <span className="text-xs text-muted-foreground">
-          {card.employee_name} ({card.employee_code})
-          {card.outlet_name ? ` · ${card.outlet_name}` : ''}
+          {card.employee_name} ({card.employee_code}){card.outlet_name ? ` · ${card.outlet_name}` : ''}
         </span>
-        {card.notes ? (
-          <span className="text-xs text-muted-foreground">{card.notes}</span>
-        ) : null}
+        {card.notes ? <span className="text-xs text-muted-foreground">{card.notes}</span> : null}
       </div>
       <div className="flex items-center gap-2 whitespace-nowrap">
         <span className="text-xs text-muted-foreground">
@@ -187,7 +198,9 @@ function IssueCardModal({ onClose }: { onClose: () => void }) {
         notes: notes.trim() || undefined,
         incident_date: incident,
       })
-      toast.success(`${reason?.colour === 'red' ? '🔴' : reason?.colour === 'green' ? '🟢' : '🟡'} Card issued`)
+      toast.success(
+        `${reason?.colour === 'red' ? '🔴' : reason?.colour === 'green' ? '🟢' : '🟡'} Card issued`,
+      )
       onClose()
     } catch (err) {
       toast.error(humanErr(err, 'Issue failed'))
@@ -207,19 +220,7 @@ function IssueCardModal({ onClose }: { onClose: () => void }) {
         <form className="flex flex-col gap-3" onSubmit={submit}>
           <label className="flex flex-col gap-1 text-xs">
             <Label className="text-xs">Employee</Label>
-            <select
-              className="h-10 rounded-lg border border-border bg-surface px-3 text-sm"
-              value={employeeId}
-              onChange={(e) => setEmployeeId(e.target.value)}
-              required
-            >
-              <option value="">— pick employee —</option>
-              {empsQ.data?.map((e) => (
-                <option key={e.id} value={e.id}>
-                  {e.employee_code} · {e.full_name}
-                </option>
-              ))}
-            </select>
+            <EmployeeSelect options={empsQ.data ?? []} value={employeeId} onChange={setEmployeeId} required />
           </label>
           <label className="flex flex-col gap-1 text-xs">
             <Label className="text-xs">Reason</Label>
@@ -254,8 +255,12 @@ function IssueCardModal({ onClose }: { onClose: () => void }) {
             />
           </label>
           <div className="flex justify-end gap-2 pt-2">
-            <Button type="button" variant="ghost" onClick={onClose}>Cancel</Button>
-            <Button type="submit" loading={issue.isPending}>Issue card</Button>
+            <Button type="button" variant="ghost" onClick={onClose}>
+              Cancel
+            </Button>
+            <Button type="submit" loading={issue.isPending}>
+              Issue card
+            </Button>
           </div>
         </form>
       </div>

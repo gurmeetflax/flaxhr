@@ -35,7 +35,7 @@ export function certificateHtml(c: {
   const esc = (s: string) => s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
   const row = (k: string, v: string) =>
     `<tr><td style="color:#64748b;padding:6px 12px 6px 0;vertical-align:top;white-space:nowrap">${k}</td><td style="padding:6px 0">${v}</td></tr>`
-  return `<div class="letter" style="font-family:system-ui,sans-serif">
+  return `<div class="letter">
 <h1>Signature certificate</h1>
 <p style="color:#475569">This page records how the document above was signed electronically in the Flax HR app.</p>
 <table style="font-size:13px;border-collapse:collapse">

@@ -198,12 +198,13 @@ export function usePositionTerms() {
     queryFn: async () => {
       const [{ data: terms, error }, { data: des, error: dErr }] = await Promise.all([
         supabase.schema('core').from('position_terms').select('*'),
-        supabase.schema('core').from('designations').select('code, name'),
+        supabase.schema('core').from('designations').select('code, name').eq('is_active', true),
       ])
       if (error) throw error
       if (dErr) throw dErr
       const names = new Map((des ?? []).map((d) => [d.code as string, d.name as string]))
       return ((terms ?? []) as PositionTerms[])
+        .filter((t) => names.has(t.designation_code))
         .map((t) => ({ ...t, designation_name: names.get(t.designation_code) ?? t.designation_code }))
         .sort((a, b) => a.designation_name.localeCompare(b.designation_name))
     },
@@ -419,10 +420,10 @@ export function fillTemplate(
 }
 
 export const LETTER_CSS = `
-.letter{font-family:Georgia,'Times New Roman',serif;color:#111827;font-size:14px;line-height:1.6;max-width:720px;margin:0 auto;padding:40px 48px;background:#fff}
+.letter{font-family:'Times New Roman',Times,serif;color:#111827;font-size:14px;line-height:1.6;max-width:720px;margin:0 auto;padding:40px 48px;background:#fff}
 .letter .head{display:flex;justify-content:space-between;align-items:flex-start;border-bottom:2px solid #65a30d;padding-bottom:12px;margin-bottom:20px}
 .letter .head img{height:44px}
-.letter .co{text-align:right;font-family:system-ui,sans-serif;font-size:11px;color:#475569;max-width:360px}
+.letter .co{text-align:right;font-size:11px;color:#475569;max-width:360px}
 .letter .co b{color:#111827;font-size:12px}
 .letter h1{font-size:20px;font-weight:700;margin:8px 0 16px}
 .letter h3{font-size:15px;font-weight:700;margin:18px 0 6px}
@@ -430,11 +431,11 @@ export const LETTER_CSS = `
 .letter ul{list-style:disc;padding-left:22px;margin:0 0 10px}
 .letter ol{list-style:decimal;padding-left:22px;margin:0 0 10px}
 .letter li{margin:3px 0}
-.letter table.salary{border-collapse:collapse;width:100%;margin:8px 0 12px;font-family:system-ui,sans-serif;font-size:13px}
+.letter table.salary{border-collapse:collapse;width:100%;margin:8px 0 12px;font-size:13px}
 .letter table.salary th,.letter table.salary td{border:1px solid #e5e7eb;padding:6px 10px;text-align:left}
 .letter table.salary th{background:#f8fafc}
 .letter table.salary .amt{text-align:right;white-space:nowrap}
-.letter .sign{display:flex;justify-content:space-between;gap:24px;margin-top:36px;font-family:system-ui,sans-serif;font-size:12px}
+.letter .sign{display:flex;justify-content:space-between;gap:24px;margin-top:36px;font-size:12px}
 .letter .sign .box{width:45%}
 .letter .sign img{height:56px;display:block;margin-bottom:4px}
 .letter .sign .line{border-top:1px solid #9ca3af;padding-top:4px}
@@ -456,7 +457,7 @@ export function letterHtml(opts: {
   return `<div class="letter">
 <div class="head"><img src="https://hr.flaxfoods.in/flax-logo.png" alt="Flax"/>
 <div class="co"><b>${esc(e?.legal_name ?? 'Health and Beyond Foods Private Limited')}</b><br/>${esc(e?.address ?? '')}${e?.gstin ? `<br/>GSTIN ${esc(e.gstin)}` : ''}</div></div>
-<div style="font-family:system-ui,sans-serif;font-size:12px;color:#475569">Date: ${esc(opts.date)}</div>
+<div style="font-size:12px;color:#475569">Date: ${esc(opts.date)}</div>
 <h1>${esc(opts.title)}</h1>
 ${opts.body}
 <div class="sign">
