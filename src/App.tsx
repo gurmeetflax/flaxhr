@@ -24,6 +24,8 @@ import {
   Users,
   Wallet,
   Briefcase,
+  UserPlus,
+  FileSignature,
 } from 'lucide-react'
 import ProtectedRoute from '@/components/ProtectedRoute'
 import { useHasRole } from '@/lib/auth'
@@ -44,6 +46,8 @@ import NewOutletPage from '@/pages/admin/NewOutletPage'
 import EditOutletPage from '@/pages/admin/EditOutletPage'
 import AttendancePage from '@/pages/admin/AttendancePage'
 import FieldVisitsPage from '@/pages/admin/FieldVisitsPage'
+import HiringPage from '@/pages/admin/HiringPage'
+import DocumentsPage from '@/pages/admin/DocumentsPage'
 import EmployeeReportPage from '@/pages/admin/EmployeeReportPage'
 import RegularisationsPage from '@/pages/admin/RegularisationsPage'
 import ShiftsPage from '@/pages/admin/ShiftsPage'
@@ -61,6 +65,7 @@ import OvertimePage from '@/pages/admin/OvertimePage'
 import MyOvertimePage from '@/pages/me/MyOvertimePage'
 import PayrollRunPage from '@/pages/admin/PayrollRunPage'
 import PayslipPage from '@/pages/me/PayslipPage'
+import MyDocumentsPage from '@/pages/me/MyDocumentsPage'
 import FnfListPage from '@/pages/admin/FnfListPage'
 import FnfDetailPage from '@/pages/admin/FnfDetailPage'
 import PipsPage from '@/pages/admin/PipsPage'
@@ -90,6 +95,8 @@ const adminNav = [
   { to: '/admin', label: 'Overview', icon: Home },
   { to: '/admin/outlets', label: 'Outlets', icon: Store },
   { to: '/admin/employees', label: 'Employees', icon: Users },
+  { to: '/admin/hiring', label: 'Hiring', icon: UserPlus },
+  { to: '/admin/documents', label: 'Documents', icon: FileSignature },
   { to: '/admin/attendance', label: 'Attendance', icon: ClipboardList },
   { to: '/admin/field-visits', label: 'Field visits', icon: Briefcase },
   { to: '/admin/reports', label: 'Reports', icon: FileBarChart },
@@ -121,6 +128,7 @@ const employeeNav = [
   { to: '/me/roster', label: 'My roster', icon: CalendarDays },
   { to: '/me/leave', label: 'Leave', icon: Plane },
   { to: '/me/payslips', label: 'Payslips', icon: Receipt },
+  { to: '/me/documents', label: 'Documents', icon: FileSignature },
   { to: '/me/overtime', label: 'Overtime', icon: Clock },
   { to: '/me/incentives', label: 'My incentives', icon: CircleDollarSign },
   { to: '/me/performance', label: 'My performance', icon: Sparkles },
@@ -135,7 +143,12 @@ const managerNav = [{ to: '/me/team-roster', label: 'Team roster', icon: Calenda
 
 function EmployeeShell() {
   const isManager = useHasRole('manager')
-  return <AppShell nav={isManager ? [...employeeNav.slice(0, 4), ...managerNav, ...employeeNav.slice(4)] : employeeNav} title="Employee" />
+  return (
+    <AppShell
+      nav={isManager ? [...employeeNav.slice(0, 4), ...managerNav, ...employeeNav.slice(4)] : employeeNav}
+      title="Employee"
+    />
+  )
 }
 
 export default function App() {
@@ -148,9 +161,7 @@ export default function App() {
 
       {/* On the native Android/iOS shell, admin routes are locked away:
           the mobile app is employee-only. Web users still see everything. */}
-      {IS_NATIVE ? (
-        <Route path="/admin/*" element={<Navigate to="/me" replace />} />
-      ) : null}
+      {IS_NATIVE ? <Route path="/admin/*" element={<Navigate to="/me" replace />} /> : null}
 
       {/* Printable report: outside the app shell so the PDF is just the report. */}
       {IS_NATIVE ? null : (
@@ -182,6 +193,8 @@ export default function App() {
         <Route path="/admin/employees/:id" element={<EditEmployeePage />} />
         <Route path="/admin/attendance" element={<AttendancePage />} />
         <Route path="/admin/field-visits" element={<FieldVisitsPage />} />
+        <Route path="/admin/hiring" element={<HiringPage />} />
+        <Route path="/admin/documents" element={<DocumentsPage />} />
         <Route path="/admin/reports" element={<ReportsPage />} />
         <Route path="/admin/regularisations" element={<RegularisationsPage />} />
         <Route path="/admin/shifts" element={<ShiftsPage />} />
@@ -194,14 +207,8 @@ export default function App() {
         <Route path="/admin/service-charge" element={<ServiceChargePage />} />
         <Route path="/admin/service-charge/runs/:id" element={<ServiceChargeRunPage />} />
         <Route path="/admin/evaluations" element={<EvaluationsPage />} />
-        <Route
-          path="/admin/evaluations/questionnaires/:id"
-          element={<EvaluationBuilderPage />}
-        />
-        <Route
-          path="/admin/evaluations/runs/:id"
-          element={<EvaluationRunPage />}
-        />
+        <Route path="/admin/evaluations/questionnaires/:id" element={<EvaluationBuilderPage />} />
+        <Route path="/admin/evaluations/runs/:id" element={<EvaluationRunPage />} />
         <Route path="/admin/settings" element={<SettingsPage />} />
         <Route path="/admin/gift-codes" element={<GiftCodesPage />} />
         <Route path="/admin/signature" element={<SignaturePage />} />
@@ -240,6 +247,7 @@ export default function App() {
         <Route path="/me/leave" element={<LeavePage />} />
         <Route path="/me/overview" element={<MyDashboard />} />
         <Route path="/me/payslips" element={<PayslipPage />} />
+        <Route path="/me/documents" element={<MyDocumentsPage />} />
         <Route path="/me/overtime" element={<MyOvertimePage />} />
         <Route path="/me/incentives" element={<MyIncentivesPage />} />
         <Route path="/me/performance" element={<MyPerformancePage />} />

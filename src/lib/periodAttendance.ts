@@ -70,6 +70,8 @@ export interface PeriodTotals {
   absent: number
   weekOff: number
   leave: number
+  // Days that count for pay: attended days plus approved paid leave / week offs.
+  paidDays: number
   workedMin: number
   lateMin: number
   overtimeMin: number
@@ -243,9 +245,11 @@ export async function loadPeriod(opts: {
       else if (offBy.has(key(emp.id, date))) status = 'week_off'
       else if (date > today || date === today) status = 'future'
       else status = 'absent'
+      // Week offs are paid only when applied for as leave and approved;
+      // a roster "off" day on its own is unpaid.
       const paid =
         status === 'leave' || status === 'week_off'
-          ? (leave?.leave_types?.is_paid ?? true)
+          ? (leave?.leave_types?.is_paid ?? false)
           : status === 'absent'
             ? false
             : status === 'future' || status === 'not_employed' || status === 'short'
@@ -292,6 +296,7 @@ export function totalsOf(days: PeriodDay[]): PeriodTotals {
     absent,
     weekOff: n('week_off'),
     leave: n('leave'),
+    paidDays: days.filter((d) => d.paid === true).length,
     workedMin: days.reduce((a, d) => a + (d.workedMin ?? 0), 0),
     lateMin: days.reduce((a, d) => a + (d.status === 'late' ? (d.lateMin ?? 0) : 0), 0),
     overtimeMin: days.reduce((a, d) => a + (d.overtimeMin ?? 0), 0),

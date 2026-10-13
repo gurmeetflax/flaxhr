@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { addDays, format, startOfWeek } from 'date-fns'
-import { Globe2, Send } from 'lucide-react'
+import { Globe2, MessageCircle, Send } from 'lucide-react'
 import { toast } from 'sonner'
 import { supabase } from '@/lib/supabase'
 import { PageHeader } from '@/components/layout/AppShell'
@@ -10,6 +10,7 @@ import { Button } from '@/components/ui/Button'
 import { cn } from '@/lib/utils'
 import { useRoster, useUpsertRosterEntry, usePublishWeek, type RosterEntry } from '@/lib/roster'
 import { useShifts } from '@/lib/shifts'
+import { renderRosterPng, shareRosterPng } from '@/lib/rosterImage'
 
 interface OutletOption {
   id: string
@@ -219,6 +220,33 @@ function OutletRoster({
     }
   }
 
+  const [sharing, setSharing] = useState(false)
+  const onShare = async () => {
+    setSharing(true)
+    try {
+      const shiftById = new Map(shifts.map((s) => [s.id, s]))
+      const rows = [...(employeesQ.data ?? [])]
+        .sort((a, b) => a.full_name.localeCompare(b.full_name))
+        .map((e) => ({
+          name: e.full_name,
+          cells: days.map((d) => {
+            const entry = byEmpDay.get(`${e.id}|${d}`)
+            if (entry?.status === 'off') return { label: 'Off', time: '', off: true }
+            const s = entry?.shift_id ? shiftById.get(entry.shift_id) : undefined
+            return s ? { label: s.name, time: clock(s.start_time) + ' – ' + clock(s.end_time) } : { label: '', time: '' }
+          }),
+        }))
+      const png = await renderRosterPng({ outletName, days, rows })
+      const how = await shareRosterPng(png, outletName, fromDate)
+      if (how === 'link') toast.success('Opening WhatsApp with the roster image link')
+      if (how === 'downloaded') toast.success('Roster image downloaded — attach it in WhatsApp')
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : 'Could not share the roster')
+    } finally {
+      setSharing(false)
+    }
+  }
+
   const onPublish = async () => {
     try {
       await publish.mutateAsync({ outletId, fromDate, toDate })
@@ -233,13 +261,18 @@ function OutletRoster({
       <CardContent className="flex flex-col gap-3 p-4 sm:p-6">
         <div className="flex items-center justify-between gap-3">
           <CardTitle>{outletName}</CardTitle>
-          <Button
-            size="sm"
-            onClick={onPublish}
-            loading={publish.isPending}
-          >
-            <Send className="h-4 w-4" /> Publish week
-          </Button>
+          <div className="flex flex-wrap justify-end gap-2">
+            <Button size="sm" variant="outline" onClick={onShare} loading={sharing}>
+              <MessageCircle className="h-4 w-4" /> Send to WhatsApp
+            </Button>
+            <Button
+              size="sm"
+              onClick={onPublish}
+              loading={publish.isPending}
+            >
+              <Send className="h-4 w-4" /> Publish week
+            </Button>
+          </div>
         </div>
 
         {shifts.length === 0 ? (
@@ -315,4 +348,10 @@ function OutletRoster({
       </CardContent>
     </Card>
   )
+}
+
+// "09:30:00" → "9:30 AM"
+function clock(t: string): string {
+  const [h, m] = t.split(':').map(Number)
+  return format(new Date(2000, 0, 1, h, m), 'h:mm a')
 }
