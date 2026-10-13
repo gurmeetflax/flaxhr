@@ -25,6 +25,7 @@ import {
   Wallet,
   Briefcase,
   UserPlus,
+  FileSignature,
 } from 'lucide-react'
 import ProtectedRoute from '@/components/ProtectedRoute'
 import { useHasRole } from '@/lib/auth'
@@ -46,6 +47,7 @@ import EditOutletPage from '@/pages/admin/EditOutletPage'
 import AttendancePage from '@/pages/admin/AttendancePage'
 import FieldVisitsPage from '@/pages/admin/FieldVisitsPage'
 import HiringPage from '@/pages/admin/HiringPage'
+import DocumentsPage from '@/pages/admin/DocumentsPage'
 import EmployeeReportPage from '@/pages/admin/EmployeeReportPage'
 import RegularisationsPage from '@/pages/admin/RegularisationsPage'
 import ShiftsPage from '@/pages/admin/ShiftsPage'
@@ -93,6 +95,7 @@ const adminNav = [
   { to: '/admin/outlets', label: 'Outlets', icon: Store },
   { to: '/admin/employees', label: 'Employees', icon: Users },
   { to: '/admin/hiring', label: 'Hiring', icon: UserPlus },
+  { to: '/admin/documents', label: 'Documents', icon: FileSignature },
   { to: '/admin/attendance', label: 'Attendance', icon: ClipboardList },
   { to: '/admin/field-visits', label: 'Field visits', icon: Briefcase },
   { to: '/admin/reports', label: 'Reports', icon: FileBarChart },
@@ -186,6 +189,7 @@ export default function App() {
         <Route path="/admin/attendance" element={<AttendancePage />} />
         <Route path="/admin/field-visits" element={<FieldVisitsPage />} />
         <Route path="/admin/hiring" element={<HiringPage />} />
+        <Route path="/admin/documents" element={<DocumentsPage />} />
         <Route path="/admin/reports" element={<ReportsPage />} />
         <Route path="/admin/regularisations" element={<RegularisationsPage />} />
         <Route path="/admin/shifts" element={<ShiftsPage />} />
