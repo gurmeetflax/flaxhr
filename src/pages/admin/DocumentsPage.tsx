@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { format } from 'date-fns'
-import { Check, Download, Eye, Upload, X } from 'lucide-react'
+import { Check, Download, Eye, Pencil, Upload } from 'lucide-react'
 import { toast } from 'sonner'
 import { supabase } from '@/lib/supabase'
 import { PageHeader } from '@/components/layout/AppShell'
@@ -31,6 +31,7 @@ import {
   type SignStatus,
 } from '@/lib/documents'
 import LetterPreview from './LetterPreview'
+import RichTextEditor, { type RichTextEditorHandle } from './RichTextEditor'
 import { EmployeeSelect } from '@/components/ui/EmployeeSelect'
 
 type Tab = 'sent' | 'templates' | 'companies' | 'terms'
@@ -205,14 +206,14 @@ function TemplatesTab() {
 
 function TemplateEditor({ tpl }: { tpl: DocTemplate }) {
   const save = useSaveTemplate()
+  const [editing, setEditing] = useState(false)
   const [title, setTitle] = useState(tpl.title)
   const [body, setBody] = useState(tpl.body)
   const [method, setMethod] = useState(tpl.sign_method)
   const [active, setActive] = useState(tpl.is_active)
   const [previewFor, setPreviewFor] = useState('')
-  const [preview, setPreview] = useState<string | null>(null)
-  const [missing, setMissing] = useState<string[]>([])
-  const ta = useRef<HTMLTextAreaElement>(null)
+  const [draftPreview, setDraftPreview] = useState<{ html: string; missing: string[] } | null>(null)
+  const editor = useRef<RichTextEditorHandle>(null)
 
   const emps = useQuery<{ id: string; full_name: string; employee_code: string }[]>({
     queryKey: ['doc-preview-employees'],
@@ -226,124 +227,161 @@ function TemplateEditor({ tpl }: { tpl: DocTemplate }) {
       return data ?? []
     },
   })
+  const previewId = previewFor || emps.data?.[0]?.id
 
-  const insert = (key: string) => {
-    const el = ta.current
-    const token = `{{${key}}}`
-    if (!el) return setBody((b) => b + token)
-    const s = el.selectionStart
-    setBody((b) => b.slice(0, s) + token + b.slice(el.selectionEnd))
-    requestAnimationFrame(() => {
-      el.focus()
-      el.setSelectionRange(s + token.length, s + token.length)
-    })
+  const render = async (t: Pick<DocTemplate, 'title' | 'body'>) => {
+    const ctx = await loadDocContext(previewId!)
+    const sig = await directorSignatureDataUrl(ctx.entity)
+    return renderForEmployee({ ...tpl, ...t }, ctx, sig)
   }
 
-  const doPreview = async () => {
-    const id = previewFor || emps.data?.[0]?.id
-    if (!id) return
-    try {
-      const ctx = await loadDocContext(id)
-      const sig = await directorSignatureDataUrl(ctx.entity)
-      const r = renderForEmployee({ ...tpl, title, body }, ctx, sig)
-      setPreview(r.html)
-      setMissing(r.missing)
-    } catch (e) {
-      toast.error(e instanceof Error ? e.message : 'Preview failed')
-    }
-  }
+  // The saved letter, filled in for the chosen employee.
+  const saved = useQuery({
+    queryKey: ['template-preview', tpl.id, tpl.version, previewId],
+    enabled: !!previewId && !editing,
+    queryFn: () => render(tpl),
+  })
+
+  const shown = editing ? draftPreview : saved.data
 
   return (
     <Card>
       <CardContent className="flex flex-col gap-3 p-4 sm:p-6">
-        <div className="grid gap-2 sm:grid-cols-[1fr_180px_auto] sm:items-end">
-          <label className="flex flex-col gap-1 text-xs text-muted-foreground">
-            Title
-            <Input value={title} onChange={(e) => setTitle(e.target.value)} />
-          </label>
-          <label className="flex flex-col gap-1 text-xs text-muted-foreground">
-            Signed with
-            <select
-              className="h-10 rounded-lg border border-border bg-surface px-2 text-sm text-foreground"
-              value={method}
-              onChange={(e) => setMethod(e.target.value as DocTemplate['sign_method'])}
-            >
-              <option value="aadhaar">Aadhaar eSign</option>
-              <option value="in_app">In-app signature</option>
-            </select>
-          </label>
-          <label className="flex h-10 items-center gap-2 text-sm">
-            <input type="checkbox" checked={active} onChange={(e) => setActive(e.target.checked)} /> Active
-          </label>
-        </div>
-        <div className="flex flex-wrap gap-1">
-          {PLACEHOLDERS.map((p) => (
-            <button
-              key={p.key}
-              type="button"
-              title={p.label}
-              onClick={() => insert(p.key)}
-              className="rounded-full border border-border bg-surface px-2 py-0.5 font-mono text-[11px] hover:border-primary"
-            >
-              {`{{${p.key}}}`}
-            </button>
-          ))}
-        </div>
-        <textarea
-          ref={ta}
-          className="min-h-[360px] w-full rounded-lg border border-border bg-surface p-3 font-mono text-xs"
-          value={body}
-          onChange={(e) => setBody(e.target.value)}
-        />
-        <p className="text-xs text-muted-foreground">
-          Text uses simple HTML (&lt;p&gt;, &lt;b&gt;, &lt;h3&gt;, &lt;ul&gt;&lt;li&gt;). The letterhead,
-          date, your signature and the employee's signature block are added automatically. Documents already
-          sent keep the wording they were sent with.
-        </p>
-        <div className="flex flex-wrap items-center gap-2">
-          <Button
-            loading={save.isPending}
-            onClick={async () => {
-              try {
-                await save.mutateAsync({
-                  id: tpl.id,
-                  title,
-                  body,
-                  sign_method: method,
-                  is_active: active,
-                  version: tpl.version,
-                })
-                toast.success(`Saved as version ${tpl.version + 1}`)
-              } catch (e) {
-                toast.error(e instanceof Error ? e.message : 'Save failed')
-              }
-            }}
-          >
-            <Check className="h-4 w-4" /> Save
-          </Button>
+        {editing ? (
+          <>
+            <div className="grid gap-2 sm:grid-cols-[1fr_180px_auto] sm:items-end">
+              <label className="flex flex-col gap-1 text-xs text-muted-foreground">
+                Title
+                <Input value={title} onChange={(e) => setTitle(e.target.value)} />
+              </label>
+              <label className="flex flex-col gap-1 text-xs text-muted-foreground">
+                Signed with
+                <select
+                  className="h-10 rounded-lg border border-border bg-surface px-2 text-sm text-foreground"
+                  value={method}
+                  onChange={(e) => setMethod(e.target.value as DocTemplate['sign_method'])}
+                >
+                  <option value="aadhaar">Aadhaar eSign</option>
+                  <option value="in_app">In-app signature</option>
+                </select>
+              </label>
+              <label className="flex h-10 items-center gap-2 text-sm">
+                <input type="checkbox" checked={active} onChange={(e) => setActive(e.target.checked)} /> In
+                use
+              </label>
+            </div>
+            <div className="flex flex-col gap-1">
+              <span className="text-xs text-muted-foreground">
+                Click to insert employee details where the cursor is — they fill in automatically for each
+                person:
+              </span>
+              <div className="flex flex-wrap gap-1">
+                {PLACEHOLDERS.map((p) => (
+                  <button
+                    key={p.key}
+                    type="button"
+                    title={`Inserts {{${p.key}}}`}
+                    onMouseDown={(e) => e.preventDefault()}
+                    onClick={() => editor.current?.insertText(`{{${p.key}}}`)}
+                    className="rounded-full border border-border bg-surface px-2 py-0.5 text-xs hover:border-primary"
+                  >
+                    + {p.label}
+                  </button>
+                ))}
+              </div>
+            </div>
+            <RichTextEditor ref={editor} initialHtml={tpl.body} onChange={setBody} />
+            <p className="text-xs text-muted-foreground">
+              The letterhead, date, your signature and the employee's signature block are added automatically.
+              Documents already sent keep the wording they were sent with.
+            </p>
+            <div className="flex flex-wrap items-center gap-2">
+              <Button
+                loading={save.isPending}
+                onClick={async () => {
+                  try {
+                    await save.mutateAsync({
+                      id: tpl.id,
+                      title,
+                      body,
+                      sign_method: method,
+                      is_active: active,
+                      version: tpl.version,
+                    })
+                    toast.success(`Saved as version ${tpl.version + 1}`)
+                  } catch (e) {
+                    toast.error(e instanceof Error ? e.message : 'Save failed')
+                  }
+                }}
+              >
+                <Check className="h-4 w-4" /> Save
+              </Button>
+              <Button
+                variant="outline"
+                disabled={!previewId}
+                onClick={() =>
+                  render({ title, body })
+                    .then(setDraftPreview)
+                    .catch((e) => toast.error(e instanceof Error ? e.message : 'Preview failed'))
+                }
+              >
+                <Eye className="h-4 w-4" /> Preview changes
+              </Button>
+              <Button
+                variant="ghost"
+                onClick={() => {
+                  setEditing(false)
+                  setTitle(tpl.title)
+                  setBody(tpl.body)
+                  setMethod(tpl.sign_method)
+                  setActive(tpl.is_active)
+                  setDraftPreview(null)
+                }}
+              >
+                Cancel
+              </Button>
+            </div>
+          </>
+        ) : (
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <div>
+              <CardTitle>{tpl.title}</CardTitle>
+              <CardDescription>
+                {tpl.sign_method === 'aadhaar' ? 'Aadhaar eSign' : 'In-app signature'} · version {tpl.version}
+                {tpl.is_active ? '' : ' · not in use'}
+              </CardDescription>
+            </div>
+            <Button variant="outline" onClick={() => setEditing(true)}>
+              <Pencil className="h-4 w-4" /> Edit wording
+            </Button>
+          </div>
+        )}
+
+        <div className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
+          Showing it as
           <EmployeeSelect
             className="w-64"
             options={emps.data ?? []}
             value={previewFor}
-            onChange={setPreviewFor}
-            placeholder="Preview with… (search)"
+            onChange={(id) => {
+              setPreviewFor(id)
+              setDraftPreview(null)
+            }}
+            placeholder={emps.data?.[0] ? `${emps.data[0].full_name} (search)` : 'Search employee'}
           />
-          <Button variant="outline" onClick={doPreview}>
-            <Eye className="h-4 w-4" /> Preview
-          </Button>
-          {preview ? (
-            <Button variant="ghost" onClick={() => setPreview(null)}>
-              <X className="h-4 w-4" />
-            </Button>
-          ) : null}
+          would see it
         </div>
-        {preview && missing.length ? (
+        {shown?.missing.length ? (
           <p className="rounded-md bg-amber-50 px-3 py-2 text-xs text-amber-800">
-            Not on this employee's record yet: {missing.join(', ')}. Fill these in on their profile before
-            sending.
+            Not on this employee's record yet: {shown.missing.join(', ')}. Fill these in on their profile
+            before sending.
           </p>
         ) : null}
-        {preview ? <LetterPreview html={preview} /> : null}
+        {shown ? (
+          <LetterPreview html={shown.html} />
+        ) : !editing && saved.isLoading ? (
+          <p className="text-sm text-muted-foreground">Loading letter…</p>
+        ) : null}
         <p className="text-xs text-muted-foreground">
           {KIND_LABEL[tpl.kind]} · starter wording — have it reviewed by your lawyer before relying on it.
         </p>
