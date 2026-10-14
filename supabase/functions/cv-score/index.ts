@@ -75,8 +75,15 @@ const SCHEMA = {
 Deno.serve(async (req: Request) => {
   if (req.method === 'OPTIONS') return new Response(null, { status: 204, headers: CORS })
   if (req.method !== 'POST') return json(405, { error: 'POST only' })
-  if (!ANTHROPIC_API_KEY) return json(500, { error: 'ANTHROPIC_API_KEY not set in Supabase secrets' })
+  try {
+    return await handle(req)
+  } catch (e) {
+    console.error('cv-score', e)
+    return json(500, { error: e instanceof Error ? e.message : String(e) })
+  }
+})
 
+async function handle(req: Request): Promise<Response> {
   // Only admin / HR may score. Check with the caller's own JWT.
   const userClient = createClient(SUPABASE_URL, ANON_KEY, {
     global: { headers: { authorization: req.headers.get('authorization') ?? '' } },
@@ -92,13 +99,16 @@ Deno.serve(async (req: Request) => {
   if (!cand) return json(404, { error: 'candidate not found or not allowed' })
 
   const sb = createClient(SUPABASE_URL, SERVICE_ROLE, { auth: { persistSession: false } })
+  if (!ANTHROPIC_API_KEY) return fail(sb, cand.id, 'ANTHROPIC_API_KEY is not set in Supabase secrets.')
+  // Clear any earlier error so the app shows "scoring" again.
+  await sb.schema('core').from('candidates').update({ score_error: null }).eq('id', cand.id)
   const { data: role, error: rErr } = await sb
     .schema('core')
     .from('hiring_roles')
     .select('title, department, requirements')
     .eq('id', cand.role_id)
     .single()
-  if (rErr) return json(500, { error: rErr.message })
+  if (rErr) return fail(sb, cand.id, `Couldn't load the role: ${rErr.message}`)
 
   const { data: file, error: fErr } = await sb.storage.from('cvs').download(cand.cv_path)
   if (fErr || !file) return fail(sb, cand.id, `Couldn't read the CV file: ${fErr?.message ?? 'missing'}`)
@@ -141,7 +151,8 @@ Deno.serve(async (req: Request) => {
     result = JSON.parse(text)
   } catch (e) {
     if (e instanceof Anthropic.RateLimitError) return fail(sb, cand.id, 'AI is busy (rate limit). Try again in a minute.')
-    if (e instanceof Anthropic.AuthenticationError) return fail(sb, cand.id, 'ANTHROPIC_API_KEY is invalid.')
+    if (e instanceof Anthropic.AuthenticationError)
+      return fail(sb, cand.id, 'The Anthropic API key in Supabase secrets is invalid or revoked. Replace ANTHROPIC_API_KEY.')
     if (e instanceof Anthropic.APIError) return fail(sb, cand.id, `AI error ${e.status}: ${e.message}`)
     return fail(sb, cand.id, e instanceof Error ? e.message : String(e))
   }
@@ -168,9 +179,9 @@ Deno.serve(async (req: Request) => {
     if (!cur?.[k] && result[k]) patch[k] = String(result[k]).trim()
   }
   const { error: uErr } = await sb.schema('core').from('candidates').update(patch).eq('id', cand.id)
-  if (uErr) return json(500, { error: uErr.message })
+  if (uErr) return fail(sb, cand.id, `Couldn't save the score: ${uErr.message}`)
   return json(200, { ok: true, score })
-})
+}
 
 async function toContentBlock(file: Blob, mime: string, name: string): Promise<any> {
   const lower = name.toLowerCase()
