@@ -198,8 +198,15 @@ export async function loadAutoRosterInputs(opts: {
   shifts: Shift[]
   roster: RosterEntry[]
   busiestDays: number[]
-}): Promise<{ staff: StaffInput[]; locked: Map<string, LockedCell>; skipped: string[] }> {
-  const { outletId, days, shifts, roster, busiestDays } = opts
+  /** Roaming staff to use as cover (employee ids). */
+  coverIds?: string[]
+}): Promise<{
+  staff: StaffInput[]
+  floaters: StaffInput[]
+  locked: Map<string, LockedCell>
+  skipped: string[]
+}> {
+  const { outletId, days, shifts, roster, busiestDays, coverIds = [] } = opts
   const from = days[0]
   const to = days[6]
   const histFrom = format(addDays(new Date(`${from}T00:00:00`), -28), 'yyyy-MM-dd')
@@ -306,7 +313,41 @@ export async function loadAutoRosterInputs(opts: {
         locked.set(`${l.employee_id}|${d}`, { kind: 'leave' })
     }
   }
-  return { staff, locked, skipped }
+  // Roaming cover: unavailable wherever they're already rostered this week.
+  const floaters: StaffInput[] = []
+  if (coverIds.length) {
+    const [cE, cR] = await Promise.all([
+      supabase.from('v_employees').select('id, full_name, hired_on').in('id', coverIds),
+      supabase
+        .from('v_roster')
+        .select('employee_id, work_date')
+        .in('employee_id', coverIds)
+        .gte('work_date', from)
+        .lte('work_date', to),
+    ])
+    if (cE.error) throw cE.error
+    if (cR.error) throw cR.error
+    for (const r of cR.data ?? []) locked.set(`${r.employee_id}|${r.work_date}`, { kind: 'leave' })
+    for (const e of cE.data ?? []) {
+      for (const d of days)
+        if (d < today && !locked.has(`${e.id}|${d}`)) locked.set(`${e.id}|${d}`, { kind: 'past' })
+      floaters.push({
+        id: e.id as string,
+        name: e.full_name as string,
+        group: null,
+        isLead: true,
+        monthsAtFlax: e.hired_on
+          ? differenceInCalendarMonths(new Date(`${from}T00:00:00`), new Date(e.hired_on as string))
+          : null,
+        shiftIds: [],
+        closingCount: 0,
+        busyDayCount: 0,
+        lastOffWeekday: null,
+      })
+    }
+  }
+
+  return { staff, floaters, locked, skipped }
 }
 
 export function rulesInput(r: RosterRules): RulesInput {
@@ -341,5 +382,31 @@ export function useSaveDraft() {
       return entries.length
     },
     onSuccess: () => qc.invalidateQueries({ queryKey: ['roster'] }),
+  })
+}
+
+// Staff in roaming roles (no roster group, e.g. area / operations managers)
+// who can be used as cover at any outlet.
+export function useRoamingStaff() {
+  return useQuery({
+    queryKey: ['roaming-staff'],
+    staleTime: 5 * 60_000,
+    queryFn: async () => {
+      const { data: des, error: dErr } = await supabase
+        .from('v_designations')
+        .select('code')
+        .is('roster_group', null)
+      if (dErr) throw dErr
+      const codes = (des ?? []).map((d) => d.code as string)
+      if (!codes.length) return []
+      const { data, error } = await supabase
+        .from('v_employees')
+        .select('id, full_name, designation_name')
+        .in('designation_code', codes)
+        .eq('is_active', true)
+        .order('full_name')
+      if (error) throw error
+      return (data ?? []) as { id: string; full_name: string; designation_name: string | null }[]
+    },
   })
 }

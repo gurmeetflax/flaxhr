@@ -164,8 +164,11 @@ export function generateRoster(input: {
   needs: NeedInput[]
   rules: RulesInput
   locked: Map<string, LockedCell> // `${employeeId}|${date}`
+  /** Roaming staff (e.g. area managers) to place where the outlet is still short. */
+  floaters?: StaffInput[]
 }): RosterDraft {
   const { days, staff, needs, rules, locked } = input
+  const floaters = input.floaters ?? []
   const warnings: string[] = []
   const entries: DraftEntry[] = []
   const shortfalls: ShortfallLine[] = []
@@ -459,6 +462,64 @@ export function generateRoster(input: {
     warnings.push(
       `${p.name}: no shift to give (no staffing needs at this outlet yet) — left blank to fill by hand.`,
     )
+
+  // ── 3b. Cover from roaming staff ──────────────────────────────────────
+  // After the outlet's own team is placed, roaming staff fill what is still
+  // uncovered, day by day: the shift that covers the most "nobody on duty"
+  // hours first. They keep at least one day off and skip days they are
+  // already booked (here or at another outlet).
+  const shortAt = (di: number, h: number) =>
+    [...groupsNeeded].reduce(
+      (best, g) => {
+        const gap = needOf(di, g)[h] - coverOf(di, g)[h]
+        return gap > best.gap ? { g, gap, empty: coverOf(di, g)[h] <= 0 } : best
+      },
+      { g: null as RosterGroup | null, gap: 0, empty: false },
+    )
+  const coverGain = (s: NormShift, di: number) =>
+    runsOn(s, di)
+      ? hoursOf(s).reduce((a, h) => {
+          const x = shortAt(di, h)
+          return a + (x.gap > 0 ? (x.empty ? 3 : 1) : 0)
+        }, 0)
+      : 0
+  for (const f of floaters) {
+    const isPast = (di: number) => locked.get(key(f.id, days[di]))?.kind === 'past'
+    const open = days.map((_d, di) => di).filter((di) => !locked.has(key(f.id, days[di])) && !isPast(di))
+    const placed: number[] = []
+    for (;;) {
+      if (placed.length >= Math.min(6, open.length)) break
+      let best: { di: number; s: NormShift; gain: number } | null = null
+      for (const di of open) {
+        if (placed.includes(di)) continue
+        for (const s of shifts) {
+          if (!canDo(f, s)) continue
+          const gain = coverGain(s, di)
+          if (gain > 0 && (!best || gain > best.gain)) best = { di, s, gain }
+        }
+      }
+      if (!best) break
+      placed.push(best.di)
+      for (const h of hoursOf(best.s)) {
+        const x = shortAt(best.di, h)
+        if (x.g) coverOf(best.di, x.g)[h] += 1
+      }
+      entries.push({
+        employeeId: f.id,
+        date: days[best.di],
+        shiftId: best.s.id,
+        off: false,
+        reason: `Cover: ${best.s.name}`,
+      })
+    }
+    if (placed.length)
+      warnings.push(
+        `${f.name} covers ${placed.length} day${placed.length === 1 ? '' : 's'} here (${placed
+          .sort((a, b) => a - b)
+          .map((di) => labelDay(days[di]).split(',')[0])
+          .join(', ')}).`,
+      )
+  }
 
   // ── 4. Checks ─────────────────────────────────────────────────────────
   // Shifts that run without an experienced person: one line per shift.

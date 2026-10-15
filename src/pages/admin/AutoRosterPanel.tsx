@@ -20,6 +20,7 @@ import {
   rulesInput,
   suggestFromOrders,
   useSaveDraft,
+  useRoamingStaff,
   useSaveStaffingSetup,
   useStaffingSetup,
   busiestFromOrders,
@@ -393,6 +394,8 @@ export function AutoFill({
         ))
   const [draft, setDraft] = useState<(RosterDraft & { skipped: string[] }) | null>(null)
   const [busy, setBusy] = useState(false)
+  const roaming = useRoamingStaff()
+  const [cover, setCover] = useState<Set<string>>(new Set())
 
   const needs = setup.data?.needs ?? []
   const shiftName = new Map(shifts.map((s) => [s.id, s.name.trim()]))
@@ -402,12 +405,13 @@ export function AutoFill({
     setBusy(true)
     try {
       const use = activeShifts.filter((s) => chosen.has(s.id))
-      const { staff, locked, skipped } = await loadAutoRosterInputs({
+      const { staff, floaters, locked, skipped } = await loadAutoRosterInputs({
         outletId,
         days,
         shifts: use,
         roster,
         busiestDays: setup.data.rules.busiest_days,
+        coverIds: [...cover],
       })
       const result = generateRoster({
         days,
@@ -416,6 +420,7 @@ export function AutoFill({
         needs: setup.data.needs,
         rules: rulesInput(setup.data.rules),
         locked,
+        floaters,
       })
       setDraft({ ...result, skipped })
     } catch (e) {
@@ -511,6 +516,36 @@ export function AutoFill({
           ))}
         </div>
       </div>
+
+      {roaming.data?.length ? (
+        <div className="flex flex-col gap-1">
+          <span className="text-xs text-muted-foreground">
+            Use as cover where this outlet is still short (placed on the gap days only)
+          </span>
+          <div className="flex flex-wrap gap-1">
+            {roaming.data.map((r) => (
+              <button
+                key={r.id}
+                type="button"
+                onClick={() => {
+                  const next = new Set(cover)
+                  if (next.has(r.id)) next.delete(r.id)
+                  else next.add(r.id)
+                  setCover(next)
+                  setDraft(null)
+                }}
+                className={cn(
+                  'rounded-full px-2.5 py-1 text-xs',
+                  cover.has(r.id) ? 'bg-primary text-primary-foreground' : 'bg-muted text-muted-foreground',
+                )}
+              >
+                {r.full_name}
+                {r.designation_name ? ` · ${r.designation_name}` : ''}
+              </button>
+            ))}
+          </div>
+        </div>
+      ) : null}
 
       <div className="flex flex-wrap gap-2">
         <Button
@@ -610,7 +645,7 @@ export function AutoFill({
                 </tr>
               </thead>
               <tbody className="divide-y divide-border">
-                {employees.map((e) => (
+                {[...employees, ...(roaming.data ?? []).filter((r) => cover.has(r.id))].map((e) => (
                   <tr key={e.id}>
                     <td className="whitespace-nowrap px-2 py-1 font-medium">{e.full_name}</td>
                     {days.map((d) => {
