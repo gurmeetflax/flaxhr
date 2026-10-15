@@ -305,20 +305,29 @@ export function generateRoster(input: {
     }
   }
 
-  // Everyone left joins the shift with the most need for their role.
+  // Everyone left joins the shift with the most need for their role. A
+  // role with no needs set (e.g. service at a delivery outlet) follows the
+  // outlet's overall busy hours instead of being left blank.
   const blank: StaffInput[] = []
+  const allNeed = (di: number, h: number) => [...groupsNeeded].reduce((a, g) => a + needOf(di, g)[h], 0)
   for (const p of [...unassigned]) {
+    const ownNeeds = !!p.group && groupsNeeded.has(p.group)
+    if (!ownNeeds && p.group === 'office' && !p.shiftIds.length) {
+      blank.push(p) // office roles keep office hours, set by hand
+      continue
+    }
     const opts = shifts
       .filter((s) => canDo(p, s))
       .map((s) => ({
         s,
-        need: p.group
-          ? days.reduce(
-              (a, _d, di) =>
-                a + (runsOn(s, di) ? hoursOf(s).reduce((x, h) => x + needOf(di, p.group!)[h], 0) : 0),
-              0,
-            )
-          : 0,
+        need: days.reduce(
+          (a, _d, di) =>
+            a +
+            (runsOn(s, di)
+              ? hoursOf(s).reduce((x, h) => x + (ownNeeds ? needOf(di, p.group!)[h] : allNeed(di, h)), 0)
+              : 0),
+          0,
+        ),
       }))
       .sort((a, b) => b.need - a.need || (crew.get(a.s.id)?.length ?? 0) - (crew.get(b.s.id)?.length ?? 0))
     const best = opts[0]
@@ -444,7 +453,7 @@ export function generateRoster(input: {
   }
   for (const p of blank)
     warnings.push(
-      `${p.name}: no staffing need set for ${p.group ? GROUP_LABEL[p.group] : 'their role'} — left blank to fill by hand.`,
+      `${p.name}: no shift to give (no staffing needs at this outlet yet) — left blank to fill by hand.`,
     )
 
   // ── 4. Checks ─────────────────────────────────────────────────────────
