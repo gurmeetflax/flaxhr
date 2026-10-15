@@ -14,6 +14,7 @@ import {
   useDeleteDesignation,
   type Designation,
 } from '@/lib/designations'
+import { GROUP_LABEL, type RosterGroup } from '@/lib/autoRoster'
 
 export default function SettingsPage() {
   return (
@@ -454,6 +455,8 @@ function DesignationsCard() {
   const [draftCode, setDraftCode] = useState('')
   const [draftName, setDraftName] = useState('')
   const [draftPoints, setDraftPoints] = useState('1')
+  const [draftGroup, setDraftGroup] = useState<RosterGroup | ''>('')
+  const [draftLead, setDraftLead] = useState(false)
   const [adding, setAdding] = useState(false)
 
   function startAdd() {
@@ -461,6 +464,8 @@ function DesignationsCard() {
     setDraftCode('')
     setDraftName('')
     setDraftPoints('1')
+    setDraftGroup('')
+    setDraftLead(false)
     setAdding(true)
   }
   function startEdit(d: Designation) {
@@ -469,6 +474,8 @@ function DesignationsCard() {
     setDraftCode(d.code)
     setDraftName(d.name)
     setDraftPoints(String(d.sc_points_per_day ?? 1))
+    setDraftGroup(d.roster_group ?? '')
+    setDraftLead(d.is_lead)
   }
   function cancel() {
     setAdding(false)
@@ -500,6 +507,8 @@ function DesignationsCard() {
         is_active: editing?.is_active ?? true,
         display_order: editing?.display_order ?? designations.length * 10 + 10,
         sc_points_per_day: points,
+        roster_group: draftGroup || null,
+        is_lead: draftLead,
       })
       toast.success(editing ? 'Designation updated' : 'Designation added')
       cancel()
@@ -560,7 +569,14 @@ function DesignationsCard() {
               <li key={d.code} className="flex items-center gap-3 py-2">
                 <div className="flex-1">
                   <div className="font-medium">{d.name}</div>
-                  <div className="font-mono text-xs text-muted-foreground">{d.code}</div>
+                  <div className="font-mono text-xs text-muted-foreground">
+                    {d.code}
+                    <span className="font-sans">
+                      {' · '}
+                      {d.roster_group ? GROUP_LABEL[d.roster_group] : 'no roster group'}
+                      {d.is_lead ? ' · can lead a shift' : ''}
+                    </span>
+                  </div>
                 </div>
                 <span className="hidden text-xs text-muted-foreground sm:inline">
                   SC pts/day:{' '}
@@ -595,7 +611,7 @@ function DesignationsCard() {
         )}
 
         {(adding || editing) ? (
-          <div className="grid gap-3 rounded-lg border border-border bg-muted/30 p-4 sm:grid-cols-[1fr_2fr_120px_auto_auto]">
+          <div className="grid gap-3 rounded-lg border border-border bg-muted/30 p-4 sm:grid-cols-[1fr_2fr_120px_140px_auto_auto_auto]">
             <div>
               <Label className="mb-1 block text-xs">Code</Label>
               <Input
@@ -625,6 +641,25 @@ function DesignationsCard() {
                 placeholder="1.00"
               />
             </div>
+            <div>
+              <Label className="mb-1 block text-xs">Roster group</Label>
+              <select
+                className="h-10 w-full rounded-lg border border-border bg-surface px-2 text-sm"
+                value={draftGroup}
+                onChange={(e) => setDraftGroup(e.target.value as RosterGroup | '')}
+              >
+                <option value="">None</option>
+                {(Object.keys(GROUP_LABEL) as RosterGroup[]).map((g) => (
+                  <option key={g} value={g}>
+                    {GROUP_LABEL[g]}
+                  </option>
+                ))}
+              </select>
+            </div>
+            <label className="flex h-10 items-center gap-2 self-end text-sm">
+              <input type="checkbox" checked={draftLead} onChange={(e) => setDraftLead(e.target.checked)} /> Can lead a
+              shift
+            </label>
             <Button onClick={save} loading={upsert.isPending} className="self-end">
               {editing ? 'Save' : 'Add'}
             </Button>
