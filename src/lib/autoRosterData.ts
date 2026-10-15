@@ -37,8 +37,27 @@ export const DEFAULT_RULES = (outletId: string): RosterRules => ({
   max_off_per_day: 2,
   senior_months: 12,
   new_joiner_months: 3,
-  orders_per_staff_hour: 8,
+  orders_per_staff_hour: 4,
 })
+
+export interface HourlyOrders {
+  weekday: number
+  hour: number
+  avg_orders: number
+  avg_dine_in: number
+}
+
+// The outlet's two busiest weekdays by Petpooja orders.
+export function busiestFromOrders(hourly: HourlyOrders[]): number[] {
+  const perDay = [0, 1, 2, 3, 4, 5, 6].map((wd) => ({
+    wd,
+    n: hourly.filter((h) => h.weekday === wd).reduce((a, h) => a + Number(h.avg_orders), 0),
+  }))
+  return perDay
+    .sort((a, b) => b.n - a.n)
+    .slice(0, 2)
+    .map((d) => d.wd)
+}
 
 export function useStaffingSetup(outletId: string) {
   return useQuery({
@@ -47,14 +66,31 @@ export function useStaffingSetup(outletId: string) {
       const [needsR, rulesR, ordersR] = await Promise.all([
         supabase.schema('core').from('staffing_needs').select('*').eq('outlet_id', outletId),
         supabase.schema('core').from('roster_rules').select('*').eq('outlet_id', outletId).maybeSingle(),
-        supabase.from('v_outlet_hourly_orders').select('weekday, hour, avg_orders').eq('outlet_id', outletId),
+        supabase
+          .from('v_outlet_hourly_orders')
+          .select('weekday, hour, avg_orders, avg_dine_in')
+          .eq('outlet_id', outletId),
       ])
       if (needsR.error) throw needsR.error
       if (rulesR.error) throw rulesR.error
+      const hourlyOrders = (ordersR.data ?? []) as HourlyOrders[]
+      const savedRules = rulesR.data as RosterRules | null
+      // Until someone saves rules, busiest days come from the outlet's own orders.
+      const rules = savedRules ?? {
+        ...DEFAULT_RULES(outletId),
+        ...(hourlyOrders.length ? { busiest_days: busiestFromOrders(hourlyOrders) } : {}),
+      }
+      const savedNeeds = (needsR.data ?? []) as StaffingNeed[]
+      // No needs entered: use busy hours from Petpooja.
+      const fromOrders = !savedNeeds.length && hourlyOrders.length > 0
       return {
-        needs: (needsR.data ?? []) as StaffingNeed[],
-        rules: (rulesR.data as RosterRules | null) ?? DEFAULT_RULES(outletId),
-        hourlyOrders: (ordersR.data ?? []) as { weekday: number; hour: number; avg_orders: number }[],
+        needs: fromOrders
+          ? suggestFromOrders(outletId, hourlyOrders, rules.orders_per_staff_hour)
+          : savedNeeds,
+        needsFromOrders: fromOrders,
+        rulesSaved: !!savedRules,
+        rules,
+        hourlyOrders,
       }
     },
   })
@@ -105,39 +141,50 @@ export function useSaveStaffingSetup() {
   })
 }
 
-// Petpooja orders per hour → suggested kitchen and service headcount,
-// merged into blocks of equal need.
+// Petpooja orders per hour → suggested headcount, merged into blocks of
+// equal need. Kitchen follows all orders (one cook per
+// orders_per_staff_hour, at least one while orders come in, plus an hour
+// of prep before the first rush). Service follows dine-in orders, only at
+// outlets that get dine-in guests most days.
 export function suggestFromOrders(
   outletId: string,
-  hourly: { weekday: number; hour: number; avg_orders: number }[],
+  hourly: HourlyOrders[],
   ordersPerStaffHour: number,
 ): StaffingNeed[] {
+  const rate = Math.max(1, ordersPerStaffHour)
+  const dineInWeek = hourly.reduce((a, h) => a + Number(h.avg_dine_in ?? 0), 0)
   const out: StaffingNeed[] = []
   for (let wd = 0; wd < 7; wd++) {
-    const byHour = new Map(hourly.filter((h) => h.weekday === wd).map((h) => [h.hour, Number(h.avg_orders)]))
-    for (const group of ['kitchen', 'service'] as RosterGroup[]) {
-      let start = -1
-      let count = 0
-      const flush = (end: number) => {
-        if (start >= 0 && count > 0)
+    const day = hourly.filter((h) => h.weekday === wd)
+    const at = (h: number) => day.find((x) => x.hour === h)
+    const kitchen = Array.from({ length: 24 }, (_, h) => {
+      const o = Number(at(h)?.avg_orders ?? 0)
+      return o >= 0.5 ? Math.max(1, Math.ceil(o / rate)) : 0
+    })
+    const first = kitchen.findIndex((n) => n > 0)
+    if (first > 0) kitchen[first - 1] = 1 // prep
+    const service = Array.from({ length: 24 }, (_, h) => {
+      if (dineInWeek < 7 || kitchen[h] === 0) return 0
+      return Math.max(1, Math.ceil(Number(at(h)?.avg_dine_in ?? 0) / 2))
+    })
+    for (const [group, perHour] of [
+      ['kitchen', kitchen],
+      ['service', service],
+    ] as [RosterGroup, number[]][]) {
+      let start = 0
+      for (let h = 1; h <= 24; h++) {
+        if (h < 24 && perHour[h] === perHour[start]) continue
+        if (perHour[start] > 0)
           out.push({
             outlet_id: outletId,
             weekday: wd,
             block_start: `${String(start).padStart(2, '0')}:00`,
-            block_end: `${String(end % 24).padStart(2, '0')}:00`,
+            block_end: `${String(h % 24).padStart(2, '0')}:00`,
             roster_group: group,
-            headcount: count,
+            headcount: perHour[start],
             source: 'petpooja',
           })
-      }
-      for (let h = 0; h <= 24; h++) {
-        const orders = byHour.get(h) ?? 0
-        const n = h < 24 && orders > 0 ? Math.max(1, Math.ceil(orders / ordersPerStaffHour)) : 0
-        if (n !== count) {
-          flush(h)
-          start = h
-          count = n
-        }
+        start = h
       }
     }
   }

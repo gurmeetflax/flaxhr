@@ -22,6 +22,8 @@ import {
   useSaveDraft,
   useSaveStaffingSetup,
   useStaffingSetup,
+  busiestFromOrders,
+  type HourlyOrders,
   type RosterRules,
   type StaffingNeed,
 } from '@/lib/autoRosterData'
@@ -85,6 +87,8 @@ export function StaffingSetup({ outletId, onClose }: { outletId: string; onClose
       initialRows={toRows(setup.data.needs)}
       initialRules={setup.data.rules}
       hourlyOrders={setup.data.hourlyOrders}
+      fromOrders={setup.data.needsFromOrders}
+      rulesSaved={setup.data.rulesSaved}
       saving={save.isPending}
       onClose={onClose}
       onSave={async (rows, rules) => {
@@ -105,6 +109,8 @@ function StaffingSetupForm({
   initialRows,
   initialRules,
   hourlyOrders,
+  fromOrders,
+  rulesSaved,
   saving,
   onSave,
   onClose,
@@ -112,7 +118,9 @@ function StaffingSetupForm({
   outletId: string
   initialRows: NeedRow[]
   initialRules: RosterRules
-  hourlyOrders: { weekday: number; hour: number; avg_orders: number }[]
+  hourlyOrders: HourlyOrders[]
+  fromOrders: boolean
+  rulesSaved: boolean
   saving: boolean
   onSave: (rows: NeedRow[], rules: RosterRules) => void
   onClose: () => void
@@ -144,6 +152,12 @@ function StaffingSetupForm({
           <p className="text-xs text-muted-foreground">
             How many people each role needs in each busy period. The auto roster fills shifts to cover these.
           </p>
+          {fromOrders ? (
+            <p className="mt-1 text-xs text-primary">
+              Calculated from this outlet's Petpooja orders (last 8 weeks). Adjust anything and Save to keep
+              your version, or leave it and it keeps following the orders.
+            </p>
+          ) : null}
         </div>
         <Button size="sm" variant="ghost" onClick={onClose} aria-label="Close">
           <X className="h-4 w-4" />
@@ -153,6 +167,15 @@ function StaffingSetupForm({
       <div className="grid gap-3 sm:grid-cols-2">
         <div className="flex flex-col gap-1 text-xs text-muted-foreground">
           Busiest days (no week offs)
+          {hourlyOrders.length ? (
+            <span className="text-[11px]">
+              By orders:{' '}
+              {busiestFromOrders(hourlyOrders)
+                .map((d) => WEEKDAYS[d])
+                .join(', ')}
+              {rulesSaved ? '' : ' (used until you save)'}
+            </span>
+          ) : null}
           <div className="flex flex-wrap gap-1">
             {WEEK_ORDER.map((d) => (
               <DayChip
@@ -164,7 +187,7 @@ function StaffingSetupForm({
             ))}
           </div>
         </div>
-        <div className="grid grid-cols-3 gap-2">
+        <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
           <NumField
             label="Max off per day"
             value={rules.max_off_per_day}
@@ -179,6 +202,11 @@ function StaffingSetupForm({
             label="New joiner under (months)"
             value={rules.new_joiner_months}
             onChange={(v) => setRules({ ...rules, new_joiner_months: v })}
+          />
+          <NumField
+            label="Orders per cook per hour"
+            value={rules.orders_per_staff_hour}
+            onChange={(v) => setRules({ ...rules, orders_per_staff_hour: Math.max(1, v) })}
           />
         </div>
       </div>
@@ -264,10 +292,10 @@ function StaffingSetupForm({
           onClick={() => {
             const suggested = toRows(suggestFromOrders(outletId, hourlyOrders, rules.orders_per_staff_hour))
             setRows(suggested)
-            toast.success('Filled from Petpooja orders — check and adjust before saving')
+            toast.success('Recalculated from Petpooja orders — check and adjust before saving')
           }}
         >
-          <Sparkles className="h-4 w-4" /> Suggest from Petpooja
+          <Sparkles className="h-4 w-4" /> {fromOrders ? 'Recalculate' : 'Reset to Petpooja'}
         </Button>
         <span className="flex-1" />
         <Button size="sm" loading={saving} onClick={() => onSave(rows, rules)}>
@@ -276,7 +304,7 @@ function StaffingSetupForm({
       </div>
       {!hourlyOrders.length ? (
         <p className="text-xs text-muted-foreground">
-          Petpooja suggestions switch on once this outlet's orders start coming in.
+          No Petpooja orders for this outlet yet, so needs are entered by hand.
         </p>
       ) : null}
     </div>
@@ -429,6 +457,15 @@ export function AutoFill({
         </Button>
       </div>
 
+      {setup.data?.needsFromOrders ? (
+        <div className="rounded-md bg-primary/10 p-2 text-xs text-primary">
+          Using this outlet's busy hours from Petpooja (last 8 weeks, refreshed nightly)
+          {setup.data.rulesSaved
+            ? ''
+            : `; busiest days: ${setup.data.rules.busiest_days.map((d) => WEEKDAYS[d]).join(', ')}`}
+          . Change them under Staffing needs.
+        </div>
+      ) : null}
       {setup.data && !needs.length ? (
         <div className="flex flex-wrap items-center gap-2 rounded-md bg-amber-50 p-2 text-sm text-amber-800">
           <AlertTriangle className="h-4 w-4" /> Set this outlet's staffing needs first.
