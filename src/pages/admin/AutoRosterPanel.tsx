@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { format } from 'date-fns'
 import { AlertTriangle, Check, Plus, Sparkles, Trash2, Wand2, X } from 'lucide-react'
 import { toast } from 'sonner'
@@ -425,11 +425,23 @@ export function AutoFill({
     }
   }
 
+  // Build straight away when the panel opens, so the week is visible
+  // without hunting for a button.
+  const autoRan = useRef(false)
+  useEffect(() => {
+    if (autoRan.current || !setup.data || !setup.data.needs.length) return
+    autoRan.current = true
+    const t = setTimeout(() => void run(), 0)
+    return () => clearTimeout(t)
+    // run reads the latest props; it only needs to fire once.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [setup.data])
+
   const save = async () => {
     if (!draft) return
     try {
       const n = await saveDraft.mutateAsync({ outletId, entries: draft.entries })
-      toast.success(`${n} roster cells filled as a draft — review, then Publish week`)
+      toast.success(`${n} cells added to the roster as a draft — check them, then Publish week`)
       onClose()
     } catch (e) {
       toast.error(e instanceof Error ? e.message : 'Save failed')
@@ -501,18 +513,38 @@ export function AutoFill({
       </div>
 
       <div className="flex flex-wrap gap-2">
-        <Button size="sm" onClick={run} loading={busy} disabled={!needs.length || !chosen.size}>
-          <Wand2 className="h-4 w-4" /> {draft ? 'Rebuild' : 'Build draft'}
+        <Button
+          size="sm"
+          variant="outline"
+          onClick={run}
+          loading={busy}
+          disabled={!needs.length || !chosen.size}
+        >
+          <Wand2 className="h-4 w-4" /> {draft ? 'Rebuild' : 'Build'}
         </Button>
         <Button size="sm" variant="outline" onClick={onEditNeeds}>
           Staffing needs
         </Button>
-        {draft ? (
-          <Button size="sm" loading={saveDraft.isPending} onClick={save} disabled={!draft.entries.length}>
-            <Check className="h-4 w-4" /> Save {draft.entries.length} cells as draft
-          </Button>
-        ) : null}
       </div>
+      {busy && !draft ? <p className="text-sm text-muted-foreground">Building the week…</p> : null}
+      {draft ? (
+        draft.entries.length ? (
+          <div className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-primary bg-surface p-3">
+            <span className="text-sm">
+              <b>Preview</b> — {draft.entries.length} cells below. Nothing is in the roster until you press
+              the button.
+            </span>
+            <Button loading={saveDraft.isPending} onClick={save}>
+              <Check className="h-4 w-4" /> Put into roster
+            </Button>
+          </div>
+        ) : (
+          <p className="rounded-md bg-muted p-2 text-sm">
+            Nothing to fill: every cell this week is already set or the day has passed. Pick next week to plan
+            ahead.
+          </p>
+        )
+      ) : null}
 
       {draft ? (
         <>
@@ -539,7 +571,7 @@ export function AutoFill({
                   <li key={g.group}>
                     <b>{GROUP_LABEL[g.group]}</b>: about {g.extraPeople} more{' '}
                     {g.extraPeople === 1 ? 'person' : 'people'} needed — {g.shortHours} of {g.neededHours}{' '}
-                    person-hours this week aren't covered.
+                    person-hours left this week aren't covered.
                   </li>
                 ))}
               </ul>
@@ -558,7 +590,7 @@ export function AutoFill({
                     {format(new Date(`${s.date}T00:00:00`), 'EEE d')} · {hhmm(s.from)}–{hhmm(s.to)} ·{' '}
                     {s.empty
                       ? `no ${GROUP_LABEL[s.group].toLowerCase()} staff on duty`
-                      : `${s.short} ${GROUP_LABEL[s.group].toLowerCase()} short`}
+                      : `${s.short > 1 ? 'up to ' : ''}${s.short} ${GROUP_LABEL[s.group].toLowerCase()} short`}
                   </li>
                 ))}
               </ul>
