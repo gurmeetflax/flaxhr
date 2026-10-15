@@ -29,6 +29,10 @@ update core.designations set roster_group = case
   end
 where roster_group is null;
 
+-- Roaming roles (area / operations managers) aren't rostered at an outlet.
+update core.designations set roster_group = null
+where name in ('Area Manager', 'Operations Manager', 'Operation Head');
+
 update core.designations set is_lead = true
 where name ~* '(head chef|sous chef|chef de partie|^cdp$|dcdp|kitchen manager|bakery head|sr captain|^captain$|shift incharge|manager)';
 

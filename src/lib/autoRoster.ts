@@ -5,17 +5,19 @@
 // calls generateRoster(), shows the draft and warnings, and saves the
 // entries as 'planned' for the manager to adjust and publish.
 //
-// Rules, in order:
-//  1. Cells already filled (any status) and approved leave are kept.
-//  2. Everyone gets one week off: never on the outlet's busiest days, at
-//     most max_off_per_day people off on a day, on the day their role
-//     needs least. The weekday rotates from the previous week.
-//  3. Each day, shifts are filled to cover the busy-hour needs per role
+// It is a weekly roster: each person works one shift all week and has one
+// week off. Rules, in order:
+//  1. Cells already filled (any status) and approved leave are kept; a
+//     person with filled shift days keeps that shift for the week.
+//  2. Shifts are given out to cover the week's busy-hour needs per role
 //     group: the shift that covers the most uncovered need goes first.
-//  4. Every shift gets an experienced person (a lead role, or senior_months
+//  3. Every shift gets an experienced person (a lead role, or senior_months
 //     at Flax); new joiners go into shifts that already have one.
-//  5. Closing shifts and busy-day shifts go to whoever has had the fewest.
-//  6. Staff left after needs are met join the busiest shift for their role.
+//  4. Closing shifts go to whoever has had the fewest recently.
+//  5. Staff left after needs are met join the busiest shift for their role.
+//  6. Week offs: never on the outlet's busiest days, at most max_off_per_day
+//     a day, on the day the person's absence leaves the least gap, not
+//     taking a shift's only lead away, rotating from last week.
 
 export type RosterGroup = 'kitchen' | 'service' | 'barista' | 'management' | 'support' | 'office'
 
@@ -188,214 +190,281 @@ export function generateRoster(input: {
     return out
   }
 
-  // ── 1. Week offs ──────────────────────────────────────────────────────
-  const offDay = new Map<string, number>() // employee → day index
-  const offsOn = days.map(() => 0)
+  const canDo = (p: StaffInput, s: NormShift) => !p.shiftIds.length || p.shiftIds.includes(s.id)
+  const runsOn = (s: NormShift, di: number) => s.days.has(weekdayOf(days[di]))
+
+  // Days each person can work this week (not on leave, not already filled).
+  const freeDays = new Map<string, number[]>()
+  for (const p of staff)
+    freeDays.set(
+      p.id,
+      days.flatMap((d, di) => (locked.has(key(p.id, d)) ? [] : [di])),
+    )
+
+  // Cover per day × group × hour, from people on duty.
+  const cover = new Map<string, number[]>()
+  const coverOf = (di: number, g: RosterGroup) => {
+    const k = `${di}|${g}`
+    let a = cover.get(k)
+    if (!a) cover.set(k, (a = Array<number>(48).fill(0)))
+    return a
+  }
+  const needOf = (di: number, g: RosterGroup) => needAt.get(`${di}|${g}`) ?? Array<number>(48).fill(0)
+  const addCover = (p: StaffInput, s: NormShift, di: number, by: number) => {
+    if (!p.group || !runsOn(s, di)) return
+    const c = coverOf(di, p.group)
+    for (const h of hoursOf(s)) c[h] += by
+  }
+
+  // ── 1. One shift per person for the whole week ────────────────────────
+  const weekly = new Map<string, NormShift>() // employee → shift
+  const crew = new Map<string, StaffInput[]>() // shift → people on it this week
+  const join = (p: StaffInput, s: NormShift) => {
+    weekly.set(p.id, s)
+    crew.set(s.id, [...(crew.get(s.id) ?? []), p])
+  }
+
+  // Cells already filled count as cover; someone with filled shift days keeps that shift.
   for (const p of staff) {
+    const counts = new Map<string, number>()
     days.forEach((d, di) => {
       const l = locked.get(key(p.id, d))
-      if (l?.kind === 'off') {
+      if (l?.kind === 'shift' && l.shiftId && shiftById.has(l.shiftId)) {
+        addCover(p, shiftById.get(l.shiftId)!, di, 1)
+        counts.set(l.shiftId, (counts.get(l.shiftId) ?? 0) + 1)
+      }
+    })
+    const top = [...counts.entries()].sort((a, b) => b[1] - a[1])[0]
+    if (top) join(p, shiftById.get(top[0])!)
+  }
+
+  const weekGain = (p: StaffInput, s: NormShift) => {
+    if (!p.group) return 0
+    let g = 0
+    for (const di of freeDays.get(p.id)!) {
+      if (!runsOn(s, di)) continue
+      const need = needOf(di, p.group)
+      const c = coverOf(di, p.group)
+      for (const h of hoursOf(s)) g += Math.max(0, need[h] - c[h])
+    }
+    return g
+  }
+  const busyShare = (s: NormShift) => (busiest.size ? s.days.size : 0)
+  const load = (p: StaffInput, s: NormShift) =>
+    (s.closing ? p.closingCount : 0) + (busyShare(s) ? p.busyDayCount / 4 : 0)
+  const pickPerson = (pool: StaffInput[], s: NormShift) => {
+    const able = pool.filter((p) => canDo(p, s))
+    if (!able.length) return undefined
+    const hasSenior = (crew.get(s.id) ?? []).some(isSenior)
+    const score = (p: StaffInput) =>
+      (!hasSenior ? (isSenior(p) ? 0 : 100) : isNew(p) ? 0 : isSenior(p) ? 20 : 10) + load(p, s)
+    return able.sort((a, b) => score(a) - score(b) || a.name.localeCompare(b.name))[0]
+  }
+  const assignWeek = (p: StaffInput, s: NormShift) => {
+    join(p, s)
+    for (const di of freeDays.get(p.id)!) addCover(p, s, di, 1)
+  }
+
+  const weekDemand = (g: RosterGroup) => days.reduce((a, _d, di) => a + dayDemand(di, g), 0)
+  const unassigned = staff.filter((p) => !weekly.has(p.id) && freeDays.get(p.id)!.length)
+  for (const g of [...groupsNeeded].sort((a, b) => weekDemand(b) - weekDemand(a))) {
+    const pool = unassigned.filter((p) => p.group === g)
+    for (;;) {
+      const options = shifts
+        .map((s) => ({ s, gain: Math.max(0, ...pool.filter((p) => canDo(p, s)).map((p) => weekGain(p, s))) }))
+        .filter((o) => o.gain > 0)
+        // Equal cover: prefer a shift that already has people (and a lead).
+        .sort(
+          (a, b) =>
+            b.gain - a.gain ||
+            Number((crew.get(b.s.id) ?? []).some(isSenior)) -
+              Number((crew.get(a.s.id) ?? []).some(isSenior)) ||
+            (crew.get(b.s.id)?.length ?? 0) - (crew.get(a.s.id)?.length ?? 0) ||
+            a.s.start - b.s.start,
+        )
+      if (!options.length) break
+      const s = options[0].s
+      const p = pickPerson(pool, s)
+      if (!p) break
+      pool.splice(pool.indexOf(p), 1)
+      unassigned.splice(unassigned.indexOf(p), 1)
+      assignWeek(p, s)
+    }
+  }
+
+  // Everyone left joins the shift with the most need for their role.
+  const blank: StaffInput[] = []
+  for (const p of [...unassigned]) {
+    const opts = shifts
+      .filter((s) => canDo(p, s))
+      .map((s) => ({
+        s,
+        need: p.group
+          ? days.reduce(
+              (a, _d, di) =>
+                a + (runsOn(s, di) ? hoursOf(s).reduce((x, h) => x + needOf(di, p.group!)[h], 0) : 0),
+              0,
+            )
+          : 0,
+      }))
+      .sort((a, b) => b.need - a.need || (crew.get(a.s.id)?.length ?? 0) - (crew.get(b.s.id)?.length ?? 0))
+    const best = opts[0]
+    if (!best || (!best.need && !p.shiftIds.length)) {
+      blank.push(p)
+      continue
+    }
+    assignWeek(p, best.s)
+  }
+
+  // An experienced person on every shift: swap one in from a shift with two.
+  for (const [sid, people] of crew) {
+    if (people.some(isSenior)) continue
+    const s = shiftById.get(sid)!
+    for (const [oid, others] of crew) {
+      if (oid === sid || others.filter(isSenior).length < 2) continue
+      const o = shiftById.get(oid)!
+      const senior = others.find((x) => isSenior(x) && canDo(x, s) && !hasLockedShift(x))
+      const back = senior && people.find((x) => x.group === senior.group && canDo(x, o) && !hasLockedShift(x))
+      if (!senior || !back) continue
+      for (const di of freeDays.get(senior.id)!) {
+        addCover(senior, o, di, -1)
+        addCover(senior, s, di, 1)
+      }
+      for (const di of freeDays.get(back.id)!) {
+        addCover(back, s, di, -1)
+        addCover(back, o, di, 1)
+      }
+      weekly.set(senior.id, s)
+      weekly.set(back.id, o)
+      crew.set(sid, [...people.filter((x) => x !== back), senior])
+      crew.set(oid, [...others.filter((x) => x !== senior), back])
+      break
+    }
+  }
+  function hasLockedShift(p: StaffInput) {
+    return days.some((d) => locked.get(key(p.id, d))?.kind === 'shift')
+  }
+
+  // ── 2. Week offs, where they hurt least ───────────────────────────────
+  const offDay = new Map<string, number>()
+  const offsOn = days.map(() => 0)
+  for (const p of staff)
+    days.forEach((d, di) => {
+      if (locked.get(key(p.id, d))?.kind === 'off') {
         offDay.set(p.id, di)
         offsOn[di]++
       }
     })
+  const seniorsOnDuty = (sid: string, di: number, except: StaffInput) =>
+    (crew.get(sid) ?? []).filter(
+      (x) => x !== except && isSenior(x) && offDay.get(x.id) !== di && freeDaysOrLocked(x, di),
+    ).length
+  function freeDaysOrLocked(x: StaffInput, di: number) {
+    const l = locked.get(key(x.id, days[di]))
+    return !l || l.kind === 'shift'
   }
-  // Fixed order so the same inputs give the same roster.
-  const order = [...staff].sort((a, b) => a.name.localeCompare(b.name))
+  // Seniors first, so leads' days off are spread before others choose.
+  const order = [...staff].sort(
+    (a, b) => Number(isSenior(b)) - Number(isSenior(a)) || a.name.localeCompare(b.name),
+  )
   for (const p of order) {
     if (offDay.has(p.id)) continue
-    const free = days.map((d, di) => ({ d, di })).filter(({ d }) => !locked.has(key(p.id, d)))
+    const free = freeDays.get(p.id)!
     if (!free.length) continue
-    const allowed = free.filter(({ d }) => !busiest.has(weekdayOf(d)))
-    const pickFrom = (list: typeof free, capped: boolean) =>
+    const s = weekly.get(p.id)
+    // Cost of this person being off that day: hours their role goes short.
+    const harm = (di: number) => {
+      if (!s || !p.group || !runsOn(s, di)) return -1 // their shift doesn't run: ideal day off
+      const need = needOf(di, p.group)
+      const c = coverOf(di, p.group)
+      let h = 0
+      for (const x of hoursOf(s)) if (c[x] - 1 < need[x]) h++
+      const leadGap =
+        isSenior(p) && seniorsOnDuty(s.id, di, p) === 0 && (crew.get(s.id)?.length ?? 0) > 1 ? 50 : 0
+      return h + leadGap
+    }
+    const pickFrom = (list: number[], capped: boolean) =>
       list
-        .filter(({ di }) => !capped || offsOn[di] < rules.maxOffPerDay)
+        .filter((di) => !capped || offsOn[di] < rules.maxOffPerDay)
         .sort(
           (a, b) =>
-            dayDemand(a.di, p.group) - dayDemand(b.di, p.group) ||
-            offsOn[a.di] - offsOn[b.di] ||
-            // rotate: avoid repeating last week's day
-            Number(weekdayOf(a.d) === p.lastOffWeekday) - Number(weekdayOf(b.d) === p.lastOffWeekday) ||
-            a.di - b.di,
+            harm(a) - harm(b) ||
+            offsOn[a] - offsOn[b] ||
+            Number(weekdayOf(days[a]) === p.lastOffWeekday) -
+              Number(weekdayOf(days[b]) === p.lastOffWeekday) ||
+            a - b,
         )[0]
+    const allowed = free.filter((di) => !busiest.has(weekdayOf(days[di])))
     let pick = pickFrom(allowed, true)
-    if (!pick) {
+    if (pick === undefined) {
       pick = pickFrom(allowed, false) ?? pickFrom(free, false)
-      if (pick)
+      if (pick !== undefined)
         warnings.push(
-          `${p.name}: week off on ${labelDay(pick.d)} goes over the limit of ${rules.maxOffPerDay} off per day${
-            busiest.has(weekdayOf(pick.d)) ? ' and falls on a busiest day' : ''
+          `${p.name}: week off on ${labelDay(days[pick])} goes over the limit of ${rules.maxOffPerDay} off per day${
+            busiest.has(weekdayOf(days[pick])) ? ' and falls on a busiest day' : ''
           }.`,
         )
     }
-    if (!pick) continue
-    offDay.set(p.id, pick.di)
-    offsOn[pick.di]++
-    entries.push({ employeeId: p.id, date: pick.d, shiftId: null, off: true, reason: 'Week off' })
+    if (pick === undefined) continue
+    offDay.set(p.id, pick)
+    offsOn[pick]++
+    if (s) addCover(p, s, pick, -1)
   }
 
-  // ── 2–6. Shifts, day by day ───────────────────────────────────────────
-  const blankDays = new Map<StaffInput, number>()
-  const closingLoad = new Map(staff.map((p) => [p.id, p.closingCount]))
-  const busyLoad = new Map(staff.map((p) => [p.id, p.busyDayCount]))
+  // ── 3. Write the week ─────────────────────────────────────────────────
+  for (const p of staff) {
+    const s = weekly.get(p.id)
+    for (const di of freeDays.get(p.id)!) {
+      const date = days[di]
+      if (offDay.get(p.id) === di) {
+        entries.push({ employeeId: p.id, date, shiftId: null, off: true, reason: 'Week off' })
+      } else if (s && runsOn(s, di)) {
+        entries.push({
+          employeeId: p.id,
+          date,
+          shiftId: s.id,
+          off: false,
+          reason: `${s.name} all week`,
+        })
+      }
+    }
+  }
+  for (const p of blank)
+    warnings.push(
+      `${p.name}: no staffing need set for ${p.group ? GROUP_LABEL[p.group] : 'their role'} — left blank to fill by hand.`,
+    )
 
+  // ── 4. Checks per day ────────────────────────────────────────────────
   days.forEach((date, di) => {
-    const wd = weekdayOf(date)
-    const isBusy = busiest.has(wd)
-    const dayShifts = shifts.filter((s) => s.days.has(wd))
-    const crew = new Map<string, StaffInput[]>() // shiftId → people
-    const add = (sid: string, p: StaffInput) => crew.set(sid, [...(crew.get(sid) ?? []), p])
-
-    // Locked cells count towards cover.
-    const residual = new Map<RosterGroup, number[]>()
-    for (const g of groupsNeeded)
-      residual.set(g, [...(needAt.get(`${di}|${g}`) ?? Array<number>(48).fill(0))])
-    const available: StaffInput[] = []
-    for (const p of staff) {
-      const l = locked.get(key(p.id, date))
-      if (l?.kind === 'shift' && l.shiftId) {
-        const s = shiftById.get(l.shiftId)
-        if (s) {
-          add(s.id, p)
-          const r = p.group ? residual.get(p.group) : undefined
-          if (r) for (const h of hoursOf(s)) r[h]--
-        }
-        continue
-      }
-      if (l || offDay.get(p.id) === di) continue
-      available.push(p)
-    }
-
-    const canDo = (p: StaffInput, s: NormShift) => !p.shiftIds.length || p.shiftIds.includes(s.id)
-    const gain = (s: NormShift, r: number[]) => hoursOf(s).reduce((a, h) => a + Math.max(0, r[h]), 0)
-    const load = (p: StaffInput, s: NormShift) =>
-      (s.closing ? (closingLoad.get(p.id) ?? 0) : 0) + (isBusy ? (busyLoad.get(p.id) ?? 0) : 0)
-    const assign = (p: StaffInput, s: NormShift, reason: string) => {
-      add(s.id, p)
-      entries.push({ employeeId: p.id, date, shiftId: s.id, off: false, reason })
-      if (s.closing) closingLoad.set(p.id, (closingLoad.get(p.id) ?? 0) + 1)
-      if (isBusy) busyLoad.set(p.id, (busyLoad.get(p.id) ?? 0) + 1)
-      const r = p.group ? residual.get(p.group) : undefined
-      if (r) for (const h of hoursOf(s)) r[h]--
-    }
-    const pickPerson = (pool: StaffInput[], s: NormShift) => {
-      const able = pool.filter((p) => canDo(p, s))
-      if (!able.length) return undefined
-      const people = crew.get(s.id) ?? []
-      const hasSenior = people.some(isSenior)
-      const score = (p: StaffInput) =>
-        (!hasSenior ? (isSenior(p) ? 0 : 100) : isNew(p) ? 0 : isSenior(p) ? 20 : 10) + load(p, s)
-      return able.sort((a, b) => score(a) - score(b) || a.name.localeCompare(b.name))[0]
-    }
-
-    // Busiest group first.
-    const groups = [...groupsNeeded].sort((a, b) => dayDemand(di, b) - dayDemand(di, a))
-    for (const g of groups) {
-      const r = residual.get(g)!
-      const pool = available.filter((p) => p.group === g)
-      for (;;) {
-        const options = dayShifts
-          .map((s) => ({ s, gain: gain(s, r) }))
-          .filter((o) => o.gain > 0 && pool.some((p) => canDo(p, o.s)))
-          // Equal cover: prefer a shift that already has people (and a lead).
-          .sort(
-            (a, b) =>
-              b.gain - a.gain ||
-              Number((crew.get(b.s.id) ?? []).some(isSenior)) -
-                Number((crew.get(a.s.id) ?? []).some(isSenior)) ||
-              (crew.get(b.s.id)?.length ?? 0) - (crew.get(a.s.id)?.length ?? 0) ||
-              a.s.start - b.s.start,
-          )
-        if (!options.length) break
-        const { s } = options[0]
-        const p = pickPerson(pool, s)
-        if (!p) break
-        pool.splice(pool.indexOf(p), 1)
-        available.splice(available.indexOf(p), 1)
-        assign(p, s, `Covers ${GROUP_LABEL[g].toLowerCase()} need`)
-      }
-    }
-
-    // Everyone still free works the busiest shift they can do.
-    for (const p of [...available]) {
-      const r = p.group ? residual.get(p.group) : undefined
-      const opts = dayShifts
-        .filter((s) => canDo(p, s))
-        .map((s) => ({
-          s,
-          need: r ? hoursOf(s).reduce((a, h) => a + (needAt.get(`${di}|${p.group}`)?.[h] ?? 0), 0) : 0,
-        }))
-        .sort((a, b) => b.need - a.need || (crew.get(a.s.id)?.length ?? 0) - (crew.get(b.s.id)?.length ?? 0))
-      const s = p.shiftIds.length ? (opts[0]?.s ?? null) : r ? (opts[0]?.s ?? null) : null
-      if (!s) {
-        blankDays.set(p, (blankDays.get(p) ?? 0) + 1)
-        continue
-      }
-      available.splice(available.indexOf(p), 1)
-      assign(p, s, 'Extra hands on the busiest shift')
-    }
-
-    // Senior on every shift: swap one in from a shift that has two.
     for (const [sid, people] of crew) {
-      if (people.some(isSenior)) continue
       const s = shiftById.get(sid)!
-      let fixed = false
-      for (const [oid, others] of crew) {
-        if (oid === sid || others.filter(isSenior).length < 2) continue
-        const senior = others.find((o) => isSenior(o) && canDo(o, s))
-        const swapBack =
-          senior && people.find((x) => x.group === senior.group && canDo(x, shiftById.get(oid)!))
-        if (!senior || !swapBack) continue
-        const eS = entries.find((e) => e.employeeId === senior.id && e.date === date && !e.off)
-        const eB = entries.find((e) => e.employeeId === swapBack.id && e.date === date && !e.off)
-        if (!eS || !eB) continue // locked cells aren't moved
-        eS.shiftId = sid
-        eS.reason = 'Experienced lead for this shift'
-        eB.shiftId = oid
-        crew.set(sid, [...people.filter((x) => x !== swapBack), senior])
-        crew.set(oid, [...others.filter((x) => x !== senior), swapBack])
-        fixed = true
-        break
-      }
-      if (!fixed)
-        warnings.push(
-          `${labelDay(date)} ${s.name}: no experienced person (lead role or ${rules.seniorMonths}+ months at Flax).`,
-        )
+      if (!runsOn(s, di)) continue
+      const onDuty = people.filter((x) => offDay.get(x.id) !== di && freeDaysOrLocked(x, di))
+      if (!onDuty.length || onDuty.some(isSenior)) continue
+      const fresh = onDuty.filter(isNew)
+      warnings.push(
+        `${labelDay(date)} ${s.name}: no experienced person on duty${
+          fresh.length
+            ? ` (new joiner${fresh.length > 1 ? 's' : ''} ${fresh.map((f) => f.name).join(', ')} on their own)`
+            : ''
+        }.`,
+      )
     }
-
-    for (const [sid, people] of crew) {
-      if (people.some(isSenior)) continue
-      const fresh = people.filter(isNew)
-      if (fresh.length)
-        warnings.push(
-          `${labelDay(date)} ${shiftById.get(sid)!.name}: new joiner${fresh.length > 1 ? 's' : ''} ${fresh
-            .map((f) => f.name)
-            .join(', ')} without an experienced colleague.`,
-        )
-    }
-
-    // Shortfalls, merged into continuous blocks.
     for (const g of groupsNeeded) {
-      const r = residual.get(g)!
+      const need = needOf(di, g)
+      const c = coverOf(di, g)
       let h = 0
       while (h < 48) {
-        if (r[h] > 0) {
-          const short = r[h]
+        const short = need[h] - c[h]
+        if (short > 0) {
           let e = h
-          while (e + 1 < 48 && r[e + 1] === short) e++
+          while (e + 1 < 48 && need[e + 1] - c[e + 1] === short) e++
           shortfalls.push({ date, group: g, from: h * 60, to: (e + 1) * 60, short })
           h = e + 1
         } else h++
       }
     }
   })
-
-  for (const [p, n] of blankDays)
-    warnings.push(
-      `${p.name}: no staffing need set for ${p.group ? GROUP_LABEL[p.group] : 'their role'} — ${n} day${
-        n === 1 ? '' : 's'
-      } left blank to fill by hand.`,
-    )
 
   return { entries, warnings, shortfalls, adjustedShifts }
 

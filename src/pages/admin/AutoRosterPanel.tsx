@@ -447,9 +447,9 @@ export function AutoFill({
             <Wand2 className="h-4 w-4 text-primary" /> Auto roster
           </div>
           <p className="text-xs text-muted-foreground">
-            Fills empty cells only: one week off each (not on busiest days), shifts that cover the busy hours,
-            an experienced person on every shift, new joiners alongside them, and closing / weekend shifts
-            shared fairly.
+            A weekly roster: each person keeps one shift all week plus one week off (not on busiest days).
+            Shifts cover the busy hours, every shift has an experienced person, new joiners work alongside
+            them, and closing shifts are shared fairly. Only empty cells are filled.
           </p>
         </div>
         <Button size="sm" variant="ghost" onClick={onClose} aria-label="Close">
@@ -523,7 +523,10 @@ export function AutoFill({
             </Notice>
           ) : null}
           {draft.skipped.length ? (
-            <Notice>Skipped (no designation or its roster group not set): {draft.skipped.join(', ')}.</Notice>
+            <Notice>
+              Not rostered here (no designation, or a roaming role like area manager — set a roster group in
+              Settings → Designations to include): {draft.skipped.join(', ')}.
+            </Notice>
           ) : null}
           {draft.warnings.map((w) => (
             <Notice key={w}>{w}</Notice>
