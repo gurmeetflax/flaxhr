@@ -531,14 +531,34 @@ export function AutoFill({
           {draft.warnings.map((w) => (
             <Notice key={w}>{w}</Notice>
           ))}
+          {draft.gaps.length ? (
+            <div className="rounded-md border border-destructive/30 bg-destructive/5 p-2 text-sm">
+              <div className="font-medium text-destructive">Not enough people to cover the busy hours</div>
+              <ul className="mt-1 list-disc pl-4 text-xs">
+                {draft.gaps.map((g) => (
+                  <li key={g.group}>
+                    <b>{GROUP_LABEL[g.group]}</b>: about {g.extraPeople} more{' '}
+                    {g.extraPeople === 1 ? 'person' : 'people'} needed — {g.shortHours} of {g.neededHours}{' '}
+                    person-hours this week aren't covered.
+                  </li>
+                ))}
+              </ul>
+              <p className="mt-1 text-xs text-muted-foreground">
+                Until then: borrow staff from a nearby outlet on the days below, or hire. Shifts are already
+                chosen to cover opening to closing before adding extra hands at the rush.
+              </p>
+            </div>
+          ) : null}
           {draft.shortfalls.length ? (
             <div className="rounded-md bg-destructive/10 p-2 text-xs text-destructive">
-              <div className="mb-1 font-medium">Short-staffed after using everyone available:</div>
+              <div className="mb-1 font-medium">Gaps by day:</div>
               <ul className="list-disc pl-4">
                 {draft.shortfalls.map((s, i) => (
-                  <li key={i}>
+                  <li key={i} className={s.empty ? 'font-semibold' : undefined}>
                     {format(new Date(`${s.date}T00:00:00`), 'EEE d')} · {hhmm(s.from)}–{hhmm(s.to)} ·{' '}
-                    {s.short} {GROUP_LABEL[s.group].toLowerCase()} short
+                    {s.empty
+                      ? `no ${GROUP_LABEL[s.group].toLowerCase()} staff on duty`
+                      : `${s.short} ${GROUP_LABEL[s.group].toLowerCase()} short`}
                   </li>
                 ))}
               </ul>

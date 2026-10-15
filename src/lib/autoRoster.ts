@@ -84,12 +84,23 @@ export interface ShortfallLine {
   from: number // minutes
   to: number
   short: number
+  /** Nobody of this role on duty at all. */
+  empty: boolean
+}
+
+export interface StaffingGap {
+  group: RosterGroup
+  neededHours: number // person-hours of need this week
+  shortHours: number // person-hours not covered
+  /** Rough extra people needed to cover it (6 days × shift length each). */
+  extraPeople: number
 }
 
 export interface RosterDraft {
   entries: DraftEntry[]
   warnings: string[]
   shortfalls: ShortfallLine[]
+  gaps: StaffingGap[]
   /** Shifts whose saved times looked like an AM/PM mix-up. */
   adjustedShifts: { id: string; name: string; used: string }[]
 }
@@ -245,7 +256,9 @@ export function generateRoster(input: {
       if (!runsOn(s, di)) continue
       const need = needOf(di, p.group)
       const c = coverOf(di, p.group)
-      for (const h of hoursOf(s)) g += Math.max(0, need[h] - c[h])
+      // An hour nobody covers counts three times an extra pair of hands,
+      // so small teams cover opening to closing before doubling the rush.
+      for (const h of hoursOf(s)) if (need[h] > c[h]) g += c[h] === 0 ? 3 : 1
     }
     return g
   }
@@ -378,7 +391,7 @@ export function generateRoster(input: {
       const need = needOf(di, p.group)
       const c = coverOf(di, p.group)
       let h = 0
-      for (const x of hoursOf(s)) if (c[x] - 1 < need[x]) h++
+      for (const x of hoursOf(s)) if (c[x] - 1 < need[x]) h += c[x] - 1 <= 0 ? 3 : 1
       const leadGap =
         isSenior(p) && seniorsOnDuty(s.id, di, p) === 0 && (crew.get(s.id)?.length ?? 0) > 1 ? 50 : 0
       return h + leadGap
@@ -434,39 +447,59 @@ export function generateRoster(input: {
       `${p.name}: no staffing need set for ${p.group ? GROUP_LABEL[p.group] : 'their role'} — left blank to fill by hand.`,
     )
 
-  // ── 4. Checks per day ────────────────────────────────────────────────
-  days.forEach((date, di) => {
-    for (const [sid, people] of crew) {
-      const s = shiftById.get(sid)!
-      if (!runsOn(s, di)) continue
+  // ── 4. Checks ─────────────────────────────────────────────────────────
+  // Shifts that run without an experienced person: one line per shift.
+  for (const [sid, people] of crew) {
+    const s = shiftById.get(sid)!
+    const bare = days.filter((_d, di) => {
+      if (!runsOn(s, di)) return false
       const onDuty = people.filter((x) => offDay.get(x.id) !== di && freeDaysOrLocked(x, di))
-      if (!onDuty.length || onDuty.some(isSenior)) continue
-      const fresh = onDuty.filter(isNew)
-      warnings.push(
-        `${labelDay(date)} ${s.name}: no experienced person on duty${
-          fresh.length
-            ? ` (new joiner${fresh.length > 1 ? 's' : ''} ${fresh.map((f) => f.name).join(', ')} on their own)`
-            : ''
-        }.`,
-      )
-    }
-    for (const g of groupsNeeded) {
+      return onDuty.length > 0 && !onDuty.some(isSenior)
+    })
+    if (!bare.length) continue
+    const fresh = people.filter(isNew)
+    warnings.push(
+      `${s.name}: no experienced person on duty ${
+        bare.length === days.length
+          ? 'all week'
+          : `on ${bare.map((d) => labelDay(d).split(',')[0]).join(', ')}`
+      }${fresh.length ? ` — new joiner${fresh.length > 1 ? 's' : ''} ${fresh.map((f) => f.name).join(', ')} without a senior` : ''}.`,
+    )
+  }
+
+  const gaps: StaffingGap[] = []
+  for (const g of groupsNeeded) {
+    let neededHours = 0
+    let shortHours = 0
+    days.forEach((date, di) => {
       const need = needOf(di, g)
       const c = coverOf(di, g)
       let h = 0
       while (h < 48) {
-        const short = need[h] - c[h]
+        neededHours += need[h]
+        const short = Math.max(0, need[h] - c[h])
+        shortHours += short
         if (short > 0) {
+          const empty = c[h] <= 0
           let e = h
-          while (e + 1 < 48 && need[e + 1] - c[e + 1] === short) e++
-          shortfalls.push({ date, group: g, from: h * 60, to: (e + 1) * 60, short })
+          while (e + 1 < 48 && need[e + 1] - c[e + 1] === short && c[e + 1] <= 0 === empty) {
+            e++
+            neededHours += need[e]
+            shortHours += short
+          }
+          shortfalls.push({ date, group: g, from: h * 60, to: (e + 1) * 60, short, empty })
           h = e + 1
         } else h++
       }
+    })
+    if (shortHours > 0) {
+      const avgShift =
+        shifts.reduce((a, x) => a + (x.end - x.start) / 60, 0) / Math.max(1, shifts.length) || 9
+      gaps.push({ group: g, neededHours, shortHours, extraPeople: Math.ceil(shortHours / (avgShift * 6)) })
     }
-  })
+  }
 
-  return { entries, warnings, shortfalls, adjustedShifts }
+  return { entries, warnings, shortfalls, gaps, adjustedShifts }
 
   function labelDay(d: string) {
     return new Date(`${d}T00:00:00`).toLocaleDateString('en-IN', {
