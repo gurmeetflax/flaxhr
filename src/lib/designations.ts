@@ -1,5 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { supabase } from '@/lib/supabase'
+import type { RosterGroup } from '@/lib/autoRoster'
 
 export interface Designation {
   code: string
@@ -8,6 +9,9 @@ export interface Designation {
   display_order: number
   /** Service-charge weight per day worked. Default 1.00. */
   sc_points_per_day: number
+  /** Auto roster: which role group this title fills, and whether it can lead a shift. */
+  roster_group: RosterGroup | null
+  is_lead: boolean
 }
 
 export function useDesignations(opts: { activeOnly?: boolean } = {}) {
@@ -18,7 +22,7 @@ export function useDesignations(opts: { activeOnly?: boolean } = {}) {
     queryFn: async () => {
       let q = supabase
         .from('v_designations')
-        .select('code, name, is_active, display_order, sc_points_per_day')
+        .select('code, name, is_active, display_order, sc_points_per_day, roster_group, is_lead')
         .order('display_order')
         .order('name')
       if (activeOnly) q = q.eq('is_active', true)
@@ -40,6 +44,8 @@ export function useUpsertDesignation() {
         display_order: input.display_order ?? 0,
       }
       if (input.sc_points_per_day != null) row.sc_points_per_day = input.sc_points_per_day
+      if (input.roster_group !== undefined) row.roster_group = input.roster_group
+      if (input.is_lead !== undefined) row.is_lead = input.is_lead
       const { error } = await supabase
         .schema('core' as never)
         .from('designations')

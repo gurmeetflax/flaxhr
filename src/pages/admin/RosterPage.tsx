@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { addDays, format, startOfWeek } from 'date-fns'
-import { Globe2, MessageCircle, Send } from 'lucide-react'
+import { Globe2, MessageCircle, Send, Wand2 } from 'lucide-react'
 import { toast } from 'sonner'
 import { supabase } from '@/lib/supabase'
 import { PageHeader } from '@/components/layout/AppShell'
@@ -11,6 +11,7 @@ import { cn } from '@/lib/utils'
 import { useRoster, useUpsertRosterEntry, usePublishWeek, type RosterEntry } from '@/lib/roster'
 import { useShifts } from '@/lib/shifts'
 import { renderRosterPng, shareRosterPng } from '@/lib/rosterImage'
+import { AutoFill, StaffingSetup } from './AutoRosterPanel'
 
 interface OutletOption {
   id: string
@@ -31,9 +32,7 @@ export default function RosterPage() {
     format(startOfWeek(new Date(), { weekStartsOn: 1 }), 'yyyy-MM-dd'),
   )
 
-  const days = Array.from({ length: 7 }, (_, i) =>
-    format(addDays(new Date(weekStart), i), 'yyyy-MM-dd'),
-  )
+  const days = Array.from({ length: 7 }, (_, i) => format(addDays(new Date(weekStart), i), 'yyyy-MM-dd'))
   const fromDate = days[0]
   const toDate = days[6]
 
@@ -59,10 +58,7 @@ export default function RosterPage() {
 
   return (
     <>
-      <PageHeader
-        title="Roster"
-        description="Plan shifts per outlet · week view"
-      />
+      <PageHeader title="Roster" description="Plan shifts per outlet · week view" />
 
       <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div className="-mx-1 flex flex-wrap gap-2 px-1">
@@ -87,12 +83,7 @@ export default function RosterPage() {
             className="h-10 rounded-lg border border-border bg-surface px-3 text-sm"
             value={weekStart}
             onChange={(e) =>
-              setWeekStart(
-                format(
-                  startOfWeek(new Date(e.target.value), { weekStartsOn: 1 }),
-                  'yyyy-MM-dd',
-                ),
-              )
+              setWeekStart(format(startOfWeek(new Date(e.target.value), { weekStartsOn: 1 }), 'yyyy-MM-dd'))
             }
           />
           <span className="text-xs text-muted-foreground">
@@ -125,9 +116,7 @@ export default function RosterPage() {
       ) : outletId ? (
         <OutletRoster
           outletId={outletId}
-          outletName={
-            outletsQ.data?.find((o) => o.id === outletId)?.display_name ?? outletId
-          }
+          outletName={outletsQ.data?.find((o) => o.id === outletId)?.display_name ?? outletId}
           days={days}
           fromDate={fromDate}
           toDate={toDate}
@@ -160,9 +149,7 @@ function OutletPill({
       onClick={onClick}
       className={cn(
         'inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 text-xs font-medium transition-colors',
-        active
-          ? 'bg-primary text-primary-foreground'
-          : 'bg-muted text-muted-foreground hover:bg-muted/70',
+        active ? 'bg-primary text-primary-foreground' : 'bg-muted text-muted-foreground hover:bg-muted/70',
       )}
     >
       {icon ? <Globe2 className="h-3 w-3" /> : null}
@@ -220,6 +207,7 @@ function OutletRoster({
     }
   }
 
+  const [panel, setPanel] = useState<'auto' | 'needs' | null>(null)
   const [sharing, setSharing] = useState(false)
   const onShare = async () => {
     setSharing(true)
@@ -233,7 +221,9 @@ function OutletRoster({
             const entry = byEmpDay.get(`${e.id}|${d}`)
             if (entry?.status === 'off') return { label: 'Off', time: '', off: true }
             const s = entry?.shift_id ? shiftById.get(entry.shift_id) : undefined
-            return s ? { label: s.name, time: clock(s.start_time) + ' – ' + clock(s.end_time) } : { label: '', time: '' }
+            return s
+              ? { label: s.name, time: clock(s.start_time) + ' – ' + clock(s.end_time) }
+              : { label: '', time: '' }
           }),
         }))
       const png = await renderRosterPng({ outletName, days, rows })
@@ -259,26 +249,38 @@ function OutletRoster({
   return (
     <Card>
       <CardContent className="flex flex-col gap-3 p-4 sm:p-6">
-        <div className="flex items-center justify-between gap-3">
+        <div className="flex flex-wrap items-center justify-between gap-3">
           <CardTitle>{outletName}</CardTitle>
           <div className="flex flex-wrap justify-end gap-2">
+            <Button size="sm" variant="outline" onClick={() => setPanel(panel === 'auto' ? null : 'auto')}>
+              <Wand2 className="h-4 w-4" /> Auto roster
+            </Button>
             <Button size="sm" variant="outline" onClick={onShare} loading={sharing}>
               <MessageCircle className="h-4 w-4" /> Send to WhatsApp
             </Button>
-            <Button
-              size="sm"
-              onClick={onPublish}
-              loading={publish.isPending}
-            >
+            <Button size="sm" onClick={onPublish} loading={publish.isPending}>
               <Send className="h-4 w-4" /> Publish week
             </Button>
           </div>
         </div>
 
+        {panel === 'needs' ? (
+          <StaffingSetup outletId={outletId} onClose={() => setPanel('auto')} />
+        ) : panel === 'auto' ? (
+          <AutoFill
+            outletId={outletId}
+            days={days}
+            shifts={shifts}
+            roster={roster}
+            employees={[...(employeesQ.data ?? [])].sort((a, b) => a.full_name.localeCompare(b.full_name))}
+            onClose={() => setPanel(null)}
+            onEditNeeds={() => setPanel('needs')}
+          />
+        ) : null}
+
         {shifts.length === 0 ? (
           <CardDescription>
-            No shifts defined for this outlet — go to Shifts and add one (or a
-            universal template).
+            No shifts defined for this outlet — go to Shifts and add one (or a universal template).
           </CardDescription>
         ) : null}
 
@@ -299,9 +301,7 @@ function OutletRoster({
                 <tr key={e.id}>
                   <td className="px-3 py-2">
                     <div className="font-medium">{e.full_name}</div>
-                    <div className="text-xs text-muted-foreground">
-                      {e.employee_code}
-                    </div>
+                    <div className="text-xs text-muted-foreground">{e.employee_code}</div>
                   </td>
                   {days.map((d) => {
                     const entry = byEmpDay.get(`${e.id}|${d}`)
@@ -309,9 +309,7 @@ function OutletRoster({
                       <td key={d} className="px-2 py-2">
                         <select
                           className="h-9 w-full rounded-md border border-border bg-surface px-2 text-xs"
-                          value={
-                            entry?.shift_id ?? (entry?.status === 'off' ? '__off' : '')
-                          }
+                          value={entry?.shift_id ?? (entry?.status === 'off' ? '__off' : '')}
                           onChange={(ev) => setShift(e.id, d, ev.target.value)}
                         >
                           <option value="">—</option>
@@ -323,9 +321,7 @@ function OutletRoster({
                           <option value="__off">Off</option>
                         </select>
                         {entry?.status === 'published' ? (
-                          <span className="mt-1 block text-[10px] text-primary">
-                            published
-                          </span>
+                          <span className="mt-1 block text-[10px] text-primary">published</span>
                         ) : null}
                       </td>
                     )
@@ -334,10 +330,7 @@ function OutletRoster({
               ))}
               {employeesQ.data?.length === 0 ? (
                 <tr>
-                  <td
-                    colSpan={8}
-                    className="px-3 py-6 text-center text-muted-foreground"
-                  >
+                  <td colSpan={8} className="px-3 py-6 text-center text-muted-foreground">
                     No active employees at this outlet.
                   </td>
                 </tr>
