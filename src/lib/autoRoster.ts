@@ -68,7 +68,11 @@ export interface RulesInput {
   newJoinerMonths: number
 }
 
-export type LockedCell = { kind: 'shift'; shiftId: string | null } | { kind: 'off' } | { kind: 'leave' }
+export type LockedCell =
+  | { kind: 'shift'; shiftId: string | null }
+  | { kind: 'off' }
+  | { kind: 'leave' }
+  | { kind: 'past' } // day already gone: never filled
 
 export interface DraftEntry {
   employeeId: string
