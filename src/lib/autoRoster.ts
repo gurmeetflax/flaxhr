@@ -164,8 +164,11 @@ export function generateRoster(input: {
   needs: NeedInput[]
   rules: RulesInput
   locked: Map<string, LockedCell> // `${employeeId}|${date}`
+  /** Roaming staff (e.g. area managers) to place where the outlet is still short. */
+  floaters?: StaffInput[]
 }): RosterDraft {
   const { days, staff, needs, rules, locked } = input
+  const floaters = input.floaters ?? []
   const warnings: string[] = []
   const entries: DraftEntry[] = []
   const shortfalls: ShortfallLine[] = []
@@ -460,6 +463,64 @@ export function generateRoster(input: {
       `${p.name}: no shift to give (no staffing needs at this outlet yet) — left blank to fill by hand.`,
     )
 
+  // ── 3b. Cover from roaming staff ──────────────────────────────────────
+  // After the outlet's own team is placed, roaming staff fill what is still
+  // uncovered, day by day: the shift that covers the most "nobody on duty"
+  // hours first. They keep at least one day off and skip days they are
+  // already booked (here or at another outlet).
+  const shortAt = (di: number, h: number) =>
+    [...groupsNeeded].reduce(
+      (best, g) => {
+        const gap = needOf(di, g)[h] - coverOf(di, g)[h]
+        return gap > best.gap ? { g, gap, empty: coverOf(di, g)[h] <= 0 } : best
+      },
+      { g: null as RosterGroup | null, gap: 0, empty: false },
+    )
+  const coverGain = (s: NormShift, di: number) =>
+    runsOn(s, di)
+      ? hoursOf(s).reduce((a, h) => {
+          const x = shortAt(di, h)
+          return a + (x.gap > 0 ? (x.empty ? 3 : 1) : 0)
+        }, 0)
+      : 0
+  for (const f of floaters) {
+    const isPast = (di: number) => locked.get(key(f.id, days[di]))?.kind === 'past'
+    const open = days.map((_d, di) => di).filter((di) => !locked.has(key(f.id, days[di])) && !isPast(di))
+    const placed: number[] = []
+    for (;;) {
+      if (placed.length >= Math.min(6, open.length)) break
+      let best: { di: number; s: NormShift; gain: number } | null = null
+      for (const di of open) {
+        if (placed.includes(di)) continue
+        for (const s of shifts) {
+          if (!canDo(f, s)) continue
+          const gain = coverGain(s, di)
+          if (gain > 0 && (!best || gain > best.gain)) best = { di, s, gain }
+        }
+      }
+      if (!best) break
+      placed.push(best.di)
+      for (const h of hoursOf(best.s)) {
+        const x = shortAt(best.di, h)
+        if (x.g) coverOf(best.di, x.g)[h] += 1
+      }
+      entries.push({
+        employeeId: f.id,
+        date: days[best.di],
+        shiftId: best.s.id,
+        off: false,
+        reason: `Cover: ${best.s.name}`,
+      })
+    }
+    if (placed.length)
+      warnings.push(
+        `${f.name} covers ${placed.length} day${placed.length === 1 ? '' : 's'} here (${placed
+          .sort((a, b) => a - b)
+          .map((di) => labelDay(days[di]).split(',')[0])
+          .join(', ')}).`,
+      )
+  }
+
   // ── 4. Checks ─────────────────────────────────────────────────────────
   // Shifts that run without an experienced person: one line per shift.
   for (const [sid, people] of crew) {
@@ -480,35 +541,50 @@ export function generateRoster(input: {
     )
   }
 
+  // Days already gone (cells locked as past) aren't reported.
+  const pastDay = (di: number) => staff.some((p) => locked.get(key(p.id, days[di]))?.kind === 'past')
+  const openDays = days.map((_d, di) => di).filter((di) => !pastDay(di))
+
   const gaps: StaffingGap[] = []
   for (const g of groupsNeeded) {
     let neededHours = 0
     let shortHours = 0
-    days.forEach((date, di) => {
+    for (const di of openDays) {
+      const date = days[di]
       const need = needOf(di, g)
       const c = coverOf(di, g)
+      for (let x = 0; x < 48; x++) {
+        neededHours += need[x]
+        shortHours += Math.max(0, need[x] - c[x])
+      }
+      // One line per stretch: "nobody on duty" stretches, and "short" stretches.
       let h = 0
       while (h < 48) {
-        neededHours += need[h]
-        const short = Math.max(0, need[h] - c[h])
-        shortHours += short
-        if (short > 0) {
-          const empty = c[h] <= 0
-          let e = h
-          while (e + 1 < 48 && need[e + 1] - c[e + 1] === short && c[e + 1] <= 0 === empty) {
-            e++
-            neededHours += need[e]
-            shortHours += short
-          }
-          shortfalls.push({ date, group: g, from: h * 60, to: (e + 1) * 60, short, empty })
-          h = e + 1
-        } else h++
+        if (need[h] - c[h] <= 0) {
+          h++
+          continue
+        }
+        const empty = c[h] <= 0
+        let e = h
+        let most = need[h] - c[h]
+        while (e + 1 < 48 && need[e + 1] - c[e + 1] > 0 && c[e + 1] <= 0 === empty) {
+          e++
+          most = Math.max(most, need[e] - c[e])
+        }
+        shortfalls.push({ date, group: g, from: h * 60, to: (e + 1) * 60, short: most, empty })
+        h = e + 1
       }
-    })
+    }
     if (shortHours > 0) {
       const avgShift =
         shifts.reduce((a, x) => a + (x.end - x.start) / 60, 0) / Math.max(1, shifts.length) || 9
-      gaps.push({ group: g, neededHours, shortHours, extraPeople: Math.ceil(shortHours / (avgShift * 6)) })
+      const workDays = Math.max(1, Math.min(6, openDays.length))
+      gaps.push({
+        group: g,
+        neededHours,
+        shortHours,
+        extraPeople: Math.ceil(shortHours / (avgShift * workDays)),
+      })
     }
   }
 

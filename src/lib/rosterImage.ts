@@ -137,7 +137,7 @@ export async function loadOutletRosterRows(outletId: string, days: string[]): Pr
       .or(`outlet_id.eq.${outletId},outlet_id.is.null`),
     supabase
       .from('v_roster')
-      .select('employee_id, work_date, status, shift_id')
+      .select('employee_id, employee_name, work_date, status, shift_id')
       .eq('outlet_id', outletId)
       .gte('work_date', days[0])
       .lte('work_date', days[days.length - 1]),
@@ -145,7 +145,13 @@ export async function loadOutletRosterRows(outletId: string, days: string[]): Pr
   for (const r of [empR, shiftR, rosterR]) if (r.error) throw r.error
   const shiftById = new Map((shiftR.data ?? []).map((s) => [s.id as string, s]))
   const cell = new Map((rosterR.data ?? []).map((r) => [`${r.employee_id}|${r.work_date}`, r]))
-  return [...(empR.data ?? [])]
+  // Own staff plus anyone rostered here this week as cover.
+  const people = new Map((empR.data ?? []).map((e) => [e.id as string, e.full_name as string]))
+  for (const r of rosterR.data ?? [])
+    if (!people.has(r.employee_id as string))
+      people.set(r.employee_id as string, `${r.employee_name} (cover)`)
+  return [...people.entries()]
+    .map(([id, full_name]) => ({ id, full_name }))
     .sort((a, b) => String(a.full_name).localeCompare(String(b.full_name)))
     .map((e) => ({
       name: e.full_name as string,

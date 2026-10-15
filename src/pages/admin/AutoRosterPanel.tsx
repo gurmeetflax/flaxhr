@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { format } from 'date-fns'
 import { AlertTriangle, Check, Plus, Sparkles, Trash2, Wand2, X } from 'lucide-react'
 import { toast } from 'sonner'
@@ -20,6 +20,7 @@ import {
   rulesInput,
   suggestFromOrders,
   useSaveDraft,
+  useRoamingStaff,
   useSaveStaffingSetup,
   useStaffingSetup,
   busiestFromOrders,
@@ -393,6 +394,8 @@ export function AutoFill({
         ))
   const [draft, setDraft] = useState<(RosterDraft & { skipped: string[] }) | null>(null)
   const [busy, setBusy] = useState(false)
+  const roaming = useRoamingStaff()
+  const [cover, setCover] = useState<Set<string>>(new Set())
 
   const needs = setup.data?.needs ?? []
   const shiftName = new Map(shifts.map((s) => [s.id, s.name.trim()]))
@@ -402,12 +405,13 @@ export function AutoFill({
     setBusy(true)
     try {
       const use = activeShifts.filter((s) => chosen.has(s.id))
-      const { staff, locked, skipped } = await loadAutoRosterInputs({
+      const { staff, floaters, locked, skipped } = await loadAutoRosterInputs({
         outletId,
         days,
         shifts: use,
         roster,
         busiestDays: setup.data.rules.busiest_days,
+        coverIds: [...cover],
       })
       const result = generateRoster({
         days,
@@ -416,6 +420,7 @@ export function AutoFill({
         needs: setup.data.needs,
         rules: rulesInput(setup.data.rules),
         locked,
+        floaters,
       })
       setDraft({ ...result, skipped })
     } catch (e) {
@@ -425,11 +430,23 @@ export function AutoFill({
     }
   }
 
+  // Build straight away when the panel opens, so the week is visible
+  // without hunting for a button.
+  const autoRan = useRef(false)
+  useEffect(() => {
+    if (autoRan.current || !setup.data || !setup.data.needs.length) return
+    autoRan.current = true
+    const t = setTimeout(() => void run(), 0)
+    return () => clearTimeout(t)
+    // run reads the latest props; it only needs to fire once.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [setup.data])
+
   const save = async () => {
     if (!draft) return
     try {
       const n = await saveDraft.mutateAsync({ outletId, entries: draft.entries })
-      toast.success(`${n} roster cells filled as a draft — review, then Publish week`)
+      toast.success(`${n} cells added to the roster as a draft — check them, then Publish week`)
       onClose()
     } catch (e) {
       toast.error(e instanceof Error ? e.message : 'Save failed')
@@ -500,19 +517,69 @@ export function AutoFill({
         </div>
       </div>
 
+      {roaming.data?.length ? (
+        <div className="flex flex-col gap-1">
+          <span className="text-xs text-muted-foreground">
+            Use as cover where this outlet is still short (placed on the gap days only)
+          </span>
+          <div className="flex flex-wrap gap-1">
+            {roaming.data.map((r) => (
+              <button
+                key={r.id}
+                type="button"
+                onClick={() => {
+                  const next = new Set(cover)
+                  if (next.has(r.id)) next.delete(r.id)
+                  else next.add(r.id)
+                  setCover(next)
+                  setDraft(null)
+                }}
+                className={cn(
+                  'rounded-full px-2.5 py-1 text-xs',
+                  cover.has(r.id) ? 'bg-primary text-primary-foreground' : 'bg-muted text-muted-foreground',
+                )}
+              >
+                {r.full_name}
+                {r.designation_name ? ` · ${r.designation_name}` : ''}
+              </button>
+            ))}
+          </div>
+        </div>
+      ) : null}
+
       <div className="flex flex-wrap gap-2">
-        <Button size="sm" onClick={run} loading={busy} disabled={!needs.length || !chosen.size}>
-          <Wand2 className="h-4 w-4" /> {draft ? 'Rebuild' : 'Build draft'}
+        <Button
+          size="sm"
+          variant="outline"
+          onClick={run}
+          loading={busy}
+          disabled={!needs.length || !chosen.size}
+        >
+          <Wand2 className="h-4 w-4" /> {draft ? 'Rebuild' : 'Build'}
         </Button>
         <Button size="sm" variant="outline" onClick={onEditNeeds}>
           Staffing needs
         </Button>
-        {draft ? (
-          <Button size="sm" loading={saveDraft.isPending} onClick={save} disabled={!draft.entries.length}>
-            <Check className="h-4 w-4" /> Save {draft.entries.length} cells as draft
-          </Button>
-        ) : null}
       </div>
+      {busy && !draft ? <p className="text-sm text-muted-foreground">Building the week…</p> : null}
+      {draft ? (
+        draft.entries.length ? (
+          <div className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-primary bg-surface p-3">
+            <span className="text-sm">
+              <b>Preview</b> — {draft.entries.length} cells below. Nothing is in the roster until you press
+              the button.
+            </span>
+            <Button loading={saveDraft.isPending} onClick={save}>
+              <Check className="h-4 w-4" /> Put into roster
+            </Button>
+          </div>
+        ) : (
+          <p className="rounded-md bg-muted p-2 text-sm">
+            Nothing to fill: every cell this week is already set or the day has passed. Pick next week to plan
+            ahead.
+          </p>
+        )
+      ) : null}
 
       {draft ? (
         <>
@@ -539,7 +606,7 @@ export function AutoFill({
                   <li key={g.group}>
                     <b>{GROUP_LABEL[g.group]}</b>: about {g.extraPeople} more{' '}
                     {g.extraPeople === 1 ? 'person' : 'people'} needed — {g.shortHours} of {g.neededHours}{' '}
-                    person-hours this week aren't covered.
+                    person-hours left this week aren't covered.
                   </li>
                 ))}
               </ul>
@@ -558,7 +625,7 @@ export function AutoFill({
                     {format(new Date(`${s.date}T00:00:00`), 'EEE d')} · {hhmm(s.from)}–{hhmm(s.to)} ·{' '}
                     {s.empty
                       ? `no ${GROUP_LABEL[s.group].toLowerCase()} staff on duty`
-                      : `${s.short} ${GROUP_LABEL[s.group].toLowerCase()} short`}
+                      : `${s.short > 1 ? 'up to ' : ''}${s.short} ${GROUP_LABEL[s.group].toLowerCase()} short`}
                   </li>
                 ))}
               </ul>
@@ -578,7 +645,7 @@ export function AutoFill({
                 </tr>
               </thead>
               <tbody className="divide-y divide-border">
-                {employees.map((e) => (
+                {[...employees, ...(roaming.data ?? []).filter((r) => cover.has(r.id))].map((e) => (
                   <tr key={e.id}>
                     <td className="whitespace-nowrap px-2 py-1 font-medium">{e.full_name}</td>
                     {days.map((d) => {

@@ -200,6 +200,26 @@ function OutletRoster({
   const publish = usePublishWeek()
   const canAutoRoster = useHasRole(['admin', 'hr'])
 
+  // The outlet's own staff, plus anyone rostered here this week as cover.
+  const own = employeesQ.data ?? []
+  const ownIds = new Set(own.map((e) => e.id))
+  const visitors = [
+    ...new Map(
+      roster
+        .filter((r) => !ownIds.has(r.employee_id))
+        .map((r) => [
+          r.employee_id,
+          {
+            id: r.employee_id,
+            full_name: `${r.employee_name} (cover)`,
+            employee_code: r.employee_code,
+            outlet_id: null,
+          },
+        ]),
+    ).values(),
+  ]
+  const people: EmployeeOption[] = [...own, ...visitors]
+
   const byEmpDay = new Map<string, RosterEntry>()
   for (const r of roster) byEmpDay.set(`${r.employee_id}|${r.work_date}`, r)
 
@@ -253,7 +273,7 @@ function OutletRoster({
     setSharing(true)
     try {
       const shiftById = new Map(shifts.map((s) => [s.id, s]))
-      const rows = [...(employeesQ.data ?? [])]
+      const rows = [...people]
         .sort((a, b) => a.full_name.localeCompare(b.full_name))
         .map((e) => ({
           name: e.full_name,
@@ -360,7 +380,7 @@ function OutletRoster({
               </tr>
             </thead>
             <tbody className="divide-y divide-border">
-              {employeesQ.data?.map((e) => (
+              {people.map((e) => (
                 <tr key={e.id}>
                   <td className="px-3 py-2">
                     <div className="font-medium">{e.full_name}</div>
@@ -395,7 +415,7 @@ function OutletRoster({
                   })}
                 </tr>
               ))}
-              {employeesQ.data?.length === 0 ? (
+              {employeesQ.data && people.length === 0 ? (
                 <tr>
                   <td colSpan={8} className="px-3 py-6 text-center text-muted-foreground">
                     No active employees at this outlet.
