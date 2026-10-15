@@ -64,6 +64,29 @@ export function useUpsertRosterEntry() {
   })
 }
 
+// Saves many roster cells in one request (the manual roster's Save button).
+export function useSaveRosterCells() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: async (
+      cells: {
+        outlet_id: string
+        employee_id: string
+        work_date: string
+        shift_id: string | null
+        status: RosterStatus
+      }[],
+    ) => {
+      if (!cells.length) return
+      const { error } = await supabase.schema('core').from('roster_entries').upsert(cells, {
+        onConflict: 'employee_id,work_date',
+      })
+      if (error) throw error
+    },
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['roster'] }),
+  })
+}
+
 export function useDeleteRosterEntry() {
   const qc = useQueryClient()
   return useMutation({
@@ -100,10 +123,7 @@ export function useMyRoster() {
     enabled: !!user,
     staleTime: 60_000,
     queryFn: async () => {
-      const { data, error } = await supabase
-        .from('v_my_roster')
-        .select('*')
-        .order('work_date')
+      const { data, error } = await supabase.from('v_my_roster').select('*').order('work_date')
       if (error) throw error
       return (data ?? []) as RosterEntry[]
     },

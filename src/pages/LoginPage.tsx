@@ -19,10 +19,14 @@ export default function LoginPage() {
   useEffect(() => {
     if (!user || !roles) return
     const from = (location.state as { from?: string } | null)?.from
-    const isAdminish = roles.some((r) => ['admin', 'hr', 'manager', 'auditor'].includes(r.role))
-    // Mobile shell is employee-only, even for admin accounts.
-    const target = IS_NATIVE ? '/me' : isAdminish ? '/admin' : '/me'
-    navigate(from ?? target, { replace: true })
+    const isAdminHr = roles.some((r) => ['admin', 'hr'].includes(r.role))
+    const isManager = roles.some((r) => r.role === 'manager')
+    // Mobile shell is employee-only, even for admin accounts. On the web,
+    // managers (who can't open the admin area) land on their team roster.
+    const target = IS_NATIVE ? '/me' : isAdminHr ? '/admin' : isManager ? '/me/team-roster' : '/me'
+    // Don't send someone back to an admin page they can't open.
+    const back = from && (isAdminHr || !from.startsWith('/admin')) ? from : null
+    navigate(back ?? target, { replace: true })
   }, [user, roles, navigate, location.state])
 
   return (
@@ -97,13 +101,7 @@ function AdminForm() {
 
   return (
     <div className="space-y-4 rounded-xl border border-border bg-surface p-6 shadow-soft">
-      <Button
-        type="button"
-        variant="outline"
-        className="w-full"
-        onClick={onGoogle}
-        loading={googleBusy}
-      >
+      <Button type="button" variant="outline" className="w-full" onClick={onGoogle} loading={googleBusy}>
         <GoogleLogo /> Continue with Google
       </Button>
 
@@ -196,7 +194,10 @@ function EmployeeForm() {
   }
 
   return (
-    <form onSubmit={onSubmit} className="space-y-4 rounded-xl border border-border bg-surface p-6 shadow-soft">
+    <form
+      onSubmit={onSubmit}
+      className="space-y-4 rounded-xl border border-border bg-surface p-6 shadow-soft"
+    >
       <div className="space-y-2">
         <Label htmlFor="emp-code">Employee code</Label>
         <Input
@@ -224,9 +225,7 @@ function EmployeeForm() {
       <Button type="submit" loading={busy} className="w-full">
         Sign in
       </Button>
-      <p className="text-xs text-muted-foreground">
-        Forgot your PIN? Ask your outlet manager to reset it.
-      </p>
+      <p className="text-xs text-muted-foreground">Forgot your PIN? Ask your outlet manager to reset it.</p>
     </form>
   )
 }

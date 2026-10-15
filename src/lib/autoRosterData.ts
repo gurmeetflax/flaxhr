@@ -291,6 +291,11 @@ export async function loadAutoRosterInputs(opts: {
       r.status === 'off' ? { kind: 'off' } : { kind: 'shift', shiftId: r.shift_id },
     )
   }
+  // Days already gone this week are left as they are.
+  const today = new Date().toLocaleDateString('en-CA', { timeZone: 'Asia/Kolkata' })
+  for (const p of staff)
+    for (const d of days)
+      if (d < today && !locked.has(`${p.id}|${d}`)) locked.set(`${p.id}|${d}`, { kind: 'past' })
   for (const l of leaveR.data ?? []) {
     for (const d of days) {
       if (

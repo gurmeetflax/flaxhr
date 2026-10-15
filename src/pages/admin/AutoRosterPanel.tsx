@@ -617,7 +617,8 @@ export function AutoFill({
             </table>
           </div>
           <p className="text-xs text-muted-foreground">
-            Highlighted cells are new. Grey text is already in the roster and stays as is.
+            Highlighted cells are new. Grey text is already in the roster and stays as is; days already gone
+            aren't filled. Nothing is saved until you press Save.
           </p>
         </>
       ) : null}
