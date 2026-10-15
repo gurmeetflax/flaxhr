@@ -1,16 +1,24 @@
 import { useEffect, useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { addDays, format, startOfWeek } from 'date-fns'
-import { Globe2, MessageCircle, Send, Wand2 } from 'lucide-react'
+import { FileDown, Globe2, MessageCircle, Save, Send, Undo2, Wand2 } from 'lucide-react'
 import { toast } from 'sonner'
 import { supabase } from '@/lib/supabase'
 import { PageHeader } from '@/components/layout/AppShell'
 import { Card, CardContent, CardDescription, CardTitle } from '@/components/ui/Card'
 import { Button } from '@/components/ui/Button'
 import { cn } from '@/lib/utils'
-import { useRoster, useUpsertRosterEntry, usePublishWeek, type RosterEntry } from '@/lib/roster'
+import { useRoster, useSaveRosterCells, usePublishWeek, type RosterEntry } from '@/lib/roster'
+import { useHasRole } from '@/lib/auth'
 import { useShifts } from '@/lib/shifts'
-import { renderRosterPng, shareRosterPng } from '@/lib/rosterImage'
+import {
+  clock,
+  loadOutletRosterRows,
+  renderRosterPng,
+  rosterPdf,
+  shareRosterFile,
+  shareRosterPng,
+} from '@/lib/rosterImage'
 import { AutoFill, StaffingSetup } from './AutoRosterPanel'
 
 interface OutletOption {
@@ -89,6 +97,7 @@ export default function RosterPage() {
           <span className="text-xs text-muted-foreground">
             {fromDate} → {toDate}
           </span>
+          <AllOutletsPdfButton outlets={outletsQ.data ?? []} days={days} weekStart={fromDate} />
         </div>
       </div>
 
@@ -97,7 +106,7 @@ export default function RosterPage() {
           <div className="grid gap-6">
             {outletsQ.data.map((o) => (
               <OutletRoster
-                key={o.id}
+                key={`${o.id}|${fromDate}`}
                 outletId={o.id}
                 outletName={o.display_name ?? o.id}
                 days={days}
@@ -115,6 +124,7 @@ export default function RosterPage() {
         )
       ) : outletId ? (
         <OutletRoster
+          key={`${outletId}|${fromDate}`}
           outletId={outletId}
           outletName={outletsQ.data?.find((o) => o.id === outletId)?.display_name ?? outletId}
           days={days}
@@ -186,30 +196,60 @@ function OutletRoster({
 
   const { data: shifts = [] } = useShifts(outletId)
   const { data: roster = [] } = useRoster(outletId, fromDate, toDate)
-  const upsert = useUpsertRosterEntry()
+  const saveCells = useSaveRosterCells()
   const publish = usePublishWeek()
+  const canAutoRoster = useHasRole(['admin', 'hr'])
 
   const byEmpDay = new Map<string, RosterEntry>()
   for (const r of roster) byEmpDay.set(`${r.employee_id}|${r.work_date}`, r)
 
-  const setShift = async (employeeId: string, work_date: string, shiftId: string) => {
+  // Edits stay on screen until Save; nothing is written per dropdown.
+  const [pending, setPending] = useState<Map<string, string>>(new Map())
+  const cellValue = (entry: RosterEntry | undefined) =>
+    entry?.shift_id ?? (entry?.status === 'off' ? '__off' : '')
+  const setCell = (employeeId: string, workDate: string, value: string) => {
+    const k = `${employeeId}|${workDate}`
+    setPending((prev) => {
+      const next = new Map(prev)
+      if (value === cellValue(byEmpDay.get(k))) next.delete(k)
+      else next.set(k, value)
+      return next
+    })
+  }
+  const savePending = async () => {
+    if (!pending.size) return true
     try {
-      await upsert.mutateAsync({
-        outlet_id: outletId,
-        employee_id: employeeId,
-        work_date,
-        shift_id: shiftId === '__off' || shiftId === '' ? null : shiftId,
-        status: shiftId === '__off' ? 'off' : 'planned',
-      })
-      toast.success('Saved')
+      await saveCells.mutateAsync(
+        [...pending.entries()].map(([k, v]) => {
+          const [employee_id, work_date] = k.split('|')
+          return {
+            outlet_id: outletId,
+            employee_id,
+            work_date,
+            shift_id: v === '__off' || v === '' ? null : v,
+            status: v === '__off' ? ('off' as const) : ('planned' as const),
+          }
+        }),
+      )
+      toast.success(`Saved ${pending.size} change${pending.size === 1 ? '' : 's'}`)
+      setPending(new Map())
+      return true
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : 'Failed')
+      toast.error(err instanceof Error ? err.message : 'Save failed')
+      return false
     }
   }
+  useEffect(() => {
+    if (!pending.size) return
+    const warn = (e: BeforeUnloadEvent) => e.preventDefault()
+    window.addEventListener('beforeunload', warn)
+    return () => window.removeEventListener('beforeunload', warn)
+  }, [pending.size])
 
   const [panel, setPanel] = useState<'auto' | 'needs' | null>(null)
   const [sharing, setSharing] = useState(false)
   const onShare = async () => {
+    if (pending.size) return toast.error('Save your changes first')
     setSharing(true)
     try {
       const shiftById = new Map(shifts.map((s) => [s.id, s]))
@@ -238,6 +278,7 @@ function OutletRoster({
   }
 
   const onPublish = async () => {
+    if (!(await savePending())) return
     try {
       await publish.mutateAsync({ outletId, fromDate, toDate })
       toast.success(`Published — ${outletName}`)
@@ -252,7 +293,13 @@ function OutletRoster({
         <div className="flex flex-wrap items-center justify-between gap-3">
           <CardTitle>{outletName}</CardTitle>
           <div className="flex flex-wrap justify-end gap-2">
-            <Button size="sm" variant="outline" onClick={() => setPanel(panel === 'auto' ? null : 'auto')}>
+            <Button
+              size="sm"
+              variant="outline"
+              disabled={!canAutoRoster}
+              title={canAutoRoster ? undefined : 'Auto roster is run by admin / HR'}
+              onClick={() => setPanel(panel === 'auto' ? null : 'auto')}
+            >
               <Wand2 className="h-4 w-4" /> Auto roster
             </Button>
             <Button size="sm" variant="outline" onClick={onShare} loading={sharing}>
@@ -264,9 +311,25 @@ function OutletRoster({
           </div>
         </div>
 
-        {panel === 'needs' ? (
+        {pending.size ? (
+          <div className="sticky top-2 z-10 flex flex-wrap items-center justify-between gap-2 rounded-lg border border-primary/40 bg-primary/10 px-3 py-2 text-sm">
+            <span>
+              {pending.size} unsaved change{pending.size === 1 ? '' : 's'}
+            </span>
+            <span className="flex gap-2">
+              <Button size="sm" variant="ghost" onClick={() => setPending(new Map())}>
+                <Undo2 className="h-4 w-4" /> Discard
+              </Button>
+              <Button size="sm" loading={saveCells.isPending} onClick={() => void savePending()}>
+                <Save className="h-4 w-4" /> Save changes
+              </Button>
+            </span>
+          </div>
+        ) : null}
+
+        {panel === 'needs' && canAutoRoster ? (
           <StaffingSetup outletId={outletId} onClose={() => setPanel('auto')} />
-        ) : panel === 'auto' ? (
+        ) : panel === 'auto' && canAutoRoster ? (
           <AutoFill
             outletId={outletId}
             days={days}
@@ -305,12 +368,16 @@ function OutletRoster({
                   </td>
                   {days.map((d) => {
                     const entry = byEmpDay.get(`${e.id}|${d}`)
+                    const edited = pending.get(`${e.id}|${d}`)
                     return (
                       <td key={d} className="px-2 py-2">
                         <select
-                          className="h-9 w-full rounded-md border border-border bg-surface px-2 text-xs"
-                          value={entry?.shift_id ?? (entry?.status === 'off' ? '__off' : '')}
-                          onChange={(ev) => setShift(e.id, d, ev.target.value)}
+                          className={cn(
+                            'h-9 w-full rounded-md border bg-surface px-2 text-xs',
+                            edited !== undefined ? 'border-primary ring-1 ring-primary' : 'border-border',
+                          )}
+                          value={edited ?? cellValue(entry)}
+                          onChange={(ev) => setCell(e.id, d, ev.target.value)}
                         >
                           <option value="">—</option>
                           {shifts.map((s) => (
@@ -320,7 +387,7 @@ function OutletRoster({
                           ))}
                           <option value="__off">Off</option>
                         </select>
-                        {entry?.status === 'published' ? (
+                        {entry?.status === 'published' && edited === undefined ? (
                           <span className="mt-1 block text-[10px] text-primary">published</span>
                         ) : null}
                       </td>
@@ -343,8 +410,43 @@ function OutletRoster({
   )
 }
 
-// "09:30:00" → "9:30 AM"
-function clock(t: string): string {
-  const [h, m] = t.split(':').map(Number)
-  return format(new Date(2000, 0, 1, h, m), 'h:mm a')
+// Every outlet's week as one PDF (a page per outlet), shared to WhatsApp.
+function AllOutletsPdfButton({
+  outlets,
+  days,
+  weekStart,
+}: {
+  outlets: OutletOption[]
+  days: string[]
+  weekStart: string
+}) {
+  const [busy, setBusy] = useState(false)
+  const run = async () => {
+    setBusy(true)
+    try {
+      const pages: Blob[] = []
+      for (const o of outlets) {
+        const rows = await loadOutletRosterRows(o.id, days)
+        if (!rows.length) continue
+        pages.push(await renderRosterPng({ outletName: o.display_name ?? o.id, days, rows }))
+      }
+      const pdf = await rosterPdf(pages)
+      const how = await shareRosterFile(
+        pdf,
+        `flax-roster-all-outlets-${weekStart}.pdf`,
+        `Flax roster — all outlets, week of ${format(new Date(`${weekStart}T00:00:00`), 'd MMM')}`,
+      )
+      if (how === 'link') toast.success('Opening WhatsApp with the roster PDF link')
+      if (how === 'downloaded') toast.success('Roster PDF downloaded — attach it in WhatsApp')
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : 'Could not make the PDF')
+    } finally {
+      setBusy(false)
+    }
+  }
+  return (
+    <Button size="sm" variant="outline" onClick={run} loading={busy} disabled={!outlets.length}>
+      <FileDown className="h-4 w-4" /> All outlets PDF → WhatsApp
+    </Button>
+  )
 }

@@ -35,7 +35,8 @@ export async function renderRosterPng(opts: {
   canvas.height = height * scale
   const ctx = canvas.getContext('2d')!
   ctx.scale(scale, scale)
-  const font = (w: number, px: number) => `${w} ${px}px system-ui, -apple-system, "Segoe UI", Roboto, sans-serif`
+  const font = (w: number, px: number) =>
+    `${w} ${px}px system-ui, -apple-system, "Segoe UI", Roboto, sans-serif`
 
   ctx.fillStyle = '#ffffff'
   ctx.fillRect(0, 0, width, height)
@@ -114,16 +115,99 @@ export async function renderRosterPng(opts: {
   ctx.font = font(500, 12)
   ctx.fillText(`Flax HR · ${format(new Date(), 'd MMM yyyy, h:mm a')}`, PAD, height - PAD + 4)
 
-  return await new Promise<Blob>((res, rej) => canvas.toBlob((b) => (b ? res(b) : rej(new Error('Image failed'))), 'image/png'))
+  return await new Promise<Blob>((res, rej) =>
+    canvas.toBlob((b) => (b ? res(b) : rej(new Error('Image failed'))), 'image/png'),
+  )
+}
+
+// "09:30:00" → "9:30 AM"
+export function clock(t: string): string {
+  const [h, m] = t.split(':').map(Number)
+  return format(new Date(2000, 0, 1, h, m), 'h:mm a')
+}
+
+// One outlet's week as image rows, straight from the database.
+export async function loadOutletRosterRows(outletId: string, days: string[]): Promise<RosterImageRow[]> {
+  const [empR, shiftR, rosterR] = await Promise.all([
+    supabase.from('v_employees').select('id, full_name').eq('outlet_id', outletId).eq('is_active', true),
+    supabase
+      .schema('core')
+      .from('shifts')
+      .select('id, name, start_time, end_time')
+      .or(`outlet_id.eq.${outletId},outlet_id.is.null`),
+    supabase
+      .from('v_roster')
+      .select('employee_id, work_date, status, shift_id')
+      .eq('outlet_id', outletId)
+      .gte('work_date', days[0])
+      .lte('work_date', days[days.length - 1]),
+  ])
+  for (const r of [empR, shiftR, rosterR]) if (r.error) throw r.error
+  const shiftById = new Map((shiftR.data ?? []).map((s) => [s.id as string, s]))
+  const cell = new Map((rosterR.data ?? []).map((r) => [`${r.employee_id}|${r.work_date}`, r]))
+  return [...(empR.data ?? [])]
+    .sort((a, b) => String(a.full_name).localeCompare(String(b.full_name)))
+    .map((e) => ({
+      name: e.full_name as string,
+      cells: days.map((d) => {
+        const r = cell.get(`${e.id}|${d}`)
+        if (r?.status === 'off') return { label: 'Off', time: '', off: true }
+        const s = r?.shift_id ? shiftById.get(r.shift_id as string) : undefined
+        return s
+          ? {
+              label: String(s.name).trim(),
+              time: `${clock(s.start_time as string)} – ${clock(s.end_time as string)}`,
+            }
+          : { label: '', time: '' }
+      }),
+    }))
+}
+
+// Several roster PNGs as one PDF, a page per outlet.
+export async function rosterPdf(pages: Blob[]): Promise<Blob> {
+  const { jsPDF } = await import('jspdf')
+  let pdf: InstanceType<typeof jsPDF> | null = null
+  for (const png of pages) {
+    const url = URL.createObjectURL(png)
+    try {
+      const img = await new Promise<HTMLImageElement>((res, rej) => {
+        const i = new Image()
+        i.onload = () => res(i)
+        i.onerror = rej
+        i.src = url
+      })
+      const w = img.naturalWidth / 2
+      const h = img.naturalHeight / 2
+      const orientation = w > h ? 'landscape' : 'portrait'
+      if (!pdf) pdf = new jsPDF({ unit: 'px', format: [w, h], orientation, hotfixes: ['px_scaling'] })
+      else pdf.addPage([w, h], orientation)
+      pdf.addImage(img, 'PNG', 0, 0, w, h)
+    } finally {
+      URL.revokeObjectURL(url)
+    }
+  }
+  if (!pdf) throw new Error('No outlets with staff to include.')
+  return pdf.output('blob')
+}
+
+export function shareRosterPng(blob: Blob, outletName: string, weekStart: string) {
+  const fileName = `roster-${outletName.replace(/[^\w]+/g, '-').toLowerCase()}-${weekStart}.png`
+  return shareRosterFile(
+    blob,
+    fileName,
+    `${outletName} roster — week of ${format(parseISO(weekStart), 'd MMM')}`,
+  )
 }
 
 // Share to WhatsApp. Phones with Web Share (Chrome, home-screen app) get the
-// share sheet with the PNG itself; inside the Android app we upload it and
+// share sheet with the file itself; inside the Android app we upload it and
 // send a link; on desktop we download it and open WhatsApp Web.
-export async function shareRosterPng(blob: Blob, outletName: string, weekStart: string): Promise<'shared' | 'link' | 'downloaded'> {
-  const fileName = `roster-${outletName.replace(/[^\w]+/g, '-').toLowerCase()}-${weekStart}.png`
-  const file = new File([blob], fileName, { type: 'image/png' })
-  const text = `${outletName} roster — week of ${format(parseISO(weekStart), 'd MMM')}`
+export async function shareRosterFile(
+  blob: Blob,
+  fileName: string,
+  text: string,
+): Promise<'shared' | 'link' | 'downloaded'> {
+  const file = new File([blob], fileName, { type: blob.type })
 
   if (!IS_NATIVE && typeof navigator.canShare === 'function' && navigator.canShare({ files: [file] })) {
     try {
@@ -135,10 +219,14 @@ export async function shareRosterPng(blob: Blob, outletName: string, weekStart: 
   }
 
   if (IS_NATIVE) {
-    const path = `${weekStart}/${crypto.randomUUID()}-${fileName}`
-    const { error } = await supabase.storage.from('roster-shares').upload(path, blob, { contentType: 'image/png' })
+    const path = `${format(new Date(), 'yyyy-MM-dd')}/${crypto.randomUUID()}-${fileName}`
+    const { error } = await supabase.storage
+      .from('roster-shares')
+      .upload(path, blob, { contentType: blob.type })
     if (error) throw error
-    const { data, error: urlErr } = await supabase.storage.from('roster-shares').createSignedUrl(path, 60 * 60 * 24 * 14)
+    const { data, error: urlErr } = await supabase.storage
+      .from('roster-shares')
+      .createSignedUrl(path, 60 * 60 * 24 * 14)
     if (urlErr) throw urlErr
     window.open(`https://wa.me/?text=${encodeURIComponent(`${text}\n${data.signedUrl}`)}`, '_blank')
     return 'link'
