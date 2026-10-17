@@ -20,6 +20,8 @@ export interface FieldVisit {
   check_out_lng: number | null
   check_out_accuracy_m: number | null
   duration_min: number | null
+  auto_closed: boolean
+  time_unknown: boolean
 }
 
 interface Coords {
@@ -41,7 +43,8 @@ function friendly(err: { message?: string }): Error {
   return new Error(code ? ERRORS[code] : (err.message ?? 'Something went wrong'))
 }
 
-// The signed-in employee's meetings from the start of today.
+// The signed-in employee's meetings from the start of today, plus any
+// meeting still open from an earlier day (so it can be checked out).
 export function useMyTodayVisits(employeeId: string | undefined) {
   return useQuery<FieldVisit[]>({
     queryKey: ['my-field-visits', employeeId],
@@ -51,7 +54,7 @@ export function useMyTodayVisits(employeeId: string | undefined) {
         .from('v_field_visits')
         .select('*')
         .eq('employee_id', employeeId!)
-        .gte('check_in_at', startOfDay(new Date()).toISOString())
+        .or(`check_in_at.gte.${startOfDay(new Date()).toISOString()},check_out_at.is.null`)
         .order('check_in_at', { ascending: false })
       if (error) throw error
       return (data ?? []) as FieldVisit[]

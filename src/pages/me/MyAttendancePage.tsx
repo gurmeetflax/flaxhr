@@ -11,9 +11,7 @@ import { useMyEmployee } from '@/lib/auth'
 import AttendanceCalendar from './AttendanceCalendar'
 
 export default function MyAttendancePage() {
-  const [periodMonth, setPeriodMonth] = useState<string>(
-    format(startOfMonth(new Date()), 'yyyy-MM-dd'),
-  )
+  const [periodMonth, setPeriodMonth] = useState<string>(format(startOfMonth(new Date()), 'yyyy-MM-dd'))
 
   const monthStart = new Date(periodMonth + 'T00:00:00')
   const fromDate = startOfMonth(monthStart).toISOString()
@@ -51,7 +49,11 @@ export default function MyAttendancePage() {
         />
       </div>
 
-      <AttendanceCalendar employeeId={employee?.id} monthStart={monthStart} />
+      <AttendanceCalendar
+        employeeId={employee?.id}
+        monthStart={monthStart}
+        fieldStaff={employee?.field_staff === true}
+      />
 
       {isLoading ? (
         <Card>
@@ -99,23 +101,27 @@ function Row({ row }: { row: AttendanceRow }) {
       </span>
       <span className="flex items-center gap-3 text-muted-foreground">
         {row.distance_m != null ? <span>{row.distance_m} m</span> : null}
-        <span className="font-medium text-foreground">
-          {formatInTimeZone(row.punched_at, tz, 'h:mm a')}
-        </span>
+        <span className="font-medium text-foreground">{formatInTimeZone(row.punched_at, tz, 'h:mm a')}</span>
       </span>
     </li>
   )
 }
 
-function Pill({ children, tone }: { children: React.ReactNode; tone: 'positive' | 'neutral' | 'warn' | 'negative' }) {
+function Pill({
+  children,
+  tone,
+}: {
+  children: React.ReactNode
+  tone: 'positive' | 'neutral' | 'warn' | 'negative'
+}) {
   const cls =
     tone === 'positive'
       ? 'bg-primary/10 text-primary'
       : tone === 'warn'
-      ? 'bg-amber-500/10 text-amber-600'
-      : tone === 'negative'
-      ? 'bg-destructive/10 text-destructive'
-      : 'bg-muted text-muted-foreground'
+        ? 'bg-amber-500/10 text-amber-600'
+        : tone === 'negative'
+          ? 'bg-destructive/10 text-destructive'
+          : 'bg-muted text-muted-foreground'
   return <span className={`rounded-full px-2 py-0.5 text-xs font-medium ${cls}`}>{children}</span>
 }
 

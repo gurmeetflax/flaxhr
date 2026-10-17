@@ -40,6 +40,8 @@ export interface PeriodEmployee {
   phone: string | null
   hired_on: string | null
   exit_date: string | null
+  /** Field staff punch from client sites: a short in/out still counts. */
+  field_staff?: boolean
 }
 
 export interface PeriodDay {
@@ -127,7 +129,9 @@ export async function loadPeriod(opts: {
 
   let empQ = supabase
     .from('v_employees')
-    .select('id, employee_code, full_name, outlet_id, outlet_name, designation_name, phone, hired_on, exit_date, is_active')
+    .select(
+      'id, employee_code, full_name, outlet_id, outlet_name, designation_name, phone, hired_on, exit_date, is_active, field_staff',
+    )
     .order('employee_code')
   if (opts.employeeId) empQ = empQ.eq('id', opts.employeeId)
   else {
@@ -190,19 +194,23 @@ export async function loadPeriod(opts: {
       if (one) q = q.eq('employee_id', one)
       return q
     }),
-    fetchAll<{ employee_id: string; requested_for: string; type: string; reason: string | null; status: string }>(
-      (a, b) => {
-        let q = supabase
-          .from('v_regularisations')
-          .select('employee_id, requested_for, type, reason, status')
-          .gte('requested_for', `${from}T00:00:00+05:30`)
-          .lte('requested_for', `${to}T23:59:59+05:30`)
-          .order('requested_for')
-          .range(a, b)
-        if (one) q = q.eq('employee_id', one)
-        return q
-      },
-    ),
+    fetchAll<{
+      employee_id: string
+      requested_for: string
+      type: string
+      reason: string | null
+      status: string
+    }>((a, b) => {
+      let q = supabase
+        .from('v_regularisations')
+        .select('employee_id, requested_for, type, reason, status')
+        .gte('requested_for', `${from}T00:00:00+05:30`)
+        .lte('requested_for', `${to}T23:59:59+05:30`)
+        .order('requested_for')
+        .range(a, b)
+      if (one) q = q.eq('employee_id', one)
+      return q
+    }),
   ])
 
   const key = (e: string, d: string) => `${e}|${d}`
@@ -218,7 +226,8 @@ export async function loadPeriod(opts: {
 
   const today = format(new Date(), 'yyyy-MM-dd')
   const dates: string[] = []
-  for (let d = parseISO(from); format(d, 'yyyy-MM-dd') <= to; d = addDays(d, 1)) dates.push(format(d, 'yyyy-MM-dd'))
+  for (let d = parseISO(from); format(d, 'yyyy-MM-dd') <= to; d = addDays(d, 1))
+    dates.push(format(d, 'yyyy-MM-dd'))
 
   return employees.map((emp) => {
     const myLeaves = leaves.filter((l) => l.employee_id === emp.id)
@@ -227,16 +236,20 @@ export async function loadPeriod(opts: {
       const leave = myLeaves.find((l) => l.start_date <= date && l.end_date >= date) ?? null
       const notes = [...(regBy.get(key(emp.id, date)) ?? [])]
       if (leave?.reason) notes.unshift(leave.reason)
-      if (r?.first_in_at && r.last_out_at && (r.worked_minutes ?? 0) < SHORT_DAY_MIN)
-        notes.unshift(`Punched in and out ${r.worked_minutes ?? 0} min apart — likely a double tap; no real punch-out`)
+      const shortDay = !emp.field_staff && (r?.worked_minutes ?? 0) < SHORT_DAY_MIN
+      if (r?.first_in_at && r.last_out_at && shortDay)
+        notes.unshift(
+          `Punched in and out ${r.worked_minutes ?? 0} min apart — likely a double tap; no real punch-out`,
+        )
       let status: PeriodStatus
-      if ((emp.hired_on && date < emp.hired_on) || (emp.exit_date && date > emp.exit_date)) status = 'not_employed'
+      if ((emp.hired_on && date < emp.hired_on) || (emp.exit_date && date > emp.exit_date))
+        status = 'not_employed'
       else if (r?.first_in_at)
         status = !r.last_out_at
           ? date < today
             ? 'no_out'
             : 'present'
-          : (r.worked_minutes ?? 0) < SHORT_DAY_MIN
+          : shortDay
             ? 'short'
             : (r.late_minutes ?? 0) > 0
               ? 'late'

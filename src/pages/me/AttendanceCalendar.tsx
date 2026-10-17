@@ -21,12 +21,14 @@ const KIND: Record<Kind, { label: string; bg: string; fg: string; dot: string }>
   none: { label: '', bg: 'transparent', fg: '#a1a1aa', dot: 'transparent' },
 }
 
-// In and out minutes apart (often a double tap) isn't a worked day.
+// In and out minutes apart (often a double tap) isn't a worked day,
+// except for field staff, who punch from client sites.
 const SHORT_DAY_MIN = 30
 
-function kindOf(d: Day): Kind {
+function kindOf(d: Day, fieldStaff = false): Kind {
   const k = baseKind(d)
   if (
+    !fieldStaff &&
     (k === 'present' || k === 'late' || k === 'early') &&
     d.report?.worked_minutes != null &&
     d.report.worked_minutes < SHORT_DAY_MIN
@@ -82,10 +84,13 @@ function t(ts: string | null | undefined): string {
 export default function AttendanceCalendar({
   employeeId,
   monthStart,
+  fieldStaff = false,
 }: {
   employeeId: string | undefined
   monthStart: Date
+  fieldStaff?: boolean
 }) {
+  const kindFor = (d: Day) => kindOf(d, fieldStaff)
   const from = format(monthStart, 'yyyy-MM-dd')
   const to = format(endOfMonth(monthStart), 'yyyy-MM-dd')
   const q = useAttendanceDays(employeeId, from, to)
@@ -97,7 +102,7 @@ export default function AttendanceCalendar({
   const totals = useMemo(() => {
     const c = { present: 0, late: 0, absent: 0, leave: 0, hours: 0 }
     for (const d of days) {
-      const k = kindOf(d)
+      const k = kindOf(d, fieldStaff)
       if (k === 'present' || k === 'early') c.present++
       if (k === 'late') c.late++
       if (k === 'absent') c.absent++
@@ -106,17 +111,19 @@ export default function AttendanceCalendar({
     }
     c.hours = Math.round(c.hours * 10) / 10
     return c
-  }, [days])
+  }, [days, fieldStaff])
 
   // Monday-first grid.
   const lead = (getDay(monthStart) + 6) % 7
   const dim = endOfMonth(monthStart).getDate()
   const cells: (string | null)[] = [
     ...Array.from({ length: lead }, () => null),
-    ...Array.from({ length: dim }, (_, i) => format(new Date(monthStart.getFullYear(), monthStart.getMonth(), i + 1), 'yyyy-MM-dd')),
+    ...Array.from({ length: dim }, (_, i) =>
+      format(new Date(monthStart.getFullYear(), monthStart.getMonth(), i + 1), 'yyyy-MM-dd'),
+    ),
   ]
   const today = format(new Date(), 'yyyy-MM-dd')
-  const sel = picked ? byDate.get(picked) ?? null : null
+  const sel = picked ? (byDate.get(picked) ?? null) : null
 
   return (
     <Card className="mb-4">
@@ -145,7 +152,7 @@ export default function AttendanceCalendar({
                 if (!date) return <div key={`b${i}`} />
                 const d = byDate.get(date)
                 const future = date > today
-                const k: Kind = d ? kindOf(d) : 'none'
+                const k: Kind = d ? kindFor(d) : 'none'
                 const style = KIND[k]
                 const isPicked = picked === date
                 return (
@@ -158,7 +165,10 @@ export default function AttendanceCalendar({
                     className={`flex aspect-square min-h-10 flex-col items-center justify-center rounded-md text-xs transition ${
                       isPicked ? 'ring-2 ring-foreground' : ''
                     } ${date === today ? 'border border-foreground' : ''} ${future ? 'text-muted-foreground/50' : ''}`}
-                    style={{ background: future ? 'transparent' : style.bg, color: future ? undefined : style.fg }}
+                    style={{
+                      background: future ? 'transparent' : style.bg,
+                      color: future ? undefined : style.fg,
+                    }}
                   >
                     <span className="font-semibold tabular-nums">{parseISO(date).getDate()}</span>
                     {d && !future ? (
@@ -177,9 +187,9 @@ export default function AttendanceCalendar({
               <span className="font-semibold">{format(parseISO(sel.date), 'EEEE, d MMM')}</span>
               <span
                 className="rounded-full px-2 py-0.5 text-xs font-medium"
-                style={{ background: KIND[kindOf(sel)].bg, color: KIND[kindOf(sel)].fg }}
+                style={{ background: KIND[kindFor(sel)].bg, color: KIND[kindFor(sel)].fg }}
               >
-                {detailLabel(sel)}
+                {detailLabel(sel, fieldStaff)}
               </span>
             </div>
             <dl className="mt-2 grid grid-cols-[auto_1fr] gap-x-4 gap-y-1 text-xs">
@@ -198,7 +208,7 @@ export default function AttendanceCalendar({
               <dt className="text-muted-foreground">Worked</dt>
               <dd className="tabular-nums">{sel.hours != null ? `${sel.hours} h` : '—'}</dd>
             </dl>
-            {kindOf(sel) === 'no_out' || kindOf(sel) === 'absent' || kindOf(sel) === 'short' ? (
+            {kindFor(sel) === 'no_out' || kindFor(sel) === 'absent' || kindFor(sel) === 'short' ? (
               <p className="mt-2 text-xs text-muted-foreground">
                 Missing or wrong punch? Send a request from <b>Regularise</b>.
               </p>
@@ -221,8 +231,8 @@ export default function AttendanceCalendar({
   )
 }
 
-function detailLabel(d: Day): string {
-  const k = kindOf(d)
+function detailLabel(d: Day, fieldStaff = false): string {
+  const k = kindOf(d, fieldStaff)
   if (k === 'late') return `Late by ${d.report?.late_minutes ?? 0} min`
   if (k === 'early') return `Left ${d.report?.early_departure_minutes ?? 0} min early`
   return KIND[k].label || 'No shift'
