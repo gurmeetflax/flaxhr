@@ -37,14 +37,23 @@ export default function FieldVisitsPage() {
             : `${filtered.length} meetings · ${Math.round((totalMin / 60) * 10) / 10} h in meetings`
         }
         actions={
-          <Button size="sm" variant="outline" onClick={() => downloadCsv(filtered)} disabled={!filtered.length}>
+          <Button
+            size="sm"
+            variant="outline"
+            onClick={() => downloadCsv(filtered)}
+            disabled={!filtered.length}
+          >
             <Download className="h-4 w-4" /> Export CSV
           </Button>
         }
       />
 
       <div className="mb-4 grid gap-3 sm:grid-cols-3">
-        <Input placeholder="Search employee or client" value={search} onChange={(e) => setSearch(e.target.value)} />
+        <Input
+          placeholder="Search employee or client"
+          value={search}
+          onChange={(e) => setSearch(e.target.value)}
+        />
         <Input type="date" value={from} onChange={(e) => setFrom(e.target.value)} />
         <Input type="date" value={to} onChange={(e) => setTo(e.target.value)} />
       </div>
@@ -86,7 +95,14 @@ export default function FieldVisitsPage() {
                         </span>
                       )}
                     </td>
-                    <td className="px-4 py-3 tabular-nums">{fmtDuration(r.duration_min)}</td>
+                    <td className="px-4 py-3 tabular-nums">
+                      {r.time_unknown ? '—' : fmtDuration(r.duration_min)}
+                      {r.auto_closed ? (
+                        <span className="block text-[11px] text-amber-700">
+                          {r.time_unknown ? 'auto-closed, time unknown' : 'auto-closed at punch-out'}
+                        </span>
+                      ) : null}
+                    </td>
                     <td className="max-w-xs px-4 py-3 text-muted-foreground">{r.outcome ?? '—'}</td>
                   </tr>
                 ))}
@@ -132,7 +148,19 @@ function fmtDuration(min: number | null): string {
 }
 
 function downloadCsv(rows: FieldVisit[]) {
-  const header = ['employee_code', 'employee_name', 'client', 'purpose', 'check_in', 'check_in_map', 'check_out', 'check_out_map', 'duration_min', 'outcome']
+  const header = [
+    'employee_code',
+    'employee_name',
+    'client',
+    'purpose',
+    'check_in',
+    'check_in_map',
+    'check_out',
+    'check_out_map',
+    'duration_min',
+    'outcome',
+    'auto_closed',
+  ]
   const lines = [header.join(',')]
   for (const r of rows) {
     lines.push(
@@ -147,6 +175,7 @@ function downloadCsv(rows: FieldVisit[]) {
         r.check_out_lat != null && r.check_out_lng != null ? mapsLink(r.check_out_lat, r.check_out_lng) : '',
         r.duration_min ?? '',
         csv(r.outcome ?? ''),
+        r.auto_closed ? (r.time_unknown ? 'yes, time unknown' : 'yes') : '',
       ].join(','),
     )
   }

@@ -27,6 +27,12 @@ export default function MeetingCard({
 
   const visits = visitsQ.data ?? []
   const open = visits.find((v) => !v.check_out_at) ?? null
+  // A meeting left open on an earlier day (forgotten check-out).
+  const openSince =
+    open &&
+    formatInTimeZone(open.check_in_at, IST, 'yyyy-MM-dd') !== formatInTimeZone(new Date(), IST, 'yyyy-MM-dd')
+      ? formatInTimeZone(open.check_in_at, IST, 'd MMM')
+      : null
 
   const onCheckIn = async () => {
     if (!coords) return toast.error('Waiting for your location.')
@@ -65,9 +71,15 @@ export default function MeetingCard({
             <div className="rounded-lg border border-primary/30 bg-primary/5 p-3 text-sm">
               <div className="font-medium">In meeting with {open.client_name}</div>
               <div className="text-xs text-muted-foreground">
-                Since {formatInTimeZone(open.check_in_at, IST, 'h:mm a')}
+                Since {openSince ? `${openSince}, ` : ''}
+                {formatInTimeZone(open.check_in_at, IST, 'h:mm a')}
                 {open.purpose ? ` · ${open.purpose}` : ''}
               </div>
+              {openSince ? (
+                <div className="mt-1 text-xs text-amber-700">
+                  This meeting was never checked out. Check out of it to start a new one.
+                </div>
+              ) : null}
             </div>
             <label className="flex flex-col gap-1 text-sm">
               How did it go? (optional)
@@ -78,15 +90,35 @@ export default function MeetingCard({
                 onChange={(e) => setOutcome(e.target.value)}
               />
             </label>
-            <Button size="lg" variant="outline" onClick={onCheckOut} loading={checkOut.isPending} disabled={!coords}>
-              <LogOut className="h-4 w-4" /> Check out of meeting
+            <Button
+              size="lg"
+              variant="outline"
+              onClick={onCheckOut}
+              loading={checkOut.isPending}
+              disabled={!coords}
+            >
+              <LogOut className="h-4 w-4" />{' '}
+              {openSince ? `Force check out (started ${openSince})` : 'Check out of meeting'}
             </Button>
           </div>
         ) : (
           <div className="flex flex-col gap-3">
-            <Input placeholder="Meeting with (client / company)" value={client} onChange={(e) => setClient(e.target.value)} />
-            <Input placeholder="Purpose (optional)" value={purpose} onChange={(e) => setPurpose(e.target.value)} />
-            <Button size="lg" onClick={onCheckIn} loading={checkIn.isPending} disabled={!coords || !client.trim()}>
+            <Input
+              placeholder="Meeting with (client / company)"
+              value={client}
+              onChange={(e) => setClient(e.target.value)}
+            />
+            <Input
+              placeholder="Purpose (optional)"
+              value={purpose}
+              onChange={(e) => setPurpose(e.target.value)}
+            />
+            <Button
+              size="lg"
+              onClick={onCheckIn}
+              loading={checkIn.isPending}
+              disabled={!coords || !client.trim()}
+            >
               <LogIn className="h-4 w-4" /> {coords ? 'Check in to meeting' : 'Waiting for location…'}
             </Button>
           </div>
