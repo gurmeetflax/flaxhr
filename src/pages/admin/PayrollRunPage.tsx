@@ -1,5 +1,5 @@
 import { useNavigate, useParams } from 'react-router-dom'
-import { Calculator, CheckCircle2 } from 'lucide-react'
+import { Calculator, CheckCircle2, RotateCcw } from 'lucide-react'
 import { toast } from 'sonner'
 import { PageHeader } from '@/components/layout/AppShell'
 import { Card, CardContent, CardDescription, CardTitle } from '@/components/ui/Card'
@@ -9,6 +9,7 @@ import {
   useFinalisePayrollRun,
   usePayrollLines,
   usePayrollRun,
+  useReopenPayrollRun,
 } from '@/lib/payroll'
 
 export default function PayrollRunPage() {
@@ -18,10 +19,22 @@ export default function PayrollRunPage() {
   const { data: lines = [], isLoading } = usePayrollLines(id)
   const compute = useComputePayrollRun()
   const finalise = useFinalisePayrollRun()
+  const reopen = useReopenPayrollRun()
 
   if (!id) return null
 
   const isDraft = run?.status === 'draft'
+  const isEmpty = !isLoading && lines.length === 0
+
+  async function onReopen() {
+    if (!confirm('Reopen this run as a draft?')) return
+    try {
+      await reopen.mutateAsync(id!)
+      toast.success('Reopened as draft')
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : 'Reopen failed')
+    }
+  }
 
   async function onCompute() {
     try {
@@ -73,10 +86,19 @@ export default function PayrollRunPage() {
                   <Button variant="outline" onClick={onCompute} loading={compute.isPending}>
                     <Calculator className="h-4 w-4" /> Recompute
                   </Button>
-                  <Button onClick={onFinalise} loading={finalise.isPending}>
+                  <Button
+                    onClick={onFinalise}
+                    loading={finalise.isPending}
+                    disabled={isEmpty}
+                    title={isEmpty ? 'Recompute first — this run has no lines.' : undefined}
+                  >
                     <CheckCircle2 className="h-4 w-4" /> Finalise
                   </Button>
                 </>
+              ) : isEmpty ? (
+                <Button variant="outline" onClick={onReopen} loading={reopen.isPending}>
+                  <RotateCcw className="h-4 w-4" /> Reopen
+                </Button>
               ) : null}
             </div>
           </CardContent>
@@ -109,9 +131,7 @@ export default function PayrollRunPage() {
                   ) : lines.length === 0 ? (
                     <tr>
                       <td colSpan={9} className="px-3 py-6 text-center text-muted-foreground">
-                        {isDraft
-                          ? 'No lines yet. Click Recompute to populate.'
-                          : 'This run has no lines.'}
+                        {isDraft ? 'No lines yet. Click Recompute to populate.' : 'This run has no lines.'}
                       </td>
                     </tr>
                   ) : (
@@ -121,19 +141,13 @@ export default function PayrollRunPage() {
                         <td className="px-3 py-2 font-medium">{l.full_name}</td>
                         <td className="px-3 py-2 font-mono">{Number(l.gross).toFixed(0)}</td>
                         <td className="px-3 py-2 font-mono">{Number(l.days_present).toFixed(1)}</td>
-                        <td className="px-3 py-2 font-mono">
-                          {Number(l.days_paid_leave).toFixed(1)}
-                        </td>
+                        <td className="px-3 py-2 font-mono">{Number(l.days_paid_leave).toFixed(1)}</td>
                         <td className="px-3 py-2 font-mono">{Number(l.days_payable).toFixed(1)}</td>
-                        <td className="px-3 py-2 font-mono">
-                          {Number(l.prorated_gross).toFixed(2)}
-                        </td>
+                        <td className="px-3 py-2 font-mono">{Number(l.prorated_gross).toFixed(2)}</td>
                         <td className="px-3 py-2 font-mono text-warning">
                           {Number(l.deductions_total).toFixed(2)}
                         </td>
-                        <td className="px-3 py-2 font-mono font-semibold">
-                          {Number(l.net_pay).toFixed(2)}
-                        </td>
+                        <td className="px-3 py-2 font-mono font-semibold">{Number(l.net_pay).toFixed(2)}</td>
                       </tr>
                     ))
                   )}

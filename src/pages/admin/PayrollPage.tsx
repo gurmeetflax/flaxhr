@@ -73,7 +73,9 @@ export default function PayrollPage() {
               <div className="flex-1">
                 <CardTitle>Create draft run</CardTitle>
                 <CardDescription className="mt-1">
-                  Pick an outlet and a month. Existing draft for that outlet/month is reused.
+                  Pick an outlet and a month — the button stays grey until an outlet is chosen. An existing
+                  run for that outlet/month is reused. Drafts can be recomputed as often as needed; only
+                  Finalise locks a run and sends payslips.
                 </CardDescription>
               </div>
             </div>
@@ -95,11 +97,7 @@ export default function PayrollPage() {
               </div>
               <div>
                 <Label className="mb-1 block text-xs">Period (month)</Label>
-                <Input
-                  type="month"
-                  value={periodMonth}
-                  onChange={(e) => setPeriodMonth(e.target.value)}
-                />
+                <Input type="month" value={periodMonth} onChange={(e) => setPeriodMonth(e.target.value)} />
               </div>
               <div className="flex items-end">
                 <Button onClick={onCreate} loading={create.isPending} disabled={!outletId}>
