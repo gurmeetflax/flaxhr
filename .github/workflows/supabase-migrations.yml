@@ -47,11 +47,15 @@ jobs:
 
       - name: Smoke test — every new table & view exists
         env:
-          SUPABASE_DB_URL: postgres://postgres.${{ env.SUPABASE_PROJECT_REF }}:${{ env.SUPABASE_DB_PASSWORD }}@aws-0-ap-south-1.pooler.supabase.com:6543/postgres
+          PGPASSWORD: ${{ env.SUPABASE_DB_PASSWORD }}
         run: |
           # Anything in supabase/tests/*.sql is run as a smoke test against
           # the live DB. Each file should be self-contained and use
           # raise exception on failure so non-zero exit propagates.
+          # The pooler host depends on the project's region, so take the URL
+          # `supabase link` saved rather than hard-coding one.
+          SUPABASE_DB_URL="$(cat supabase/.temp/pooler-url)"
+          command -v psql >/dev/null || { sudo apt-get update -qq && sudo apt-get install -y -qq postgresql-client; }
           if [ -d supabase/tests ]; then
             for f in supabase/tests/*.sql; do
               echo "::group::$(basename "$f")"

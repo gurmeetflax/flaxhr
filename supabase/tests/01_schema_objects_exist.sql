@@ -80,7 +80,7 @@ declare
   missing text[] := array[]::text[];
 begin
   for fn in select unnest(array[
-    'public.punch(text,numeric,numeric,text,text)',
+    'public.punch(text,numeric,numeric,text,text,text,integer)',
     'public.submit_regularisation(timestamptz,text,text,text,text)',
     'public.decide_regularisation(uuid,text,text)',
     'public.submit_leave_request(uuid,date,date,text,text)',
@@ -119,7 +119,7 @@ begin
     select schemaname || '.' || viewname
     from pg_views
     where schemaname = 'public'
-      and viewname like 'v\\_%' escape '\\'
+      and viewname like 'v\_%' escape '\'
   loop
     execute format('select 1 from %s limit 0', v);
   end loop;
