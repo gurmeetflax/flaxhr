@@ -169,6 +169,14 @@ export default function PayrollRunPage() {
                           {Number(l.ot_amount ?? 0) > 0
                             ? `${Number(l.ot_amount).toFixed(2)} (${(Number(l.ot_minutes) / 60).toFixed(1)}h)`
                             : '—'}
+                          {l.calc?.long_shifts ? (
+                            <span
+                              className="ml-1 text-warning"
+                              title={`${l.calc.long_shifts} shift(s) over 14 hours — check before paying OT`}
+                            >
+                              ⚠
+                            </span>
+                          ) : null}
                         </td>
                         <td className="px-3 py-2 font-mono text-warning">
                           {Number(l.deductions_total).toFixed(2)}

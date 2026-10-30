@@ -31,6 +31,7 @@ export interface PayrollCalc {
   lates: number
   late_cut_days: number
   ot_minutes: number
+  long_shifts?: number
   field_staff: boolean
 }
 

@@ -1,6 +1,13 @@
 -- Payroll: the attendance pay rules agreed for October 2026.
 --
--- Per employee, per IST work day (4am cutoff) inside their employment:
+-- Punches are paired into shifts first (core.payroll_shift_days): each
+-- punch-in runs to the next punch within 16 hours, and the shift counts on
+-- the day it started, so a 6:45pm–4am night shift is one day. Punches a
+-- minute apart are one punch, and a lone punch-out never starts a shift.
+-- The app's 4am day cutoff split night shifts in two and showed negative
+-- or 19-hour days.
+--
+-- Per employee, per shift day inside their employment:
 --   full day   in + out and at least 4.5 hours worked (field staff: in + out)
 --   half day   in + out under 4.5 hours, or only an in or only an out
 --   paid leave approved paid leave (week-off leave counts as a no-punch day)
@@ -8,7 +15,8 @@
 --              that has a no-punch day and 3+ days worked; days 29–31 have none
 --   lates      late by more than 15 minutes; every 3 cost half a day
 --   overtime   minutes worked beyond 9h 30m (9-hour shift + 30 minutes'
---              grace), paid at salary / days in month / 9 per hour
+--              grace), paid at salary / days in month / 9 per hour;
+--              shifts over 14 hours are counted in calc.long_shifts to check
 -- Field staff are exempt from the hours rules (4.5 hours, lates, overtime).
 -- PF, ESIC and PT are unchanged and apply to the prorated pay, not overtime.
 
@@ -35,6 +43,46 @@ join core.payroll_runs r on r.id = l.run_id
 join core.employees e on e.id = l.employee_id
 left join public.flax_outlets o on o.id = r.outlet_id
 where r.status = 'finalised' and e.user_id = auth.uid();
+
+create or replace function core.payroll_shift_days(p_emp uuid, p_from date, p_to date)
+returns table (d date, worked_minutes numeric, complete_shifts integer, open_punches integer, longest_minutes numeric)
+language sql stable
+set search_path to 'core', 'attendance', 'public'
+as $function$
+  with recursive p as (
+    select l.punched_at t, l.type from attendance.logs l
+    where l.employee_id = p_emp
+      and l.punched_at >= (p_from - 1)::timestamp at time zone 'Asia/Kolkata' + interval '6 hours'
+      and l.punched_at <  (p_to + 1)::timestamp at time zone 'Asia/Kolkata' + interval '12 hours'
+  ), c as (
+    select t, type, sum(case when lag_t is null or t - lag_t > interval '2 minutes' then 1 else 0 end)
+             over (order by t) cl
+    from (select t, type, lag(t) over (order by t) lag_t from p) x
+  ), ev as (
+    select min(t) t, bool_or(type = 'in') has_in, bool_or(type = 'out') has_out,
+           row_number() over (order by min(t)) rn
+    from c group by cl
+  ), walk as (
+    select rn, t, has_in, has_out, case when has_in then 'start' else 'orphan' end::text role from ev where rn = 1
+    union all
+    select n.rn, n.t, n.has_in, n.has_out,
+           case when w.role = 'start' and n.t - w.t <= interval '16 hours'
+                     and (n.has_out or n.t - w.t <= interval '14 hours') then 'end'
+                when not n.has_in then 'orphan'
+                else 'start' end
+    from walk w join ev n on n.rn = w.rn + 1
+  ), shifts as (
+    select (s.t at time zone 'Asia/Kolkata')::date d, extract(epoch from en.t - s.t) / 60 mins
+    from walk s left join walk en on en.rn = s.rn + 1 and en.role = 'end'
+    where s.role = 'start'
+    union all
+    select ((t - interval '6 hours') at time zone 'Asia/Kolkata')::date, null from walk where role = 'orphan'
+  )
+  select d, coalesce(sum(mins), 0), count(mins)::int, (count(*) - count(mins))::int, coalesce(max(mins), 0)
+  from shifts where d between p_from and p_to group by d;
+$function$;
+
+revoke all on function core.payroll_shift_days(uuid, date, date) from public, anon, authenticated;
 
 create or replace function public.compute_payroll_run(p_run_id uuid)
 returns void
@@ -74,8 +122,11 @@ begin
       from generate_series(greatest(period_start, coalesce(emp.hired_on, period_start)),
                            least(period_end, coalesce(emp.exit_date, period_end)), interval '1 day') g
     ),
-    rep as (
-      select work_date, first_in_at, last_out_at, worked_minutes, late_minutes
+    sd as (
+      select * from core.payroll_shift_days(emp.id, period_start, period_end)
+    ),
+    lt as (
+      select work_date, late_minutes
       from public.v_attendance_report_detailed
       where employee_id = emp.id and work_date between period_start and period_end
     ),
@@ -91,17 +142,19 @@ begin
     cls as (
       select days.d, days.blk,
              case
-               when x.first_in_at is not null and x.last_out_at is not null
-                 then case when emp.field_staff or coalesce(x.worked_minutes, 0) >= 270 then 'full' else 'half' end
-               when x.first_in_at is not null or x.last_out_at is not null then 'half'
+               when x.complete_shifts > 0
+                 then case when emp.field_staff or x.worked_minutes >= 270 then 'full' else 'half' end
+               when x.open_punches > 0 then 'half'
                when lv.d is not null then 'leave'
                else 'none'
              end as k,
-             case when x.first_in_at is not null and x.last_out_at is not null and not emp.field_staff
-                  then greatest(coalesce(x.worked_minutes, 0) - 570, 0) else 0 end as ot,
-             (x.first_in_at is not null and not emp.field_staff and coalesce(x.late_minutes, 0) > 15) as late
+             case when x.complete_shifts > 0 and not emp.field_staff
+                  then greatest(x.worked_minutes - 570, 0) else 0 end as ot,
+             coalesce(x.longest_minutes, 0) > 840 as long_shift,
+             (x.d is not null and not emp.field_staff and coalesce(y.late_minutes, 0) > 15) as late
       from days
-      left join rep x on x.work_date = days.d
+      left join sd x on x.d = days.d
+      left join lt y on y.work_date = days.d
       left join lv on lv.d = days.d
     ),
     blocks as (
@@ -116,7 +169,8 @@ begin
            (select coalesce(sum(off_paid), 0) from blocks) as offs,
            count(*) filter (where k = 'none') as no_punch,
            count(*) filter (where late) as lates,
-           coalesce(sum(ot), 0) as ot_min
+           coalesce(sum(ot), 0) as ot_min,
+           count(*) filter (where long_shift) as long_shifts
       into a from cls;
 
     late_cut := floor(a.lates / 3.0) * 0.5;
@@ -157,7 +211,7 @@ begin
       prorated, ded_total, ded_breakdown, net, a.ot_min, ot_amt,
       jsonb_build_object('full_days', a.full_days, 'half_days', a.half_days, 'paid_leave', a.leave_days,
         'week_offs', a.offs, 'absent', greatest(a.no_punch - a.offs, 0), 'lates', a.lates,
-        'late_cut_days', late_cut, 'ot_minutes', a.ot_min, 'field_staff', emp.field_staff));
+        'late_cut_days', late_cut, 'ot_minutes', a.ot_min, 'long_shifts', a.long_shifts, 'field_staff', emp.field_staff));
   end loop;
 end; $function$;
 
