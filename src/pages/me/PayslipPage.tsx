@@ -12,10 +12,7 @@ export default function PayslipPage() {
 
   return (
     <>
-      <PageHeader
-        title="My payslips"
-        description="Available after each monthly payroll is finalised."
-      />
+      <PageHeader title="My payslips" description="Available after each monthly payroll is finalised." />
       <div className="grid gap-4 md:grid-cols-[260px_1fr]">
         <Card>
           <CardContent className="p-0">
@@ -77,9 +74,7 @@ function Payslip({ slip }: { slip: MyPayslip }) {
                 {slip.period_month?.slice(0, 7)} · {slip.outlet_name ?? ''}
               </p>
             </div>
-            <p className="font-mono text-xs text-muted-foreground">
-              {slip.employee_code}
-            </p>
+            <p className="font-mono text-xs text-muted-foreground">{slip.employee_code}</p>
           </div>
 
           <dl className="mb-4 grid grid-cols-2 gap-y-2 text-sm">
@@ -89,14 +84,41 @@ function Payslip({ slip }: { slip: MyPayslip }) {
             <dd className="text-right font-mono">₹{Number(slip.gross).toFixed(2)}</dd>
             <dt className="text-muted-foreground">Days in month</dt>
             <dd className="text-right font-mono">{slip.days_in_month}</dd>
-            <dt className="text-muted-foreground">Days present</dt>
-            <dd className="text-right font-mono">{Number(slip.days_present).toFixed(1)}</dd>
+            {slip.calc ? (
+              <>
+                <dt className="text-muted-foreground">Full days / half days</dt>
+                <dd className="text-right font-mono">
+                  {slip.calc.full_days} / {slip.calc.half_days}
+                </dd>
+                <dt className="text-muted-foreground">Paid week offs</dt>
+                <dd className="text-right font-mono">{slip.calc.week_offs}</dd>
+                {slip.calc.late_cut_days > 0 ? (
+                  <>
+                    <dt className="text-muted-foreground">Late cut ({slip.calc.lates} lates)</dt>
+                    <dd className="text-right font-mono">−{slip.calc.late_cut_days}</dd>
+                  </>
+                ) : null}
+              </>
+            ) : (
+              <>
+                <dt className="text-muted-foreground">Days present</dt>
+                <dd className="text-right font-mono">{Number(slip.days_present).toFixed(1)}</dd>
+              </>
+            )}
             <dt className="text-muted-foreground">Paid leave</dt>
             <dd className="text-right font-mono">{Number(slip.days_paid_leave).toFixed(1)}</dd>
             <dt className="text-muted-foreground">Days payable</dt>
             <dd className="text-right font-mono">{Number(slip.days_payable).toFixed(1)}</dd>
             <dt className="text-muted-foreground">Prorated gross</dt>
             <dd className="text-right font-mono">₹{Number(slip.prorated_gross).toFixed(2)}</dd>
+            {Number(slip.ot_amount ?? 0) > 0 ? (
+              <>
+                <dt className="text-muted-foreground">
+                  Overtime ({(Number(slip.ot_minutes) / 60).toFixed(1)} h)
+                </dt>
+                <dd className="text-right font-mono">₹{Number(slip.ot_amount).toFixed(2)}</dd>
+              </>
+            ) : null}
           </dl>
 
           {slip.deductions_breakdown.length > 0 ? (
@@ -105,8 +127,8 @@ function Payslip({ slip }: { slip: MyPayslip }) {
                 Deductions
               </div>
               <ul className="text-sm">
-                {slip.deductions_breakdown.map((d) => (
-                  <li key={d.id} className="flex items-center justify-between py-1">
+                {slip.deductions_breakdown.map((d, i) => (
+                  <li key={d.id ?? `${d.kind}-${i}`} className="flex items-center justify-between py-1">
                     <span className="capitalize">
                       {d.kind} {d.notes ? `· ${d.notes}` : ''}
                     </span>

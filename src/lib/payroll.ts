@@ -22,6 +22,18 @@ export interface DeductionLine {
   notes: string | null
 }
 
+export interface PayrollCalc {
+  full_days: number
+  half_days: number
+  paid_leave: number
+  week_offs: number
+  absent: number
+  lates: number
+  late_cut_days: number
+  ot_minutes: number
+  field_staff: boolean
+}
+
 export interface PayrollLine {
   id: string
   run_id: string
@@ -37,6 +49,9 @@ export interface PayrollLine {
   deductions_total: number
   deductions_breakdown: DeductionLine[]
   net_pay: number
+  ot_minutes: number
+  ot_amount: number
+  calc: PayrollCalc | null
   period_month: string
   status: 'draft' | 'finalised'
   outlet_id: string
@@ -61,6 +76,9 @@ export interface MyPayslip {
   outlet_name: string | null
   employee_code: string
   full_name: string
+  ot_minutes: number
+  ot_amount: number
+  calc: PayrollCalc | null
 }
 
 export function usePayrollRuns(outletId?: string | null) {

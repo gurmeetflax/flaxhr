@@ -58,6 +58,7 @@ export default function PayrollRunPage() {
   const totalGross = lines.reduce((s, l) => s + Number(l.prorated_gross), 0)
   const totalDed = lines.reduce((s, l) => s + Number(l.deductions_total), 0)
   const totalNet = lines.reduce((s, l) => s + Number(l.net_pay), 0)
+  const totalOt = lines.reduce((s, l) => s + Number(l.ot_amount ?? 0), 0)
 
   return (
     <>
@@ -76,8 +77,8 @@ export default function PayrollRunPage() {
             <div>
               <CardTitle>Totals</CardTitle>
               <CardDescription className="mt-1">
-                Gross ₹{totalGross.toFixed(2)} · Deductions ₹{totalDed.toFixed(2)} · Net ₹
-                {totalNet.toFixed(2)} · {lines.length} employees
+                Gross ₹{totalGross.toFixed(2)} · Overtime ₹{totalOt.toFixed(2)} · Deductions ₹
+                {totalDed.toFixed(2)} · Net ₹{totalNet.toFixed(2)} · {lines.length} employees
               </CardDescription>
             </div>
             <div className="flex flex-wrap gap-2">
@@ -113,10 +114,21 @@ export default function PayrollRunPage() {
                     <th className="px-3 py-2.5">Code</th>
                     <th className="px-3 py-2.5">Name</th>
                     <th className="px-3 py-2.5">Gross</th>
-                    <th className="px-3 py-2.5">Days P</th>
+                    <th className="px-3 py-2.5" title="Full days / half days worked">
+                      Full / Half
+                    </th>
+                    <th className="px-3 py-2.5" title="Paid week offs earned">
+                      Offs
+                    </th>
                     <th className="px-3 py-2.5">Leave</th>
+                    <th className="px-3 py-2.5" title="Lates over 15 min; every 3 cost half a day">
+                      Lates
+                    </th>
                     <th className="px-3 py-2.5">Payable</th>
                     <th className="px-3 py-2.5">Prorated</th>
+                    <th className="px-3 py-2.5" title="Hours beyond 9h 30m, at salary / days / 9 per hour">
+                      OT
+                    </th>
                     <th className="px-3 py-2.5">Deductions</th>
                     <th className="px-3 py-2.5">Net</th>
                   </tr>
@@ -124,13 +136,13 @@ export default function PayrollRunPage() {
                 <tbody>
                   {isLoading ? (
                     <tr>
-                      <td colSpan={9} className="px-3 py-6 text-center text-muted-foreground">
+                      <td colSpan={12} className="px-3 py-6 text-center text-muted-foreground">
                         Loading…
                       </td>
                     </tr>
                   ) : lines.length === 0 ? (
                     <tr>
-                      <td colSpan={9} className="px-3 py-6 text-center text-muted-foreground">
+                      <td colSpan={12} className="px-3 py-6 text-center text-muted-foreground">
                         {isDraft ? 'No lines yet. Click Recompute to populate.' : 'This run has no lines.'}
                       </td>
                     </tr>
@@ -140,10 +152,24 @@ export default function PayrollRunPage() {
                         <td className="px-3 py-2 font-mono text-xs">{l.employee_code}</td>
                         <td className="px-3 py-2 font-medium">{l.full_name}</td>
                         <td className="px-3 py-2 font-mono">{Number(l.gross).toFixed(0)}</td>
-                        <td className="px-3 py-2 font-mono">{Number(l.days_present).toFixed(1)}</td>
+                        <td className="px-3 py-2 font-mono">
+                          {l.calc
+                            ? `${l.calc.full_days} / ${l.calc.half_days}`
+                            : Number(l.days_present).toFixed(1)}
+                        </td>
+                        <td className="px-3 py-2 font-mono">{l.calc?.week_offs ?? '—'}</td>
                         <td className="px-3 py-2 font-mono">{Number(l.days_paid_leave).toFixed(1)}</td>
+                        <td className="px-3 py-2 font-mono">
+                          {l.calc ? (l.calc.field_staff ? 'field' : l.calc.lates) : '—'}
+                          {l.calc && l.calc.late_cut_days > 0 ? ` (−${l.calc.late_cut_days})` : ''}
+                        </td>
                         <td className="px-3 py-2 font-mono">{Number(l.days_payable).toFixed(1)}</td>
                         <td className="px-3 py-2 font-mono">{Number(l.prorated_gross).toFixed(2)}</td>
+                        <td className="px-3 py-2 font-mono">
+                          {Number(l.ot_amount ?? 0) > 0
+                            ? `${Number(l.ot_amount).toFixed(2)} (${(Number(l.ot_minutes) / 60).toFixed(1)}h)`
+                            : '—'}
+                        </td>
                         <td className="px-3 py-2 font-mono text-warning">
                           {Number(l.deductions_total).toFixed(2)}
                         </td>
