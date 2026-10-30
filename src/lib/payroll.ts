@@ -82,11 +82,7 @@ export function usePayrollRun(runId: string | undefined) {
     enabled: !!runId,
     queryFn: async () => {
       if (!runId) return null
-      const { data, error } = await supabase
-        .from('v_payroll_runs')
-        .select('*')
-        .eq('id', runId)
-        .maybeSingle()
+      const { data, error } = await supabase.from('v_payroll_runs').select('*').eq('id', runId).maybeSingle()
       if (error) throw error
       return (data as PayrollRun | null) ?? null
     },
@@ -134,6 +130,22 @@ export function useComputePayrollRun() {
     },
     onSuccess: (_p, runId) => {
       qc.invalidateQueries({ queryKey: ['payroll-lines', runId] })
+      qc.invalidateQueries({ queryKey: ['payroll-runs'] })
+    },
+  })
+}
+
+// Back to draft. Only allowed for a finalised run with no lines, so no
+// deductions were taken and no payslips went out.
+export function useReopenPayrollRun() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: async (runId: string) => {
+      const { error } = await supabase.rpc('reopen_payroll_run', { p_run_id: runId })
+      if (error) throw error
+    },
+    onSuccess: (_p, runId) => {
+      qc.invalidateQueries({ queryKey: ['payroll-run', runId] })
       qc.invalidateQueries({ queryKey: ['payroll-runs'] })
     },
   })
