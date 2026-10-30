@@ -119,7 +119,7 @@ begin
     select schemaname || '.' || viewname
     from pg_views
     where schemaname = 'public'
-      and viewname like 'v\\_%' escape '\\'
+      and viewname like 'v\_%' escape '\'
   loop
     execute format('select 1 from %s limit 0', v);
   end loop;
