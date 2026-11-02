@@ -3,7 +3,9 @@
 -- Punches are paired into shifts first (core.payroll_shift_days): each
 -- punch-in runs to the next punch within 16 hours, and the shift counts on
 -- the day it started, so a 6:45pm–4am night shift is one day. Punches a
--- minute apart are one punch, and a lone punch-out never starts a shift.
+-- minute apart are one punch, a lone punch-out never starts a shift, and a
+-- single end-of-day tap (in and out in the same second) counts as a day
+-- with a missing punch rather than the start of a shift.
 -- The app's 4am day cutoff split night shifts in two and showed negative
 -- or 19-hour days.
 --
@@ -49,6 +51,11 @@ returns table (d date, worked_minutes numeric, complete_shifts integer, open_pun
 language sql stable
 set search_path to 'core', 'attendance', 'public'
 as $function$
+  -- Punches within 2 minutes are one event. An event with both an in and an
+  -- out is a "tap": in-then-out (one tap at the end of a visit, or the app's
+  -- 4am split) can close a shift but never opens one; out-then-in (the app
+  -- closing a stale session as the shift starts) closes an open shift or
+  -- else opens one.
   with recursive p as (
     select l.punched_at t, l.type from attendance.logs l
     where l.employee_id = p_emp
@@ -58,25 +65,39 @@ as $function$
     select t, type, sum(case when lag_t is null or t - lag_t > interval '2 minutes' then 1 else 0 end)
              over (order by t) cl
     from (select t, type, lag(t) over (order by t) lag_t from p) x
-  ), ev as (
-    select min(t) t, bool_or(type = 'in') has_in, bool_or(type = 'out') has_out,
-           row_number() over (order by min(t)) rn
+  ), ev0 as (
+    select min(t) t,
+           case when bool_or(type = 'in') and bool_or(type = 'out')
+                  then case when (array_agg(type order by t desc))[1] = 'in' then 'outin' else 'tap' end
+                when bool_or(type = 'in') then 'in' else 'out' end k
     from c group by cl
+  ), ev as (
+    select *, row_number() over (order by t) rn, lead(t) over (order by t) nt, lead(k) over (order by t) nk
+    from ev0
   ), walk as (
-    select rn, t, has_in, has_out, case when has_in then 'start' else 'orphan' end::text role from ev where rn = 1
+    select rn, t, case when k in ('in', 'outin') then 'start' when k = 'tap' then 'tap' else 'orphan' end::text role,
+           t st, rn srn
+    from ev where rn = 1
     union all
-    select n.rn, n.t, n.has_in, n.has_out,
-           case when w.role = 'start' and n.t - w.t <= interval '16 hours'
-                     and (n.has_out or n.t - w.t <= interval '14 hours') then 'end'
-                when not n.has_in then 'orphan'
-                else 'start' end
+    select n.rn, n.t, x.role,
+           case when x.role = 'start' then n.t else w.st end,
+           case when x.role = 'start' then n.rn else w.srn end
     from walk w join ev n on n.rn = w.rn + 1
+    cross join lateral (select case
+        when w.role in ('start', 'skip') and n.t - w.st <= interval '16 hours' then
+          case when n.k <> 'in' then 'end'
+               when n.nk <> 'in' and n.nt - w.st <= interval '16 hours' then 'skip'
+               when n.t - w.st <= interval '14 hours' then 'end'
+               else 'start' end
+        when n.k in ('in', 'outin') then 'start'
+        when n.k = 'tap' then 'tap'
+        else 'orphan' end as role) x
   ), shifts as (
     select (s.t at time zone 'Asia/Kolkata')::date d, extract(epoch from en.t - s.t) / 60 mins
-    from walk s left join walk en on en.rn = s.rn + 1 and en.role = 'end'
+    from walk s left join walk en on en.role = 'end' and en.srn = s.rn
     where s.role = 'start'
     union all
-    select ((t - interval '6 hours') at time zone 'Asia/Kolkata')::date, null from walk where role = 'orphan'
+    select ((t - interval '6 hours') at time zone 'Asia/Kolkata')::date, null from walk where role in ('orphan', 'tap')
   )
   select d, coalesce(sum(mins), 0), count(mins)::int, (count(*) - count(mins))::int, coalesce(max(mins), 0)
   from shifts where d between p_from and p_to group by d;
