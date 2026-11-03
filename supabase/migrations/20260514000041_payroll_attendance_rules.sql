@@ -23,6 +23,8 @@
 --   A    any other no-punch day (offs beyond the pool are absent)
 --   late more than 15 minutes (and up to 3 hours) after the rostered shift
 --        start; every 3 lates in the month cost half a day
+--   short a full day under 9 hours is cut by the minute at the same rate
+--        as overtime (salary / days in month / 9 per hour)
 --   OT   minutes worked beyond 9h 30m (9-hour shift + 30 minutes' grace),
 --        paid at salary / days in month / 9 per hour; shifts over 14 hours
 --        are flagged to check
@@ -31,13 +33,15 @@
 
 alter table core.payroll_run_lines add column if not exists ot_minutes numeric not null default 0;
 alter table core.payroll_run_lines add column if not exists ot_amount numeric(12,2) not null default 0;
+alter table core.payroll_run_lines add column if not exists short_minutes numeric not null default 0;
+alter table core.payroll_run_lines add column if not exists short_amount numeric(12,2) not null default 0;
 alter table core.payroll_run_lines add column if not exists calc jsonb;
 
 create or replace view public.v_payroll_run_lines with (security_invoker = true) as
 select l.id, l.run_id, l.employee_id, e.employee_code, e.full_name, l.gross, l.days_in_month,
        l.days_present, l.days_paid_leave, l.days_payable, l.prorated_gross, l.deductions_total,
        l.deductions_breakdown, l.net_pay, l.notes, l.created_at, r.period_month, r.status, r.outlet_id,
-       l.ot_minutes, l.ot_amount, l.calc
+       l.ot_minutes, l.ot_amount, l.calc, l.short_minutes, l.short_amount
 from core.payroll_run_lines l
 join core.payroll_runs r on r.id = l.run_id
 join core.employees e on e.id = l.employee_id;
@@ -46,7 +50,7 @@ create or replace view public.v_my_payslips with (security_invoker = true) as
 select l.id, l.run_id, l.employee_id, l.gross, l.days_in_month, l.days_present, l.days_paid_leave,
        l.days_payable, l.prorated_gross, l.deductions_total, l.deductions_breakdown, l.net_pay,
        r.period_month, r.outlet_id, r.finalised_at, o.display_name as outlet_name, e.employee_code, e.full_name,
-       l.ot_minutes, l.ot_amount, l.calc
+       l.ot_minutes, l.ot_amount, l.calc, l.short_minutes, l.short_amount
 from core.payroll_run_lines l
 join core.payroll_runs r on r.id = l.run_id
 join core.employees e on e.id = l.employee_id
@@ -108,9 +112,12 @@ as $function$
   select * from s where d between p_from and p_to;
 $function$;
 
+drop function if exists public.attendance_month_report(date, date, text);
+drop function if exists core.attendance_days(uuid, date, date);
+
 create or replace function core.attendance_days(p_emp uuid, p_from date, p_to date)
 returns table (d date, status text, reason text, pairs jsonb, worked_minutes integer,
-               late_minutes integer, early_minutes integer, ot_minutes integer,
+               late_minutes integer, early_minutes integer, ot_minutes integer, short_minutes integer,
                is_late boolean, long_shift boolean, sched_start timestamptz, sched_end timestamptz)
 language sql stable
 set search_path to 'core', 'attendance', 'public'
@@ -210,6 +217,9 @@ as $function$
          case when lab.last_out is not null and lab.ends_at is not null and lab.mins > 0
               then greatest(0, extract(epoch from lab.ends_at - lab.last_out) / 60)::int end,
          case when lab.k in ('P', 'HD') and not lab.fs then greatest(round(lab.mins) - 570, 0)::int else 0 end,
+         -- A full day short of the 9-hour working day is cut by the minute
+         -- (a half day already loses half a day).
+         case when lab.st = 'P' and not lab.fs then greatest(540 - round(lab.mins), 0)::int else 0 end,
          -- Over 3 hours after the rostered start is a different shift from
          -- the one rostered, not a late arrival.
          lab.first_in is not null and lab.starts_at is not null and not lab.fs
@@ -228,7 +238,7 @@ revoke all on function core.attendance_days(uuid, date, date) from public, anon,
 -- day, from the same core.attendance_days the payroll run uses.
 create or replace function public.attendance_month_report(p_from date, p_to date, p_outlet text default null)
 returns table (employee_id uuid, d date, status text, reason text, pairs jsonb, worked_minutes integer,
-               late_minutes integer, early_minutes integer, ot_minutes integer, is_late boolean,
+               late_minutes integer, early_minutes integer, ot_minutes integer, short_minutes integer, is_late boolean,
                long_shift boolean, sched_start timestamptz, sched_end timestamptz)
 language plpgsql stable
 security definer
@@ -259,7 +269,7 @@ set search_path to 'core', 'attendance', 'public'
 as $function$
 declare r core.payroll_runs%rowtype; period_start date; period_end date; dim integer;
   emp record; ded record; a record; ded_total numeric(12,2); ded_breakdown jsonb;
-  days_payable numeric(6,2); late_cut numeric(6,2); prorated numeric(12,2); ot_amt numeric(12,2); net numeric(12,2);
+  days_payable numeric(6,2); late_cut numeric(6,2); prorated numeric(12,2); ot_amt numeric(12,2); short_amt numeric(12,2); net numeric(12,2);
   pf_rate numeric; pt_amt numeric; esic_rate numeric; esic_max numeric; pf_amt numeric; esic_amt numeric;
 begin
   if not (core.is_admin() or core.has_role('hr')) then raise exception 'FORBIDDEN' using errcode = 'P0001'; end if;
@@ -291,6 +301,7 @@ begin
            count(*) filter (where x.status = 'A') as absent,
            count(*) filter (where x.is_late) as lates,
            coalesce(sum(x.ot_minutes), 0) as ot_min,
+           coalesce(sum(x.short_minutes), 0) as short_min,
            count(*) filter (where x.long_shift) as long_shifts
       into a
       from core.attendance_days(emp.id, period_start, period_end) x;
@@ -299,6 +310,7 @@ begin
     days_payable := least(greatest(a.full_days + 0.5 * a.half_days + a.leave_days + a.offs - late_cut, 0), dim);
     prorated := round(emp.monthly_salary * days_payable / dim, 2);
     ot_amt := round(emp.monthly_salary / dim / 9.0 * a.ot_min / 60.0, 2);
+    short_amt := round(emp.monthly_salary / dim / 9.0 * a.short_min / 60.0, 2);
 
     ded_total := 0; ded_breakdown := '[]'::jsonb;
     for ded in select id, kind, monthly_amount, months_remaining, total_amount, notes
@@ -325,15 +337,15 @@ begin
       ded_breakdown := ded_breakdown || jsonb_build_object('kind', 'pt', 'amount', pt_amt, 'notes', 'Professional Tax');
     end if;
 
-    net := greatest(prorated + ot_amt - ded_total, 0);
+    net := greatest(prorated + ot_amt - short_amt - ded_total, 0);
     insert into core.payroll_run_lines (run_id, employee_id, gross, days_in_month,
       days_present, days_paid_leave, days_payable, prorated_gross, deductions_total,
-      deductions_breakdown, net_pay, ot_minutes, ot_amount, calc)
+      deductions_breakdown, net_pay, ot_minutes, ot_amount, short_minutes, short_amount, calc)
     values (r.id, emp.id, emp.monthly_salary, dim, a.full_days + a.half_days, a.leave_days, days_payable,
-      prorated, ded_total, ded_breakdown, net, a.ot_min, ot_amt,
+      prorated, ded_total, ded_breakdown, net, a.ot_min, ot_amt, a.short_min, short_amt,
       jsonb_build_object('full_days', a.full_days, 'half_days', a.half_days, 'paid_leave', a.leave_days,
         'week_offs', a.offs, 'absent', a.absent, 'lates', a.lates,
-        'late_cut_days', late_cut, 'ot_minutes', a.ot_min, 'long_shifts', a.long_shifts, 'field_staff', emp.field_staff));
+        'late_cut_days', late_cut, 'ot_minutes', a.ot_min, 'short_minutes', a.short_min, 'long_shifts', a.long_shifts, 'field_staff', emp.field_staff));
   end loop;
 end; $function$;
 
