@@ -119,6 +119,14 @@ function Payslip({ slip }: { slip: MyPayslip }) {
                 <dd className="text-right font-mono">₹{Number(slip.ot_amount).toFixed(2)}</dd>
               </>
             ) : null}
+            {Number(slip.short_amount ?? 0) > 0 ? (
+              <>
+                <dt className="text-muted-foreground">
+                  Short hours ({(Number(slip.short_minutes) / 60).toFixed(1)} h)
+                </dt>
+                <dd className="text-right font-mono">−₹{Number(slip.short_amount).toFixed(2)}</dd>
+              </>
+            ) : null}
           </dl>
 
           {slip.deductions_breakdown.length > 0 ? (

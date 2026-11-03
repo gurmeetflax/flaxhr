@@ -23,8 +23,9 @@
 --   A    any other no-punch day (offs beyond the pool are absent)
 --   late more than 15 minutes (and up to 3 hours) after the rostered shift
 --        start; every 3 lates in the month cost half a day
---   short a full day under 9 hours is cut by the minute at the same rate
---        as overtime (salary / days in month / 9 per hour)
+--   short a full day under 9 hours, and a half day with both punches under
+--        4h 30m, are cut by the minute at the same rate as overtime
+--        (salary / days in month / 9 per hour)
 --   OT   minutes worked beyond 9h 30m (9-hour shift + 30 minutes' grace),
 --        paid at salary / days in month / 9 per hour; shifts over 14 hours
 --        are flagged to check
@@ -217,9 +218,14 @@ as $function$
          case when lab.last_out is not null and lab.ends_at is not null and lab.mins > 0
               then greatest(0, extract(epoch from lab.ends_at - lab.last_out) / 60)::int end,
          case when lab.k in ('P', 'HD') and not lab.fs then greatest(round(lab.mins) - 570, 0)::int else 0 end,
-         -- A full day short of the 9-hour working day is cut by the minute
-         -- (a half day already loses half a day).
-         case when lab.st = 'P' and not lab.fs then greatest(540 - round(lab.mins), 0)::int else 0 end,
+         -- Short hours are cut by the minute: a full day below the 9-hour
+         -- working day, and a half day with both punches below 4h 30m (so
+         -- every day pays for the hours worked). A half day from a missing
+         -- punch has no hours to measure.
+         case when lab.fs then 0
+              when lab.st = 'P' then greatest(540 - round(lab.mins), 0)::int
+              when lab.st = 'HD' and lab.mins > 0 then greatest(270 - round(lab.mins), 0)::int
+              else 0 end,
          -- Over 3 hours after the rostered start is a different shift from
          -- the one rostered, not a late arrival.
          lab.first_in is not null and lab.starts_at is not null and not lab.fs

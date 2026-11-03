@@ -19,7 +19,7 @@ export const COMPANY = {
 
 export type DayStatus = 'P' | 'HD' | 'A' | 'WO' | 'PL' | 'UPL' | 'NE' | 'FUT'
 
-export type Flag = 'half' | 'late' | 'late_cut' | 'absent' | 'long'
+export type Flag = 'half' | 'short' | 'late' | 'late_cut' | 'absent' | 'long'
 
 export interface ReportDay {
   date: string
@@ -30,6 +30,7 @@ export interface ReportDay {
   lateMin: number | null
   earlyMin: number | null
   otMin: number
+  shortMin: number
   isLate: boolean
   longShift: boolean
   flags: Flag[]
@@ -58,6 +59,7 @@ export interface ReportEmployee {
     lateMin: number
     earlyMin: number
     otMin: number
+    shortMin: number
     longShifts: number
   }
 }
@@ -92,6 +94,11 @@ export const STATUS_FILL: Partial<Record<DayStatus, string>> = {
 export const FLAGS: { flag: Flag; color: string; label: string }[] = [
   { flag: 'absent', color: 'DC2626', label: 'Absent (no punch, no approved leave)' },
   { flag: 'half', color: 'EA580C', label: 'Half day: missing punch, single tap or under 4h 30m' },
+  {
+    flag: 'short',
+    color: '0EA5E9',
+    label: 'Short hours: worked under 9h (full day) or under 4h 30m (half day)',
+  },
   { flag: 'late', color: 'CA8A04', label: 'Late by more than 15 min after the rostered start' },
   { flag: 'late_cut', color: '7C2D12', label: '3rd, 6th, 9th… late of the month: half a day cut' },
   { flag: 'long', color: '7C3AED', label: 'Shift over 14 hours: check before paying overtime' },
@@ -104,8 +111,9 @@ export const RULES: string[] = [
   'Week off (WO): 4 paid week offs a month for anyone who worked 20 or more days; otherwise one week off for every 6 days worked. Rostered off days are used first, then the earliest days with no punch. Any further days off are absent.',
   'Absent (A): any other day with no punch and no approved leave.',
   'Late: arriving more than 15 minutes after the rostered shift start (over 3 hours late counts as working a different shift, not late). Every 3 lates in the month cost half a day.',
+  'Short hours: a full day under the 9-hour working day, or a half day with both punches under 4h 30m, is cut by the minute at salary ÷ days in month ÷ 9 per hour. A half day from a missing punch has no hours to measure, so only the half day is cut.',
   'Overtime: time worked beyond 9h 30m in a day (9-hour shift + 30 minutes), paid at salary ÷ days in month ÷ 9 per hour. Shifts over 14 hours are flagged to check.',
-  'Payable days = Present + ½ × Half days + Paid leave + Week offs - late cut.',
+  'Payable days = Present + ½ × Half days + Paid leave + Week offs - late cut. Pay = payable days × salary ÷ days in month + overtime - short hours.',
 ]
 
 interface RpcRow {
@@ -118,6 +126,7 @@ interface RpcRow {
   late_minutes: number | null
   early_minutes: number | null
   ot_minutes: number | null
+  short_minutes: number | null
   is_late: boolean
   long_shift: boolean
 }
@@ -187,6 +196,7 @@ export async function loadMonthReport(month: string, outletId: string | null): P
         flags.push('late')
         if (lateCount % 3 === 0) flags.push('late_cut')
       }
+      if ((r.short_minutes ?? 0) > 0) flags.push('short')
       if (r.long_shift) flags.push('long')
       return {
         date: r.d,
@@ -197,6 +207,7 @@ export async function loadMonthReport(month: string, outletId: string | null): P
         lateMin: r.is_late ? r.late_minutes : null,
         earlyMin: r.early_minutes && r.early_minutes > 0 ? r.early_minutes : null,
         otMin: r.ot_minutes ?? 0,
+        shortMin: r.short_minutes ?? 0,
         isLate: r.is_late,
         longShift: r.long_shift,
         flags,
@@ -232,6 +243,7 @@ export async function loadMonthReport(month: string, outletId: string | null): P
         lateMin: days.reduce((a, d) => a + (d.lateMin ?? 0), 0),
         earlyMin: days.reduce((a, d) => a + (d.earlyMin ?? 0), 0),
         otMin: days.reduce((a, d) => a + d.otMin, 0),
+        shortMin: days.reduce((a, d) => a + d.shortMin, 0),
         longShifts: days.filter((d) => d.longShift).length,
       },
     })
@@ -305,6 +317,7 @@ export async function downloadExcel(r: MonthReport, scope: string) {
     'Late cut (days)',
     'Hours worked',
     'Overtime',
+    'Short hours',
     'Shifts over 14h',
   ])
   sh.font = bold
@@ -327,10 +340,11 @@ export async function downloadExcel(r: MonthReport, scope: string) {
       s.lateCut,
       hmTotal(s.workedMin),
       hmTotal(s.otMin),
+      hmTotal(s.shortMin),
       s.longShifts,
     ])
   }
-  ;[11, 26, 20, 22, 12, 9, 10, 8, 10, 10, 12, 7, 13, 13, 11, 14].forEach(
+  ;[11, 26, 20, 22, 12, 9, 10, 8, 10, 10, 12, 7, 13, 13, 11, 11, 14].forEach(
     (w, i) => (sum.getColumn(i + 1).width = w),
   )
   sum.views = [{ state: 'frozen', ySplit: 5 }]
@@ -410,6 +424,8 @@ export async function downloadExcel(r: MonthReport, scope: string) {
     const lr = ws.addRow([`Late Hrs (${hmTotal(s.lateMin)})`, ...e.days.map((d) => hm(d.lateMin))])
     e.days.forEach((d, i) => d.isLate && (lr.getCell(i + 2).fill = solid('FEF9C3')))
     ws.addRow([`Early Hrs (${hmTotal(s.earlyMin)})`, ...e.days.map((d) => hm(d.earlyMin))])
+    const sr = ws.addRow([`Short Hrs (${hmTotal(s.shortMin)})`, ...e.days.map((d) => hm(d.shortMin))])
+    e.days.forEach((d, i) => d.shortMin > 0 && (sr.getCell(i + 2).fill = solid('E0F2FE')))
     const ot = ws.addRow([`Overtime Hrs (${hmTotal(s.otMin)})`, ...e.days.map((d) => hm(d.otMin))])
     e.days.forEach((d, i) => d.longShift && (ot.getCell(i + 2).fill = solid('EDE9FE')))
     ws.addRow(['Remarks', ...e.days.map((d) => d.reason ?? '')])
@@ -614,6 +630,7 @@ export async function downloadPdf(r: MonthReport, scope: string) {
       { label: `Hrs Worked ${hmTotal(s.workedMin)}`, h: 7, cell: (d) => [hm(d.workedMin)] },
       { label: `Late Hrs ${hmTotal(s.lateMin)}`, h: 7, cell: (d) => [hm(d.lateMin)] },
       { label: `Early Hrs ${hmTotal(s.earlyMin)}`, h: 7, cell: (d) => [hm(d.earlyMin)] },
+      { label: `Short Hrs ${hmTotal(s.shortMin)}`, h: 7, cell: (d) => [hm(d.shortMin)] },
       { label: `Overtime ${hmTotal(s.otMin)}`, h: 7, cell: (d) => [hm(d.otMin)] },
     ]
     for (const row of rows) {

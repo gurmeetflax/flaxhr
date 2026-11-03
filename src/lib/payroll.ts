@@ -31,6 +31,7 @@ export interface PayrollCalc {
   lates: number
   late_cut_days: number
   ot_minutes: number
+  short_minutes?: number
   long_shifts?: number
   field_staff: boolean
 }
@@ -52,6 +53,8 @@ export interface PayrollLine {
   net_pay: number
   ot_minutes: number
   ot_amount: number
+  short_minutes: number
+  short_amount: number
   calc: PayrollCalc | null
   period_month: string
   status: 'draft' | 'finalised'
@@ -79,6 +82,8 @@ export interface MyPayslip {
   full_name: string
   ot_minutes: number
   ot_amount: number
+  short_minutes: number
+  short_amount: number
   calc: PayrollCalc | null
 }
 
