@@ -1,11 +1,23 @@
 import { useEffect, useMemo, useState } from 'react'
 import { Link, useParams, useSearchParams } from 'react-router-dom'
 import { useQuery } from '@tanstack/react-query'
-import { differenceInCalendarDays, format, parseISO, startOfMonth, subDays } from 'date-fns'
+import { differenceInCalendarDays, format, parseISO, subMonths } from 'date-fns'
 import { formatInTimeZone } from 'date-fns-tz'
 import { ArrowLeft, Download } from 'lucide-react'
 import { supabase } from '@/lib/supabase'
-import { hm, loadPeriod, STATUS_TEXT, type PeriodDay, type PeriodRow } from '@/lib/periodAttendance'
+import {
+  calculationLines,
+  COMPANY,
+  downloadPdf,
+  hm,
+  hmTotal,
+  loadMonthReport,
+  monthRange,
+  RULES,
+  STATUS_LABEL,
+  type MonthReport,
+  type ReportDay,
+} from '@/lib/attendanceReport'
 import { useEmployeeShifts } from '@/lib/shifts'
 
 const IST = 'Asia/Kolkata'
@@ -17,6 +29,16 @@ interface Reg {
   reason: string | null
   status: string
   decision_note: string | null
+}
+
+interface EmpRow {
+  id: string
+  employee_code: string
+  full_name: string
+  designation_name: string | null
+  outlet_id: string | null
+  outlet_name: string | null
+  hired_on: string | null
 }
 
 interface CardRow {
@@ -31,18 +53,37 @@ interface CardRow {
 }
 
 // Printable employee report (browser "Save as PDF"). Lives outside the
-// app shell so the printout is just the report.
+// app shell so the printout is just the report. Attendance comes from the
+// monthly attendance report (core.attendance_days), the same calculation
+// payroll uses.
 export default function EmployeeReportPage() {
   const { id = '' } = useParams<{ id: string }>()
   const [params, setParams] = useSearchParams()
-  const from = params.get('from') ?? format(startOfMonth(subDays(new Date(), 1)), 'yyyy-MM-dd')
-  const to = params.get('to') ?? format(new Date(), 'yyyy-MM-dd')
-  const [draft, setDraft] = useState({ from, to })
+  const month = (
+    params.get('month') ??
+    params.get('from') ??
+    format(subMonths(new Date(), 1), 'yyyy-MM')
+  ).slice(0, 7)
+  const { from, to } = monthRange(month)
+  const [busy, setBusy] = useState(false)
 
-  const periodQ = useQuery<PeriodRow | null>({
-    queryKey: ['employee-report', id, from, to],
+  const empQ = useQuery<EmpRow | null>({
+    queryKey: ['employee-report-emp', id],
     enabled: !!id,
-    queryFn: async () => (await loadPeriod({ from, to, employeeId: id }))[0] ?? null,
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('v_employees')
+        .select('id, employee_code, full_name, designation_name, outlet_id, outlet_name, hired_on')
+        .eq('id', id)
+        .maybeSingle()
+      if (error) throw error
+      return (data as EmpRow | null) ?? null
+    },
+  })
+  const reportQ = useQuery<MonthReport>({
+    queryKey: ['employee-report', id, month, empQ.data?.outlet_id],
+    enabled: !!id && !!empQ.data,
+    queryFn: () => loadMonthReport(month, empQ.data?.outlet_id ?? null, { employeeId: id }),
   })
   const regsQ = useQuery<Reg[]>({
     queryKey: ['employee-report-regs', id, from, to],
@@ -76,58 +117,71 @@ export default function EmployeeReportPage() {
   })
   const shiftsQ = useEmployeeShifts(id)
 
-  const row = periodQ.data
-  const days = useMemo(() => (row?.days ?? []).filter((d) => d.status !== 'not_employed' && d.status !== 'future'), [row])
-  const lates = days.filter((d) => d.status === 'late')
-  const absentDays = days.filter((d) => d.status === 'absent')
-  const problems = days.filter((d) => d.status === 'no_out' || d.status === 'short')
-  const outlets = useMemo(() => {
-    const m = new Map<string, number>()
-    for (const d of days) if (d.inOutlet) m.set(d.inOutlet, (m.get(d.inOutlet) ?? 0) + 1)
-    return [...m.entries()].sort((a, b) => b[1] - a[1])
-  }, [days])
-  const shifts = (shiftsQ.data ?? []).filter((s) => s.effective_from <= to && (!s.effective_to || s.effective_to >= from))
+  const emp = empQ.data
+  const me = reportQ.data?.employees[0] ?? null
+  const days = useMemo(() => (me?.days ?? []).filter((d) => d.status !== 'NE' && d.status !== 'FUT'), [me])
+  const lates = days.filter((d) => d.isLate)
+  const absentDays = days.filter((d) => d.status === 'A')
+  const halfDays = days.filter((d) => d.status === 'HD')
+  const shifts = (shiftsQ.data ?? []).filter(
+    (s) => s.effective_from <= to && (!s.effective_to || s.effective_to >= from),
+  )
 
   useEffect(() => {
-    if (row) document.title = `${row.employee.full_name} — attendance report ${from} to ${to}`
+    if (emp) document.title = `${emp.full_name} — attendance report ${format(parseISO(from), 'MMMM yyyy')}`
     return () => {
       document.title = 'Flax HR'
     }
-  }, [row, from, to])
+  }, [emp, from])
 
-  const loading = periodQ.isLoading || regsQ.isLoading || cardsQ.isLoading
-  const t = row?.totals
+  const loading = empQ.isLoading || reportQ.isLoading || regsQ.isLoading || cardsQ.isLoading
+  const s = me?.summary
+
+  const onPdf = async () => {
+    if (!reportQ.data || !emp) return
+    setBusy(true)
+    try {
+      await downloadPdf(reportQ.data, emp.full_name)
+    } finally {
+      setBusy(false)
+    }
+  }
 
   return (
     <div className="min-h-screen bg-zinc-100 py-6 text-zinc-900 print:bg-white print:py-0">
       <style>{'@page { size: A4; margin: 12mm }'}</style>
       <div className="mx-auto mb-4 flex max-w-[210mm] flex-wrap items-end justify-between gap-3 px-4 print:hidden">
-        <Link to={`/admin/employees/${id}/snapshot`} className="inline-flex items-center gap-1 text-sm text-zinc-600 hover:text-zinc-900">
+        <Link
+          to={`/admin/employees/${id}/snapshot`}
+          className="inline-flex items-center gap-1 text-sm text-zinc-600 hover:text-zinc-900"
+        >
           <ArrowLeft className="h-4 w-4" /> Back to snapshot
         </Link>
         <div className="flex flex-wrap items-end gap-2 text-xs text-zinc-600">
           <label className="flex flex-col gap-1">
-            From
-            <input type="date" className="h-9 rounded-md border border-zinc-300 bg-white px-2 text-sm text-zinc-900" value={draft.from} max={draft.to} onChange={(e) => setDraft({ ...draft, from: e.target.value })} />
-          </label>
-          <label className="flex flex-col gap-1">
-            To
-            <input type="date" className="h-9 rounded-md border border-zinc-300 bg-white px-2 text-sm text-zinc-900" value={draft.to} min={draft.from} onChange={(e) => setDraft({ ...draft, to: e.target.value })} />
+            Month
+            <input
+              type="month"
+              className="h-9 rounded-md border border-zinc-300 bg-white px-2 text-sm text-zinc-900"
+              value={month}
+              onChange={(e) => e.target.value && setParams({ month: e.target.value })}
+            />
           </label>
           <button
             type="button"
-            className="h-9 rounded-md border border-zinc-300 bg-white px-3 text-sm text-zinc-900 hover:bg-zinc-50"
-            onClick={() => setParams({ from: draft.from, to: draft.to })}
+            disabled={loading || !me}
+            className="h-9 rounded-md border border-zinc-300 bg-white px-3 text-sm text-zinc-900 hover:bg-zinc-50 disabled:opacity-50"
+            onClick={() => window.print()}
           >
-            Apply
+            Print
           </button>
           <button
             type="button"
-            disabled={loading || !row}
+            disabled={loading || !me || busy}
             className="inline-flex h-9 items-center gap-1.5 rounded-md bg-zinc-900 px-3 text-sm font-medium text-white hover:bg-zinc-800 disabled:opacity-50"
-            onClick={() => window.print()}
+            onClick={onPdf}
           >
-            <Download className="h-4 w-4" /> Download PDF
+            <Download className="h-4 w-4" /> Attendance PDF
           </button>
         </div>
       </div>
@@ -135,110 +189,146 @@ export default function EmployeeReportPage() {
       <article className="mx-auto max-w-[210mm] bg-white p-8 shadow-sm print:max-w-none print:p-0 print:shadow-none">
         {loading ? (
           <p className="text-sm text-zinc-500">Building report…</p>
-        ) : !row || !t ? (
-          <p className="text-sm text-red-600">Couldn't load this employee.</p>
+        ) : !emp || !me || !s ? (
+          <p className="text-sm text-red-600">
+            Couldn't load this employee for {format(parseISO(from), 'MMMM yyyy')}.
+          </p>
         ) : (
           <>
             <header className="flex items-start justify-between gap-4 border-b border-zinc-200 pb-4">
               <div>
-                <p className="text-[11px] font-semibold uppercase tracking-wider text-zinc-500">Attendance &amp; discipline report</p>
-                <h1 className="mt-1 text-2xl font-bold">{row.employee.full_name}</h1>
+                <p className="text-[11px] font-semibold uppercase tracking-wider text-zinc-500">
+                  Attendance &amp; discipline report
+                </p>
+                <h1 className="mt-1 text-2xl font-bold">{emp.full_name}</h1>
                 <p className="mt-1 text-sm text-zinc-600">
-                  {row.employee.employee_code}
-                  {row.employee.designation_name ? ` · ${row.employee.designation_name}` : ''}
-                  {row.employee.outlet_name ? ` · ${row.employee.outlet_name}` : ''}
-                  {row.employee.hired_on ? ` · Joined ${format(parseISO(row.employee.hired_on), 'd MMM yyyy')}` : ''}
+                  {emp.employee_code}
+                  {emp.designation_name ? ` · ${emp.designation_name}` : ''}
+                  {emp.outlet_name ? ` · ${emp.outlet_name}` : ''}
+                  {emp.hired_on ? ` · Joined ${format(parseISO(emp.hired_on), 'd MMM yyyy')}` : ''}
                 </p>
                 <p className="mt-1 text-sm text-zinc-600">
-                  Period: <b>{format(parseISO(from), 'd MMM yyyy')} – {format(parseISO(to), 'd MMM yyyy')}</b>
+                  Month: <b>{format(parseISO(from), 'MMMM yyyy')}</b>
                 </p>
               </div>
-              <img src="/flax-logo.png" alt="Flax" className="h-10 w-auto" />
+              <img src={COMPANY.logo} alt="H&B" className="h-14 w-auto" />
             </header>
 
             <Section title="Summary">
               <div className="grid grid-cols-4 gap-2">
-                <Kpi label="Attendance score" value={t.score == null ? '—' : `${t.score}%`} tone={tone(t.score)} hint={`${t.present + t.late + t.noOut} of ${t.workingDays} working days`} />
-                <Kpi label="Punctuality" value={t.punctuality == null ? '—' : `${t.punctuality}%`} tone={tone(t.punctuality)} hint="punched-in days on time" />
-                <Kpi label="Hours worked" value={hm(t.workedMin)} hint={`avg ${hm((t.present + t.late) ? t.workedMin / (t.present + t.late) : 0)} / day`} />
-                <Kpi label="Overtime" value={hm(t.overtimeMin)} />
-                <Kpi label="Late days" value={t.late} tone={t.late ? 'warn' : undefined} hint={t.late ? `${hm(t.lateMin)} in total` : undefined} />
-                <Kpi label="Absent" value={t.absent} tone={t.absent ? 'bad' : undefined} />
-                <Kpi label="No punch-out" value={t.noOut} tone={t.noOut ? 'warn' : undefined} />
-                <Kpi label="Double taps" value={t.short} tone={t.short ? 'warn' : undefined} hint="in & out < 30 min" />
-                <Kpi label="Week offs" value={t.weekOff} />
-                <Kpi label="Leave" value={t.leave} />
+                <Kpi label="Payable days" value={s.payable} hint={`of ${me.days.length}`} />
+                <Kpi label="Present" value={s.present} />
+                <Kpi label="Half days" value={s.halfDays} tone={s.halfDays ? 'warn' : undefined} />
+                <Kpi label="Week offs" value={s.weekOff} />
+                <Kpi label="Absent" value={s.absent} tone={s.absent ? 'bad' : undefined} />
+                <Kpi label="Paid leave" value={s.paidLeave} />
+                <Kpi
+                  label="Lates"
+                  value={s.lates}
+                  tone={s.lates ? 'warn' : undefined}
+                  hint={s.lateCut ? `${s.lateCut} day cut` : undefined}
+                />
+                <Kpi label="Hours worked" value={hmTotal(s.workedMin)} />
+                <Kpi
+                  label="Short hours"
+                  value={hmTotal(s.shortMin)}
+                  tone={s.shortMin ? 'warn' : undefined}
+                  hint="cut by the minute"
+                />
+                <Kpi
+                  label="Overtime"
+                  value={hmTotal(s.otMin)}
+                  hint={s.longShifts ? `${s.longShifts} shift(s) over 14h` : undefined}
+                />
                 <Kpi label="Regularisations" value={regsQ.data?.length ?? 0} />
-                <Kpi label="Cards" value={cardsQ.data?.length ?? 0} tone={cardsQ.data?.some((c) => c.colour === 'red') ? 'bad' : cardsQ.data?.length ? 'warn' : undefined} />
+                <Kpi
+                  label="Cards"
+                  value={cardsQ.data?.length ?? 0}
+                  tone={
+                    cardsQ.data?.some((c) => c.colour === 'red')
+                      ? 'bad'
+                      : cardsQ.data?.length
+                        ? 'warn'
+                        : undefined
+                  }
+                />
               </div>
+              <ul className="mt-3 list-disc space-y-0.5 pl-5 text-[11px] text-zinc-600">
+                {calculationLines(me, me.days.length).map((l) => (
+                  <li key={l}>{l}</li>
+                ))}
+              </ul>
             </Section>
 
             <Section title="Shift times">
               {shifts.length ? (
                 <Table head={['Shift', 'Timing', 'Outlet', 'Effective']}>
-                  {shifts.map((s) => (
-                    <tr key={`${s.shift_id}-${s.effective_from}`}>
-                      <Td>{s.shift_name}</Td>
-                      <Td>{fmtClock(s.start_time)} – {fmtClock(s.end_time)}</Td>
-                      <Td>{s.outlet_name ?? '—'}</Td>
+                  {shifts.map((sh) => (
+                    <tr key={`${sh.shift_id}-${sh.effective_from}`}>
+                      <Td>{sh.shift_name}</Td>
                       <Td>
-                        {format(parseISO(s.effective_from), 'd MMM yyyy')} – {s.effective_to ? format(parseISO(s.effective_to), 'd MMM yyyy') : 'now'}
+                        {fmtClock(sh.start_time)} – {fmtClock(sh.end_time)}
+                      </Td>
+                      <Td>{sh.outlet_name ?? '—'}</Td>
+                      <Td>
+                        {format(parseISO(sh.effective_from), 'd MMM yyyy')} –{' '}
+                        {sh.effective_to ? format(parseISO(sh.effective_to), 'd MMM yyyy') : 'now'}
                       </Td>
                     </tr>
                   ))}
                 </Table>
               ) : (
-                <Empty>No shift assigned — late arrival and early departure can't be measured. Assign one under Shifts.</Empty>
+                <Empty>No fixed shift assigned. Late arrival is measured against the roster.</Empty>
               )}
-              {outlets.length ? (
-                <p className="mt-2 text-xs text-zinc-600">
-                  Punched in at: {outlets.map(([n, c]) => `${n} (${c} day${c === 1 ? '' : 's'})`).join(', ')}
-                </p>
-              ) : null}
             </Section>
 
-            <Section title={`Late punches (${lates.length})`}>
+            <Section title={`Late arrivals (${lates.length})`}>
               {lates.length ? (
-                <Table head={['Date', 'Punch in', 'Scheduled', 'Late by', 'Outlet']}>
+                <Table head={['Date', 'Punch in', 'Rostered start', 'Late by']}>
                   {lates.map((d) => (
                     <tr key={d.date}>
                       <Td>{fmtDate(d.date)}</Td>
-                      <Td>{clock(d.firstIn)}</Td>
+                      <Td>{clock(d.pairs[0]?.[0] ?? null)}</Td>
                       <Td>{clock(d.schedStart)}</Td>
-                      <Td className="font-medium text-amber-700">{hm(d.lateMin)}</Td>
-                      <Td>{d.inOutlet ?? '—'}</Td>
-                    </tr>
-                  ))}
-                </Table>
-              ) : (
-                <Empty>No late punches in this period.</Empty>
-              )}
-            </Section>
-
-            <Section title={`Absences & missing punches (${absentDays.length + problems.length})`}>
-              {absentDays.length ? (
-                <p className="mb-2 text-[11px]">
-                  <span className="font-medium text-red-700">Absent {absentDays.length} day{absentDays.length === 1 ? '' : 's'}:</span>{' '}
-                  {dateRuns(absentDays.map((d) => d.date))}
-                  <span className="text-zinc-500"> — no punch, leave or week off.</span>
-                </p>
-              ) : null}
-              {problems.length ? (
-                <Table head={['Date', 'Issue', 'Details']}>
-                  {problems.map((d) => (
-                    <tr key={d.date}>
-                      <Td>{fmtDate(d.date)}</Td>
-                      <Td className="text-amber-700">{STATUS_TEXT[d.status]}</Td>
-                      <Td>
-                        {d.status === 'no_out'
-                          ? `In ${clock(d.firstIn)} at ${d.inOutlet ?? '—'}, never punched out`
-                          : `In and out at ${clock(d.firstIn)} — likely a double tap`}
+                      <Td className="font-medium text-amber-700">
+                        {hm(d.lateMin)}
+                        {d.flags.includes('late_cut') ? (
+                          <span className="block text-[10px]">3rd late: ½ day cut</span>
+                        ) : null}
                       </Td>
                     </tr>
                   ))}
                 </Table>
+              ) : (
+                <Empty>No late arrivals this month.</Empty>
+              )}
+            </Section>
+
+            <Section title={`Absences & half days (${absentDays.length + halfDays.length})`}>
+              {absentDays.length ? (
+                <p className="mb-2 text-[11px]">
+                  <span className="font-medium text-red-700">
+                    Absent {absentDays.length} day{absentDays.length === 1 ? '' : 's'}:
+                  </span>{' '}
+                  {dateRuns(absentDays.map((d) => d.date))}
+                  <span className="text-zinc-500">
+                    {' '}
+                    — no punch, no approved leave, beyond the paid week offs.
+                  </span>
+                </p>
               ) : null}
-              {!absentDays.length && !problems.length ? <Empty>None.</Empty> : null}
+              {halfDays.length ? (
+                <Table head={['Date', 'Why', 'Punches']}>
+                  {halfDays.map((d) => (
+                    <tr key={d.date}>
+                      <Td>{fmtDate(d.date)}</Td>
+                      <Td className="text-amber-700">{d.reason ?? 'Half day'}</Td>
+                      <Td>{pairsText(d)}</Td>
+                    </tr>
+                  ))}
+                </Table>
+              ) : null}
+              {!absentDays.length && !halfDays.length ? <Empty>None.</Empty> : null}
             </Section>
 
             <Section title={`Regularisations (${regsQ.data?.length ?? 0})`}>
@@ -251,7 +341,9 @@ export default function EmployeeReportPage() {
                       <Td>{r.reason ?? '—'}</Td>
                       <Td className="capitalize">
                         {r.status}
-                        {r.decision_note ? <span className="block text-[10px] text-zinc-500">{r.decision_note}</span> : null}
+                        {r.decision_note ? (
+                          <span className="block text-[10px] text-zinc-500">{r.decision_note}</span>
+                        ) : null}
                       </Td>
                     </tr>
                   ))}
@@ -268,13 +360,17 @@ export default function EmployeeReportPage() {
                     <tr key={c.id}>
                       <Td>{fmtDate(c.incident_date)}</Td>
                       <Td>
-                        <span className={`inline-block h-2.5 w-2.5 rounded-full align-middle ${c.colour === 'red' ? 'bg-red-500' : c.colour === 'green' ? 'bg-green-500' : 'bg-amber-400'}`} />{' '}
+                        <span
+                          className={`inline-block h-2.5 w-2.5 rounded-full align-middle ${c.colour === 'red' ? 'bg-red-500' : c.colour === 'green' ? 'bg-green-500' : 'bg-amber-400'}`}
+                        />{' '}
                         <span className="capitalize">{c.colour}</span>
                         {c.source === 'auto' ? <span className="text-zinc-500"> (auto)</span> : null}
                       </Td>
                       <Td>
                         {c.reason_title ?? '—'}
-                        {c.reason_category ? <span className="block text-[10px] text-zinc-500">{c.reason_category}</span> : null}
+                        {c.reason_category ? (
+                          <span className="block text-[10px] text-zinc-500">{c.reason_category}</span>
+                        ) : null}
                       </Td>
                       <Td className="max-w-[60mm]">{c.notes ?? '—'}</Td>
                       <Td className="capitalize">{c.status}</Td>
@@ -282,30 +378,38 @@ export default function EmployeeReportPage() {
                   ))}
                 </Table>
               ) : (
-                <Empty>No cards or complaints in this period.</Empty>
+                <Empty>No cards or complaints this month.</Empty>
               )}
             </Section>
 
             <Section title="Day by day" breakBefore>
-              <Table head={['Date', 'Status', 'In', 'Out', 'Hours', 'Outlet', 'Notes']}>
+              <Table head={['Date', 'Status', 'In / out', 'Hours', 'Late', 'Short', 'OT', 'Notes']}>
                 {days.map((d) => (
                   <tr key={d.date}>
                     <Td className="whitespace-nowrap">{fmtDate(d.date)}</Td>
-                    <Td className={statusColor(d)}>{d.status === 'leave' && d.leaveName ? `Leave (${d.leaveName})` : STATUS_TEXT[d.status]}</Td>
-                    <Td className="whitespace-nowrap">{clock(d.firstIn)}</Td>
-                    <Td className="whitespace-nowrap">{clock(d.lastOut)}</Td>
-                    <Td className="whitespace-nowrap tabular-nums">{d.workedMin ? hm(d.workedMin) : '—'}</Td>
-                    <Td>{[d.inOutlet, d.outOutlet].filter((x, i, a) => x && a.indexOf(x) === i).join(' → ') || '—'}</Td>
-                    <Td className="text-[10px] text-zinc-600">{d.notes.join(' · ')}</Td>
+                    <Td className={statusColor(d)}>{STATUS_LABEL[d.status]}</Td>
+                    <Td className="whitespace-nowrap">{pairsText(d)}</Td>
+                    <Td className="whitespace-nowrap tabular-nums">{hm(d.workedMin)}</Td>
+                    <Td className="whitespace-nowrap tabular-nums">{hm(d.lateMin)}</Td>
+                    <Td className="whitespace-nowrap tabular-nums">{hm(d.shortMin)}</Td>
+                    <Td className="whitespace-nowrap tabular-nums">{hm(d.otMin)}</Td>
+                    <Td className="text-[10px] text-zinc-600">
+                      {[
+                        d.reason,
+                        d.flags.includes('late_cut') ? '3rd late: ½ day cut' : null,
+                        d.longShift ? 'shift over 14h' : null,
+                      ]
+                        .filter(Boolean)
+                        .join(' · ')}
+                    </Td>
                   </tr>
                 ))}
               </Table>
             </Section>
 
             <footer className="mt-6 border-t border-zinc-200 pt-2 text-[10px] text-zinc-500">
-              Generated {format(new Date(), 'd MMM yyyy, h:mm a')} from Flax HR. Attendance score = days punched in ÷
-              working days (week offs and approved leave excluded). Double taps (in and out under 30 min) count as
-              working days not attended.
+              Generated {format(new Date(), 'd MMM yyyy, h:mm a')} from Flax HR, with the same calculation as
+              payroll. Rules: {RULES.slice(1, 8).join(' ')}
             </footer>
           </>
         )}
@@ -314,7 +418,15 @@ export default function EmployeeReportPage() {
   )
 }
 
-function Section({ title, children, breakBefore }: { title: string; children: React.ReactNode; breakBefore?: boolean }) {
+function Section({
+  title,
+  children,
+  breakBefore,
+}: {
+  title: string
+  children: React.ReactNode
+  breakBefore?: boolean
+}) {
   return (
     <section className={`mt-5 ${breakBefore ? 'print:break-before-page' : 'break-inside-avoid'}`}>
       <h2 className="mb-2 text-sm font-semibold uppercase tracking-wide text-zinc-700">{title}</h2>
@@ -323,8 +435,25 @@ function Section({ title, children, breakBefore }: { title: string; children: Re
   )
 }
 
-function Kpi({ label, value, hint, tone }: { label: string; value: string | number; hint?: string; tone?: 'warn' | 'bad' | 'good' }) {
-  const color = tone === 'bad' ? 'text-red-700' : tone === 'warn' ? 'text-amber-700' : tone === 'good' ? 'text-green-700' : 'text-zinc-900'
+function Kpi({
+  label,
+  value,
+  hint,
+  tone,
+}: {
+  label: string
+  value: string | number
+  hint?: string
+  tone?: 'warn' | 'bad' | 'good'
+}) {
+  const color =
+    tone === 'bad'
+      ? 'text-red-700'
+      : tone === 'warn'
+        ? 'text-amber-700'
+        : tone === 'good'
+          ? 'text-green-700'
+          : 'text-zinc-900'
   return (
     <div className="rounded-md border border-zinc-200 px-2.5 py-2">
       <div className="text-[10px] uppercase tracking-wide text-zinc-500">{label}</div>
@@ -359,16 +488,15 @@ function Empty({ children }: { children: React.ReactNode }) {
   return <p className="text-xs text-zinc-500">{children}</p>
 }
 
-function tone(pct: number | null): 'good' | 'warn' | 'bad' | undefined {
-  if (pct == null) return undefined
-  return pct >= 90 ? 'good' : pct >= 75 ? 'warn' : 'bad'
+function statusColor(d: ReportDay): string {
+  if (d.status === 'A') return 'text-red-700'
+  if (d.status === 'HD') return 'text-amber-700'
+  if (d.status === 'PL' || d.status === 'WO') return 'text-blue-700'
+  return ''
 }
 
-function statusColor(d: PeriodDay): string {
-  if (d.status === 'absent') return 'text-red-700'
-  if (d.status === 'late' || d.status === 'no_out' || d.status === 'short') return 'text-amber-700'
-  if (d.status === 'leave' || d.status === 'week_off') return 'text-blue-700'
-  return ''
+function pairsText(d: ReportDay): string {
+  return d.pairs.length ? d.pairs.map((p) => `${clock(p[0])} – ${clock(p[1])}`).join(', ') : '—'
 }
 
 // ['2026-09-02','2026-09-03','2026-09-04','2026-09-08'] → "2–4, 8 Sep"
@@ -377,7 +505,8 @@ function dateRuns(dates: string[]): string {
   let i = 0
   while (i < dates.length) {
     let j = i
-    while (j + 1 < dates.length && differenceInCalendarDays(parseISO(dates[j + 1]), parseISO(dates[j])) === 1) j++
+    while (j + 1 < dates.length && differenceInCalendarDays(parseISO(dates[j + 1]), parseISO(dates[j])) === 1)
+      j++
     const a = parseISO(dates[i])
     const b = parseISO(dates[j])
     const sameMonth = j + 1 >= dates.length || format(parseISO(dates[j + 1]), 'MMM') !== format(b, 'MMM')
