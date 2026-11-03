@@ -100,7 +100,7 @@ export const FLAGS: { flag: Flag; color: string; label: string }[] = [
     color: '0EA5E9',
     label: 'Short hours: worked under 9h (full day) or under 4h 30m (half day)',
   },
-  { flag: 'late', color: 'CA8A04', label: 'Late by more than 15 min after the rostered start' },
+  { flag: 'late', color: 'CA8A04', label: 'Late by more than 15 min after the shift start' },
   { flag: 'late_cut', color: '7C2D12', label: '3rd, 6th, 9th… late of the month: half a day cut' },
   { flag: 'long', color: '7C3AED', label: 'Shift over 14 hours: check before paying overtime' },
 ]
@@ -111,7 +111,7 @@ export const RULES: string[] = [
   'Half day (HD): worked under 4h 30m, or a missing punch-in / punch-out, or a single tap at the end of the day. An approved regularisation adds the missing punch.',
   'Week off (WO): 4 paid week offs a month for anyone who worked 20 or more days; otherwise one week off for every 6 days worked. Rostered off days are used first, then the earliest days with no punch. Any further days off are absent.',
   'Absent (A): any other day with no punch and no approved leave.',
-  'Late: arriving more than 15 minutes after the rostered shift start (over 3 hours late counts as working a different shift, not late). Every 3 lates in the month cost half a day.',
+  'Late: arriving more than 15 minutes after the shift start (the rostered shift, or your fixed shift if you are not rostered; over 3 hours late counts as working a different shift, not late). Every 3 lates in the month cost half a day.',
   'Short hours: a full day under the 9-hour working day, or a half day with both punches under 4h 30m, is cut by the minute at salary ÷ days in month ÷ 9 per hour. A half day from a missing punch has no hours to measure, so only the half day is cut.',
   'Overtime: time worked beyond 9h 30m in a day (9-hour shift + 30 minutes), paid at salary ÷ days in month ÷ 9 per hour. Shifts over 14 hours are flagged to check.',
   'Payable days = Present + ½ × Half days + Paid leave + Week offs - late cut. Pay = payable days × salary ÷ days in month + overtime - short hours.',
