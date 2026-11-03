@@ -116,6 +116,36 @@ export const RULES: string[] = [
   'Payable days = Present + ½ × Half days + Paid leave + Week offs - late cut. Pay = payable days × salary ÷ days in month + overtime - short hours.',
 ]
 
+// Worked examples for the rules, on a ₹18,000 salary in a 31-day month
+// (one day = ₹580.65, one hour = ₹64.52).
+export const RULE_EXAMPLES: string[] = [
+  'Shift 10:00–19:00, arrives 10:40, leaves 19:00: worked 8h 20m, so 40 min short = ₹43 cut, and it counts as 1 late.',
+  'Leaves at 16:30 after a 10:00 start: worked 6h 30m, so 2h 30m short = ₹161 cut.',
+  'Works 3 hours: half day (₹290) and 1h 30m short of 4h 30m (₹97 cut), so ₹194 is paid for the day.',
+  'Forgets to punch out and does not regularise: half day, ₹290 cut. Regularise the punch-out and the day is counted in full.',
+  'Works 10:00–21:00 (11 hours): 1h 30m over 9h 30m = ₹97 overtime.',
+  '3 lates in the month: half a day cut (₹290). 6 lates: one day cut.',
+  'Works 22 days and has 9 days with no punch: 4 week offs are paid, the other 5 days are absent.',
+]
+
+// The month's calculation for one employee, spelled out for the report.
+export function calculationLines(e: ReportEmployee, daysInMonth: number): string[] {
+  const s = e.summary
+  const worked = s.present + s.halfDays
+  const offs =
+    worked >= 20
+      ? '4 (worked 20 or more days)'
+      : `${Math.min(4, Math.floor(worked / 6))} (1 per 6 days worked)`
+  const lines = [
+    `Week offs: ${worked} days worked, so ${offs} week offs.`,
+    `Payable days = Present ${s.present} + Half days ${s.halfDays} × ½ (${s.halfDays / 2}) + Paid leave ${s.paidLeave} + Week offs ${s.weekOff} - Late cut ${s.lateCut} (${s.lates} lates; every 3 cost ½ day) = ${s.payable} of ${daysInMonth} days.`,
+    `Hourly rate = monthly salary ÷ ${daysInMonth} ÷ 9. Overtime ${hmTotal(s.otMin)} is added and short hours ${hmTotal(s.shortMin)} are cut at this rate.`,
+    `Pay = monthly salary ÷ ${daysInMonth} × ${s.payable} payable days + overtime - short hours, before PF / ESIC / PT and other deductions.`,
+  ]
+  if (e.fieldStaff) lines.push('Field staff: the 4h 30m, late, short-hours and overtime rules do not apply.')
+  return lines
+}
+
 interface RpcRow {
   employee_id: string
   d: string
@@ -430,6 +460,9 @@ export async function downloadExcel(r: MonthReport, scope: string) {
     e.days.forEach((d, i) => d.longShift && (ot.getCell(i + 2).fill = solid('EDE9FE')))
     ws.addRow(['Remarks', ...e.days.map((d) => d.reason ?? '')])
     ws.addRow([])
+    ws.addRow(['How this month was calculated']).font = bold
+    for (const line of calculationLines(e, e.days.length)) ws.addRow([line])
+    ws.addRow([])
     ws.addRow([
       'Note: P Present, HD Half day, A Absent, WO Week off, PL Paid leave, UPL Unpaid leave. Hover a status cell for why it was marked. See the "Rules & legend" sheet.',
     ])
@@ -454,6 +487,9 @@ export async function downloadExcel(r: MonthReport, scope: string) {
     const row = rl.addRow(['', f.label])
     row.getCell(1).fill = solid(f.color)
   }
+  rl.addRow([])
+  rl.addRow(['Examples (₹18,000 salary, 31-day month)']).font = { bold: true, size: 13 }
+  RULE_EXAMPLES.forEach((t) => rl.addRow(['•', t]))
   rl.getColumn(1).width = 8
   rl.getColumn(2).width = 140
 
@@ -481,6 +517,9 @@ async function loadLogo(): Promise<string | null> {
     return null
   }
 }
+
+// The PDF's built-in font has no rupee sign.
+const pdfText = (t: string) => t.replace(/₹/g, 'Rs ')
 
 const rgb = (hex: string): [number, number, number] => [
   parseInt(hex.slice(0, 2), 16),
@@ -693,6 +732,20 @@ export async function downloadPdf(r: MonthReport, scope: string) {
       y += Math.min(text.length, 4) * 2.8 + 1.5
     }
 
+    // How the month was calculated
+    doc.setFont('helvetica', 'bold')
+    doc.setFontSize(7)
+    doc.text('How this month was calculated', M, y + 1)
+    doc.setFont('helvetica', 'normal')
+    doc.setFontSize(6.5)
+    y += 4
+    for (const line of calculationLines(e, e.days.length)) {
+      const t = doc.splitTextToSize(`• ${line}`, W - 2 * M)
+      doc.text(t, M, y)
+      y += t.length * 2.9
+    }
+    y += 2.5
+
     // Legend
     doc.setFont('helvetica', 'bold')
     doc.text('Legend:', M, y + 1)
@@ -742,6 +795,18 @@ export async function downloadPdf(r: MonthReport, scope: string) {
     doc.circle(M + 2, y - 1.2, 1.3, 'F')
     doc.text(f.label, M + 6, y)
     y += 5
+  }
+  y += 3
+  doc.setFont('helvetica', 'bold')
+  doc.setFontSize(11)
+  doc.text(pdfText('Examples (₹18,000 salary, 31-day month)'), M, y)
+  doc.setFont('helvetica', 'normal')
+  doc.setFontSize(8.5)
+  y += 6
+  for (const t of RULE_EXAMPLES) {
+    const lines = doc.splitTextToSize(pdfText(`• ${t}`), W - 2 * M)
+    doc.text(lines, M, y)
+    y += lines.length * 4 + 1
   }
 
   save(doc.output('blob'), `${fileBase(r, scope)}.pdf`)
