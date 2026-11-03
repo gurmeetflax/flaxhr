@@ -17,12 +17,10 @@
 --        single tap (an approved regularisation adds the missing punch)
 --   PL   approved paid leave (a week-off leave request counts as no punch)
 --   UPL  approved unpaid leave
---   WO   one paid week off in each 7-day block (1–7, 8–14, 15–21, 22–28)
---        that has 3+ days worked and a no-punch day; the rostered off day
---        if there is one, else the first no-punch day. Days 29–31 have none.
---        A week worked through (all 7 days) earns a comp off instead: the
---        next no-punch day that month is paid as a week off, not absent
---   A    any other no-punch day
+--   WO   a monthly pool of paid week offs: 4 for 20+ days worked (P or HD),
+--        otherwise one per 6 days worked. Rostered off days are used first,
+--        then the earliest no-punch days
+--   A    any other no-punch day (offs beyond the pool are absent)
 --   late more than 15 minutes (and up to 3 hours) after the rostered shift
 --        start; every 3 lates in the month cost half a day
 --   OT   minutes worked beyond 9h 30m (9-hour shift + 30 minutes' grace),
@@ -127,7 +125,13 @@ as $function$
   ), sh as (
     select * from core.attendance_shifts(p_emp, p_from, p_to)
   ), agg as (
-    select sh.d, coalesce(sum(minutes) filter (where kind = 'shift'), 0) mins,
+    -- Hours are first punch-in to last punch-out of the day (as SalaryBox
+    -- counted them; the 9-hour shift includes breaks), capped at 16 hours.
+    select sh.d,
+           case when count(*) filter (where kind = 'shift') > 0
+                then greatest(coalesce(sum(minutes) filter (where kind = 'shift'), 0),
+                              least(coalesce(extract(epoch from max(coalesce(out_at, in_at)) - min(in_at)) / 60, 0), 960))
+                else 0 end mins,
            count(*) filter (where kind = 'shift') nshift,
            bool_or(kind = 'open') has_open, bool_or(kind = 'out_only') has_out_only, bool_or(kind = 'tap') has_tap,
            min(in_at) first_in, max(coalesce(out_at, in_at)) last_out,
@@ -179,34 +183,26 @@ as $function$
     left join agg a on a.d = days.d
     left join lv on lv.d = days.d
     left join ro on ro.work_date = days.d
+  ), ent as (
+    -- Week offs are a monthly pool: 4 for 20+ days worked, otherwise one
+    -- per 6 days worked.
+    select case when count(*) filter (where k in ('P', 'HD')) >= 20 then 4
+                else least(4, count(*) filter (where k in ('P', 'HD')) / 6) end n
+    from cls
   ), wo as (
-    select blk, coalesce(min(d) filter (where k = 'none' and rostered_off), min(d) filter (where k = 'none')) wo_day
-    from cls where blk < 4
-    group by blk
-    having count(*) filter (where k in ('P', 'HD')) >= 3 and count(*) filter (where k = 'none') >= 1
-  ), earned as (
-    -- A week worked through (all 7 days) earns a comp off: the next
-    -- no-punch day in the month is paid as a week off instead of absent.
-    select blk, min(d) blk_start, max(d) blk_end
-    from cls where blk < 4
-    group by blk
-    having count(*) filter (where k in ('P', 'HD')) = 7
+    -- Rostered off days first, then the earliest no-punch days.
+    select d, row_number() over (order by coalesce(rostered_off, false) desc, d) rn
+    from cls where k = 'none'
   ), lab as (
-    select cls.*, case when cls.k = 'none' then case when cls.d = wo.wo_day then 'WO' else 'A' end else cls.k end st
-    from cls left join wo on wo.blk = cls.blk
-  ), co as (
-    select a.d, row_number() over (order by (a.d > (select min(blk_end) from earned)) desc, a.d) rn
-    from lab a where a.st = 'A'
-  ), co_pick as (
-    select co.d from co where co.rn <= (select count(*) from earned)
-  ), co_src as (
-    select p.d, (select string_agg(to_char(e.blk_start, 'DD') || '-' || to_char(e.blk_end, 'DD Mon'), ', ')
-                 from earned e) weeks
-    from co_pick p
+    select cls.*,
+           case when cls.k <> 'none' then cls.k
+                when wo.rn <= (select n from ent) then 'WO'
+                else 'A' end st
+    from cls left join wo on wo.d = cls.d
   )
   select lab.d,
-         case when cs.d is not null then 'WO' else lab.st end,
-         case when cs.d is not null then 'Comp off for working through ' || cs.weeks else lab.reason end,
+         lab.st,
+         lab.reason,
          lab.pairs,
          case when lab.k in ('P', 'HD') and lab.mins > 0 then round(lab.mins)::int end,
          case when lab.first_in is not null and lab.starts_at is not null
@@ -221,7 +217,7 @@ as $function$
            and lab.first_in - lab.starts_at <= interval '3 hours',
          lab.maxm > 840,
          lab.starts_at, lab.ends_at
-  from lab left join co_src cs on cs.d = lab.d
+  from lab
   order by lab.d;
 $function$;
 
