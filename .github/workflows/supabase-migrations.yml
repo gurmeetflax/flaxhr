@@ -23,10 +23,12 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      # Pinned: CLI 3.0 made `db push` target a local stack unless --remote
+      # is passed, which broke this job on 3 Nov 2026.
       - name: Install Supabase CLI
         uses: supabase/setup-cli@v1
         with:
-          version: latest
+          version: 2.122.1
 
       - name: Link to project
         run: |
