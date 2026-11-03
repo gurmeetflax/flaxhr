@@ -28,6 +28,7 @@ export interface ReportDay {
   pairs: [string | null, string | null][]
   workedMin: number | null
   lateMin: number | null
+  schedStart: string | null
   earlyMin: number | null
   otMin: number
   shortMin: number
@@ -154,6 +155,7 @@ interface RpcRow {
   pairs: [string | null, string | null][] | null
   worked_minutes: number | null
   late_minutes: number | null
+  sched_start: string | null
   early_minutes: number | null
   ot_minutes: number | null
   short_minutes: number | null
@@ -175,7 +177,7 @@ export function monthRange(month: string) {
 export async function loadMonthReport(
   month: string,
   outletId: string | null,
-  opts: { mine?: boolean } = {},
+  opts: { mine?: boolean; employeeId?: string } = {},
 ): Promise<MonthReport> {
   const { from, to, monthLabel } = monthRange(month)
 
@@ -194,6 +196,11 @@ export async function loadMonthReport(
     rows.push(...got)
   }
 
+  if (opts.employeeId) {
+    const keep = rows.filter((r) => r.employee_id === opts.employeeId)
+    rows.length = 0
+    rows.push(...keep)
+  }
   const ids = [...new Set(rows.map((r) => r.employee_id))]
   const emps = new Map<
     string,
@@ -242,6 +249,7 @@ export async function loadMonthReport(
         pairs: r.pairs ?? [],
         workedMin: r.worked_minutes,
         lateMin: r.is_late ? r.late_minutes : null,
+        schedStart: r.sched_start,
         earlyMin: r.early_minutes && r.early_minutes > 0 ? r.early_minutes : null,
         otMin: r.ot_minutes ?? 0,
         shortMin: r.short_minutes ?? 0,
