@@ -7,7 +7,10 @@ import { queryClient } from '@/lib/query-client'
 import { AuthProvider } from '@/lib/auth'
 import App from '@/App'
 import SwUpdateBanner from '@/components/SwUpdateBanner'
+import { installChunkReload } from '@/lib/chunkReload'
 import '@/index.css'
+
+installChunkReload()
 
 createRoot(document.getElementById('root')!).render(
   <StrictMode>

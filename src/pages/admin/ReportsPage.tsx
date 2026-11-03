@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
-import { endOfMonth, format, startOfMonth, subMonths } from 'date-fns'
+import { format, subMonths } from 'date-fns'
 import { supabase } from '@/lib/supabase'
 import { PageHeader } from '@/components/layout/AppShell'
 import { Input } from '@/components/ui/Input'
@@ -22,8 +22,7 @@ export default function ReportsPage() {
   const last = subMonths(new Date(), 1)
   const [outletId, setOutletId] = useState('')
   const [search, setSearch] = useState('')
-  const [from, setFrom] = useState(format(startOfMonth(last), 'yyyy-MM-dd'))
-  const [to, setTo] = useState(format(endOfMonth(last), 'yyyy-MM-dd'))
+  const [month, setMonth] = useState(format(last, 'yyyy-MM'))
 
   const outletsQ = useQuery<OutletOption[]>({
     queryKey: ['outlets-filter'],
@@ -60,7 +59,7 @@ export default function ReportsPage() {
         <AttendanceExportPanel outlets={outletsQ.data ?? []} />
       ) : (
         <>
-          <div className="mb-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+          <div className="mb-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
             <Input placeholder="Search employee" value={search} onChange={(e) => setSearch(e.target.value)} />
             <select
               className="h-10 rounded-lg border border-border bg-surface px-3 text-sm"
@@ -75,15 +74,15 @@ export default function ReportsPage() {
               ))}
             </select>
             <label className="flex flex-col gap-1 text-xs text-muted-foreground">
-              From
-              <Input type="date" value={from} max={to} onChange={(e) => setFrom(e.target.value)} />
-            </label>
-            <label className="flex flex-col gap-1 text-xs text-muted-foreground">
-              To
-              <Input type="date" value={to} min={from} onChange={(e) => setTo(e.target.value)} />
+              Month
+              <Input
+                type="month"
+                value={month}
+                onChange={(e) => e.target.value && setMonth(e.target.value)}
+              />
             </label>
           </div>
-          <ScoresPanel from={from} to={to} outletId={outletId} search={search} />
+          <ScoresPanel month={month} outletId={outletId} search={search} />
         </>
       )}
     </>
