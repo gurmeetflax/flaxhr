@@ -278,13 +278,13 @@ export default function EmployeeReportPage() {
                   ))}
                 </Table>
               ) : (
-                <Empty>No fixed shift assigned. Late arrival is measured against the roster.</Empty>
+                <Empty>No fixed shift assigned. Late arrival is measured against the roster only.</Empty>
               )}
             </Section>
 
             <Section title={`Late arrivals (${lates.length})`}>
               {lates.length ? (
-                <Table head={['Date', 'Punch in', 'Rostered start', 'Late by']}>
+                <Table head={['Date', 'Punch in', 'Shift start', 'Late by']}>
                   {lates.map((d) => (
                     <tr key={d.date}>
                       <Td>{fmtDate(d.date)}</Td>
