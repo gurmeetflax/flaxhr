@@ -101,7 +101,7 @@ export const RULES: string[] = [
   'Shift is 9 hours including break. Punches are paired into shifts; a shift counts on the day it starts, so a night shift (e.g. 6:45pm to 4am) is one day.',
   'Present (P): punch-in and punch-out with at least 4h 30m worked. Field staff: punch-in and punch-out is enough.',
   'Half day (HD): worked under 4h 30m, or a missing punch-in / punch-out, or a single tap at the end of the day. An approved regularisation adds the missing punch.',
-  'Week off (WO): one paid week off in each of days 1–7, 8–14, 15–21 and 22–28, if 3 or more days were worked in that week. The rostered off day is used if there is one. Days 29–31 have no week off.',
+  'Week off (WO): one paid week off in each of days 1–7, 8–14, 15–21 and 22–28, if 3 or more days were worked in that week. The rostered off day is used if there is one. Days 29–31 have no week off. A week worked through (all 7 days) earns a comp off: the next day off that month is paid as a week off instead of absent. No double pay.',
   'Absent (A): any other day with no punch and no approved leave.',
   'Late: arriving more than 15 minutes after the rostered shift start (over 3 hours late counts as working a different shift, not late). Every 3 lates in the month cost half a day.',
   'Overtime: time worked beyond 9h 30m in a day (9-hour shift + 30 minutes), paid at salary ÷ days in month ÷ 9 per hour. Shifts over 14 hours are flagged to check.',

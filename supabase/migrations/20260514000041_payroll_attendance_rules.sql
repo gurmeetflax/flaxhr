@@ -19,7 +19,9 @@
 --   UPL  approved unpaid leave
 --   WO   one paid week off in each 7-day block (1–7, 8–14, 15–21, 22–28)
 --        that has 3+ days worked and a no-punch day; the rostered off day
---        if there is one, else the first no-punch day. Days 29–31 have none
+--        if there is one, else the first no-punch day. Days 29–31 have none.
+--        A week worked through (all 7 days) earns a comp off instead: the
+--        next no-punch day that month is paid as a week off, not absent
 --   A    any other no-punch day
 --   late more than 15 minutes (and up to 3 hours) after the rostered shift
 --        start; every 3 lates in the month cost half a day
@@ -182,26 +184,45 @@ as $function$
     from cls where blk < 4
     group by blk
     having count(*) filter (where k in ('P', 'HD')) >= 3 and count(*) filter (where k = 'none') >= 1
+  ), earned as (
+    -- A week worked through (all 7 days) earns a comp off: the next
+    -- no-punch day in the month is paid as a week off instead of absent.
+    select blk, min(d) blk_start, max(d) blk_end
+    from cls where blk < 4
+    group by blk
+    having count(*) filter (where k in ('P', 'HD')) = 7
+  ), lab as (
+    select cls.*, case when cls.k = 'none' then case when cls.d = wo.wo_day then 'WO' else 'A' end else cls.k end st
+    from cls left join wo on wo.blk = cls.blk
+  ), co as (
+    select a.d, row_number() over (order by (a.d > (select min(blk_end) from earned)) desc, a.d) rn
+    from lab a where a.st = 'A'
+  ), co_pick as (
+    select co.d from co where co.rn <= (select count(*) from earned)
+  ), co_src as (
+    select p.d, (select string_agg(to_char(e.blk_start, 'DD') || '-' || to_char(e.blk_end, 'DD Mon'), ', ')
+                 from earned e) weeks
+    from co_pick p
   )
-  select cls.d,
-         case when cls.k = 'none' then case when cls.d = wo.wo_day then 'WO' else 'A' end else cls.k end,
-         cls.reason,
-         cls.pairs,
-         case when cls.k in ('P', 'HD') and cls.mins > 0 then round(cls.mins)::int end,
-         case when cls.first_in is not null and cls.starts_at is not null
-              then greatest(0, extract(epoch from cls.first_in - cls.starts_at) / 60)::int end,
-         case when cls.last_out is not null and cls.ends_at is not null and cls.mins > 0
-              then greatest(0, extract(epoch from cls.ends_at - cls.last_out) / 60)::int end,
-         case when cls.k in ('P', 'HD') and not cls.fs then greatest(round(cls.mins) - 570, 0)::int else 0 end,
+  select lab.d,
+         case when cs.d is not null then 'WO' else lab.st end,
+         case when cs.d is not null then 'Comp off for working through ' || cs.weeks else lab.reason end,
+         lab.pairs,
+         case when lab.k in ('P', 'HD') and lab.mins > 0 then round(lab.mins)::int end,
+         case when lab.first_in is not null and lab.starts_at is not null
+              then greatest(0, extract(epoch from lab.first_in - lab.starts_at) / 60)::int end,
+         case when lab.last_out is not null and lab.ends_at is not null and lab.mins > 0
+              then greatest(0, extract(epoch from lab.ends_at - lab.last_out) / 60)::int end,
+         case when lab.k in ('P', 'HD') and not lab.fs then greatest(round(lab.mins) - 570, 0)::int else 0 end,
          -- Over 3 hours after the rostered start is a different shift from
          -- the one rostered, not a late arrival.
-         cls.first_in is not null and cls.starts_at is not null and not cls.fs
-           and cls.first_in - cls.starts_at > interval '15 minutes'
-           and cls.first_in - cls.starts_at <= interval '3 hours',
-         cls.maxm > 840,
-         cls.starts_at, cls.ends_at
-  from cls left join wo on wo.blk = cls.blk
-  order by cls.d;
+         lab.first_in is not null and lab.starts_at is not null and not lab.fs
+           and lab.first_in - lab.starts_at > interval '15 minutes'
+           and lab.first_in - lab.starts_at <= interval '3 hours',
+         lab.maxm > 840,
+         lab.starts_at, lab.ends_at
+  from lab left join co_src cs on cs.d = lab.d
+  order by lab.d;
 $function$;
 
 revoke all on function core.attendance_shifts(uuid, date, date) from public, anon, authenticated;
