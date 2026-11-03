@@ -21,8 +21,8 @@
 --        that has 3+ days worked and a no-punch day; the rostered off day
 --        if there is one, else the first no-punch day. Days 29–31 have none
 --   A    any other no-punch day
---   late more than 15 minutes after the rostered start; every 3 lates in
---        the month cost half a day
+--   late more than 15 minutes (and up to 3 hours) after the rostered shift
+--        start; every 3 lates in the month cost half a day
 --   OT   minutes worked beyond 9h 30m (9-hour shift + 30 minutes' grace),
 --        paid at salary / days in month / 9 per hour; shifts over 14 hours
 --        are flagged to check
@@ -142,10 +142,17 @@ as $function$
       and lr.start_date <= p_to and lr.end_date >= p_from
     group by g::date
   ), ro as (
+    -- Roster entries mostly carry a shift, not times: take the shift's start
+    -- and end on that date (an end at or before the start is the next day).
     select r.work_date, bool_or(r.status = 'off') off,
-           min(r.starts_at) filter (where r.status <> 'off') starts_at,
-           max(r.ends_at) filter (where r.status <> 'off') ends_at
+           min(coalesce(r.starts_at, (r.work_date + s.start_time) at time zone 'Asia/Kolkata'))
+             filter (where r.status <> 'off') starts_at,
+           max(coalesce(r.ends_at, (r.work_date + s.end_time
+                 + case when s.end_time <= s.start_time then interval '1 day' else interval '0' end)
+                 at time zone 'Asia/Kolkata'))
+             filter (where r.status <> 'off') ends_at
     from core.roster_entries r
+    left join core.shifts s on s.id = r.shift_id
     where r.employee_id = p_emp and r.work_date between p_from and p_to
     group by r.work_date
   ), cls as (
@@ -186,8 +193,11 @@ as $function$
          case when cls.last_out is not null and cls.ends_at is not null and cls.mins > 0
               then greatest(0, extract(epoch from cls.ends_at - cls.last_out) / 60)::int end,
          case when cls.k in ('P', 'HD') and not cls.fs then greatest(round(cls.mins) - 570, 0)::int else 0 end,
+         -- Over 3 hours after the rostered start is a different shift from
+         -- the one rostered, not a late arrival.
          cls.first_in is not null and cls.starts_at is not null and not cls.fs
-           and cls.first_in - cls.starts_at > interval '15 minutes',
+           and cls.first_in - cls.starts_at > interval '15 minutes'
+           and cls.first_in - cls.starts_at <= interval '3 hours',
          cls.maxm > 840,
          cls.starts_at, cls.ends_at
   from cls left join wo on wo.blk = cls.blk
