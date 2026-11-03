@@ -8,7 +8,7 @@ import { Input } from '@/components/ui/Input'
 import { Button } from '@/components/ui/Button'
 import { useMyAttendance, type AttendanceRow } from '@/lib/attendance'
 import { useMyEmployee } from '@/lib/auth'
-import AttendanceCalendar from './AttendanceCalendar'
+import MyMonthCard from './MyMonthCard'
 
 export default function MyAttendancePage() {
   const [periodMonth, setPeriodMonth] = useState<string>(format(startOfMonth(new Date()), 'yyyy-MM-dd'))
@@ -49,11 +49,9 @@ export default function MyAttendancePage() {
         />
       </div>
 
-      <AttendanceCalendar
-        employeeId={employee?.id}
-        monthStart={monthStart}
-        fieldStaff={employee?.field_staff === true}
-      />
+      <MyMonthCard month={periodMonth.slice(0, 7)} />
+
+      <h2 className="mb-2 text-sm font-medium text-muted-foreground">Punch log</h2>
 
       {isLoading ? (
         <Card>
