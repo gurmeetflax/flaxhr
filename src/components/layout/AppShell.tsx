@@ -102,7 +102,7 @@ function Sidebar({
           <X className="h-5 w-5" />
         </button>
       </div>
-      <nav className="flex flex-1 flex-col gap-0.5 overflow-y-auto overscroll-contain p-2 [scrollbar-width:thin]">
+      <nav className="flex flex-1 flex-col gap-1 overflow-y-auto overscroll-contain p-3 [scrollbar-width:thin]">
         {nav.map((item) => (
           <NavLink
             key={item.to}
@@ -111,7 +111,7 @@ function Sidebar({
             onClick={onNavigate}
             className={({ isActive }) =>
               cn(
-                'flex items-center gap-2 rounded-md px-2.5 py-1.5 text-[13px] leading-tight transition-colors',
+                'flex items-center gap-3 rounded-md px-3 py-2.5 text-sm leading-tight transition-colors',
                 isActive
                   ? 'bg-primary/10 text-foreground font-medium'
                   : 'text-muted-foreground hover:bg-muted hover:text-foreground',
