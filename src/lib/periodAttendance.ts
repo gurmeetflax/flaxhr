@@ -108,13 +108,15 @@ interface ReportRow {
 async function fetchAll<T>(
   build: (from: number, to: number) => PromiseLike<{ data: unknown; error: { message: string } | null }>,
 ): Promise<T[]> {
+  // Page until an empty page: the API may cap rows per request below 1000,
+  // so a short page doesn't mean the end (that cut reports off at ~15 days).
   const out: T[] = []
-  for (let page = 0; page < 50; page++) {
-    const { data, error } = await build(page * 1000, page * 1000 + 999)
+  for (let page = 0; page < 200; page++) {
+    const { data, error } = await build(out.length, out.length + 999)
     if (error) throw new Error(error.message)
     const rows = (data ?? []) as T[]
+    if (!rows.length) break
     out.push(...rows)
-    if (rows.length < 1000) break
   }
   return out
 }
