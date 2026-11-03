@@ -170,7 +170,13 @@ export function monthRange(month: string) {
   }
 }
 
-export async function loadMonthReport(month: string, outletId: string | null): Promise<MonthReport> {
+// mine: the signed-in employee's own month (public.my_attendance_month)
+// instead of the admin / HR report for an outlet.
+export async function loadMonthReport(
+  month: string,
+  outletId: string | null,
+  opts: { mine?: boolean } = {},
+): Promise<MonthReport> {
   const { from, to, monthLabel } = monthRange(month)
 
   // Page until an empty page comes back: the API caps rows per request, and
@@ -178,9 +184,10 @@ export async function loadMonthReport(month: string, outletId: string | null): P
   // days.
   const rows: RpcRow[] = []
   for (let page = 0; page < 100; page++) {
-    const { data, error } = await supabase
-      .rpc('attendance_month_report', { p_from: from, p_to: to, p_outlet: outletId })
-      .range(rows.length, rows.length + 999)
+    const q = opts.mine
+      ? supabase.rpc('my_attendance_month', { p_from: from, p_to: to })
+      : supabase.rpc('attendance_month_report', { p_from: from, p_to: to, p_outlet: outletId })
+    const { data, error } = await q.range(rows.length, rows.length + 999)
     if (error) throw new Error(error.message)
     const got = (data ?? []) as RpcRow[]
     if (!got.length) break
