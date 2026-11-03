@@ -1,5 +1,6 @@
 import { Navigate, Route, Routes } from 'react-router-dom'
 import {
+  BookOpen,
   CalendarDays,
   CalendarRange,
   CheckSquare,
@@ -64,6 +65,7 @@ import PayrollPage from '@/pages/admin/PayrollPage'
 import OvertimePage from '@/pages/admin/OvertimePage'
 import MyOvertimePage from '@/pages/me/MyOvertimePage'
 import PayrollRunPage from '@/pages/admin/PayrollRunPage'
+import PoliciesPage from '@/pages/me/PoliciesPage'
 import PayslipPage from '@/pages/me/PayslipPage'
 import MyDocumentsPage from '@/pages/me/MyDocumentsPage'
 import FnfListPage from '@/pages/admin/FnfListPage'
@@ -128,6 +130,7 @@ const employeeNav = [
   { to: '/me/roster', label: 'My roster', icon: CalendarDays },
   { to: '/me/leave', label: 'Leave', icon: Plane },
   { to: '/me/payslips', label: 'Payslips', icon: Receipt },
+  { to: '/me/policies', label: 'Rules & policies', icon: BookOpen },
   { to: '/me/documents', label: 'Documents', icon: FileSignature },
   { to: '/me/overtime', label: 'Overtime', icon: Clock },
   { to: '/me/incentives', label: 'My incentives', icon: CircleDollarSign },
@@ -247,6 +250,7 @@ export default function App() {
         <Route path="/me/leave" element={<LeavePage />} />
         <Route path="/me/overview" element={<MyDashboard />} />
         <Route path="/me/payslips" element={<PayslipPage />} />
+        <Route path="/me/policies" element={<PoliciesPage />} />
         <Route path="/me/documents" element={<MyDocumentsPage />} />
         <Route path="/me/overtime" element={<MyOvertimePage />} />
         <Route path="/me/incentives" element={<MyIncentivesPage />} />
