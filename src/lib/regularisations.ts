@@ -72,7 +72,7 @@ export function useCreateRegularisation() {
         p_outlet_id: input.outlet_id ?? null,
         p_evidence_path: input.evidence_path ?? null,
       })
-      if (error) throw error
+      if (error) throw friendly(error)
     },
     onSuccess: () => qc.invalidateQueries({ queryKey: ['my-regularisations'] }),
   })
@@ -87,11 +87,21 @@ export function useDecideRegularisation() {
         p_status: input.status,
         p_note: input.note ?? null,
       })
-      if (error) throw error
+      if (error) throw friendly(error)
     },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['regularisations'] })
       qc.invalidateQueries({ queryKey: ['attendance'] })
     },
   })
+}
+
+// A future-dated regularisation became a future punch, which made the app
+// think the person had already punched out for days (Nov 2026). The
+// database now refuses them; say why in plain words.
+function friendly(error: { message: string }): Error {
+  if (error.message.includes('FUTURE_TIME')) {
+    return new Error('That date and time is in the future. Regularise only punches you already missed.')
+  }
+  return new Error(error.message)
 }
