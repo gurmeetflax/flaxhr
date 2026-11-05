@@ -36,6 +36,10 @@ export default function RegularisePage() {
     e.preventDefault()
     try {
       const requested_for = new Date(`${date}T${time}`).toISOString()
+      if (new Date(requested_for).getTime() > Date.now()) {
+        toast.error('That time is in the future. Pick the date and time of the punch you missed.')
+        return
+      }
       await create.mutateAsync({ requested_for, type, reason })
       toast.success('Regularisation submitted')
       setReason('')
@@ -55,7 +59,13 @@ export default function RegularisePage() {
               <div className="grid gap-3 sm:grid-cols-2">
                 <label className="flex flex-col gap-1 text-sm">
                   Date
-                  <Input type="date" value={date} onChange={(e) => setDate(e.target.value)} required />
+                  <Input
+                    type="date"
+                    value={date}
+                    max={format(new Date(), 'yyyy-MM-dd')}
+                    onChange={(e) => setDate(e.target.value)}
+                    required
+                  />
                 </label>
                 <label className="flex flex-col gap-1 text-sm">
                   Time
@@ -147,7 +157,9 @@ function WeekOffCard() {
     onError: (err) => toast.error(humanErr(err, 'Submit failed')),
   })
 
-  const monthKey = startOfMonth(new Date(date + 'T00:00:00')).toISOString().slice(0, 7)
+  const monthKey = startOfMonth(new Date(date + 'T00:00:00'))
+    .toISOString()
+    .slice(0, 7)
   const monthRows = (listQ.data ?? []).filter(
     (r) => r.period_month.slice(0, 7) === monthKey && (r.status === 'pending' || r.status === 'approved'),
   )
@@ -175,12 +187,7 @@ function WeekOffCard() {
             <div className="grid gap-3 sm:grid-cols-2">
               <label className="flex flex-col gap-1 text-sm">
                 Date
-                <Input
-                  type="date"
-                  value={date}
-                  onChange={(e) => setDate(e.target.value)}
-                  required
-                />
+                <Input type="date" value={date} onChange={(e) => setDate(e.target.value)} required />
               </label>
               <div className="flex flex-col gap-1 text-sm">
                 <span>This month</span>
@@ -188,9 +195,7 @@ function WeekOffCard() {
                   <span className={remaining === 0 ? 'text-destructive font-medium' : ''}>
                     {used}/{MAX_WEEK_OFFS_PER_MONTH}
                   </span>
-                  <span className="ml-2 text-xs text-muted-foreground">
-                    {remaining} remaining
-                  </span>
+                  <span className="ml-2 text-xs text-muted-foreground">{remaining} remaining</span>
                 </div>
               </div>
             </div>
@@ -203,11 +208,7 @@ function WeekOffCard() {
                 onChange={(e) => setReason(e.target.value)}
               />
             </label>
-            <Button
-              type="submit"
-              loading={submit.isPending}
-              disabled={remaining === 0}
-            >
+            <Button type="submit" loading={submit.isPending} disabled={remaining === 0}>
               {remaining === 0 ? 'Monthly cap reached' : 'Request week off'}
             </Button>
           </form>
@@ -245,10 +246,10 @@ function WeekOffPill({ status }: { status: WeekOffRow['status'] }) {
     status === 'approved'
       ? 'bg-primary/10 text-primary'
       : status === 'rejected'
-      ? 'bg-destructive/10 text-destructive'
-      : status === 'cancelled'
-      ? 'bg-muted text-muted-foreground'
-      : 'bg-amber-500/10 text-amber-600'
+        ? 'bg-destructive/10 text-destructive'
+        : status === 'cancelled'
+          ? 'bg-muted text-muted-foreground'
+          : 'bg-amber-500/10 text-amber-600'
   return <span className={`rounded-full px-2 py-0.5 text-xs font-medium capitalize ${cls}`}>{status}</span>
 }
 
@@ -275,9 +276,9 @@ function StatusPill({ status }: { status: Regularisation['status'] }) {
     status === 'approved'
       ? 'bg-primary/10 text-primary'
       : status === 'rejected'
-      ? 'bg-destructive/10 text-destructive'
-      : status === 'cancelled'
-      ? 'bg-muted text-muted-foreground'
-      : 'bg-amber-500/10 text-amber-600'
+        ? 'bg-destructive/10 text-destructive'
+        : status === 'cancelled'
+          ? 'bg-muted text-muted-foreground'
+          : 'bg-amber-500/10 text-amber-600'
   return <span className={`rounded-full px-2 py-0.5 text-xs font-medium capitalize ${cls}`}>{status}</span>
 }
