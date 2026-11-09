@@ -113,7 +113,7 @@ export const RULES: string[] = [
   'Absent (A): any other day with no punch and no approved leave.',
   'Late: arriving more than 15 minutes after the shift start (the rostered shift, or your fixed shift if you are not rostered; over 3 hours late counts as working a different shift, not late). Every 3 lates in the month cost half a day.',
   'Short hours: a full day under the 9-hour working day, or a half day with both punches under 4h 30m, is cut by the minute at salary ÷ days in month ÷ 9 per hour. A half day from a missing punch has no hours to measure, so only the half day is cut.',
-  'Overtime: time worked beyond 9h 30m in a day (9-hour shift + 30 minutes), paid at salary ÷ days in month ÷ 9 per hour. Shifts over 14 hours are flagged to check.',
+  'Overtime: the 9-hour shift plus 1 hour of grace is not paid as overtime. After 10 hours, overtime counts in whole hours only (10h 59m = none, 11h = 1 hour, 12h 30m = 2 hours), paid at salary ÷ days in month ÷ 9 per hour. Shifts over 14 hours are flagged to check.',
   'Payable days = Present + ½ × Half days + Paid leave + Week offs - late cut. Pay = payable days × salary ÷ days in month + overtime - short hours.',
 ]
 
@@ -124,7 +124,7 @@ export const RULE_EXAMPLES: string[] = [
   'Leaves at 16:30 after a 10:00 start: worked 6h 30m, so 2h 30m short = ₹161 cut.',
   'Works 3 hours: half day (₹290) and 1h 30m short of 4h 30m (₹97 cut), so ₹194 is paid for the day.',
   'Forgets to punch out and does not regularise: half day, ₹290 cut. Regularise the punch-out and the day is counted in full.',
-  'Works 10:00–21:00 (11 hours): 1h 30m over 9h 30m = ₹97 overtime.',
+  'Works 10:00–21:00 (11 hours): 1 hour over the 10-hour mark (9h shift + 1h grace) = 1 hour overtime = ₹65. Works 10:00–20:45 (10h 45m): no overtime.',
   '3 lates in the month: half a day cut (₹290). 6 lates: one day cut.',
   'Works 22 days and has 9 days with no punch: 4 week offs are paid, the other 5 days are absent.',
 ]

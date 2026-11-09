@@ -128,7 +128,10 @@ export default function PayrollRunPage() {
                     </th>
                     <th className="px-3 py-2.5">Payable</th>
                     <th className="px-3 py-2.5">Prorated</th>
-                    <th className="px-3 py-2.5" title="Hours beyond 9h 30m, at salary / days / 9 per hour">
+                    <th
+                      className="px-3 py-2.5"
+                      title="Whole hours beyond 10h (9h shift + 1h grace), at salary / days / 9 per hour"
+                    >
                       OT
                     </th>
                     <th className="px-3 py-2.5" title="Short of 9h on a full day / 4h 30m on a half day">
