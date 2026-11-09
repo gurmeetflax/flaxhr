@@ -109,7 +109,7 @@ export const RULES: string[] = [
   'Shift is 9 hours including break. Punches are paired into shifts; a shift counts on the day it starts, so a night shift (e.g. 6:45pm to 4am) is one day.',
   'Present (P): punch-in and punch-out with at least 4h 30m worked. Field staff: punch-in and punch-out is enough.',
   'Half day (HD): worked under 4h 30m, or a missing punch-in / punch-out, or a single tap at the end of the day. An approved regularisation adds the missing punch.',
-  'Week off (WO): 4 paid week offs a month for anyone who worked 20 or more days; otherwise one week off for every 6 days worked. Rostered off days are used first, then the earliest days with no punch. Any further days off are absent.',
+  'Week off (WO): one paid week off per calendar week (Monday to Sunday), at most 4 a month: the rostered off day, or the first day with no punch that week. Any other day off that week is absent. 4 week offs need 20 or more days worked in the month; otherwise one week off per 6 days worked. Working through a week off is paid as a normal working day.',
   'Absent (A): any other day with no punch and no approved leave.',
   'Late: arriving more than 15 minutes after the shift start (the rostered shift, or your fixed shift if you are not rostered; over 3 hours late counts as working a different shift, not late). Every 3 lates in the month cost half a day.',
   'Short hours: a full day under the 9-hour working day, or a half day with both punches under 4h 30m, is cut by the minute at salary ÷ days in month ÷ 9 per hour. A half day from a missing punch has no hours to measure, so only the half day is cut.',
@@ -127,7 +127,7 @@ export const RULE_EXAMPLES: string[] = [
   'Forgets to punch out and does not regularise: half day, ₹290 cut. Regularise the punch-out and the day is counted in full.',
   'Works 10:00–21:00 (11 hours): 1 hour over the 10-hour mark (9h shift + 1h grace) = 1 hour overtime = ₹65. Works 10:00–20:45 (10h 45m): no overtime.',
   '3 lates in the month: half a day cut (₹290). 6 lates: one day cut.',
-  'Works 22 days and has 9 days with no punch: 4 week offs are paid, the other 5 days are absent.',
+  'Takes Monday and Tuesday off in the same week: Monday is the week off, Tuesday is absent. Takes one day off every week: each is a paid week off (up to 4 a month).',
 ]
 
 // The month's calculation for one employee, spelled out for the report.
