@@ -114,6 +114,7 @@ export const RULES: string[] = [
   'Late: arriving more than 15 minutes after the shift start (the rostered shift, or your fixed shift if you are not rostered; over 3 hours late counts as working a different shift, not late). Every 3 lates in the month cost half a day.',
   'Short hours: a full day under the 9-hour working day, or a half day with both punches under 4h 30m, is cut by the minute at salary ÷ days in month ÷ 9 per hour. A half day from a missing punch has no hours to measure, so only the half day is cut.',
   'Overtime: the 9-hour shift plus 1 hour of grace is not paid as overtime. After 10 hours, overtime counts in whole hours only (10h 59m = none, 11h = 1 hour, 12h 30m = 2 hours), paid at salary ÷ days in month ÷ 9 per hour. Shifts over 14 hours are flagged to check.',
+  'October 2026 only (first month on the app): a day with an approved regularisation counts as a full day, with no short-hours cut, even if the times were entered wrongly.',
   'Payable days = Present + ½ × Half days + Paid leave + Week offs - late cut. Pay = payable days × salary ÷ days in month + overtime - short hours.',
 ]
 
