@@ -1,29 +1,35 @@
 import { useState } from 'react'
 import { toast } from 'sonner'
-import { format, startOfMonth } from 'date-fns'
-import { formatInTimeZone } from 'date-fns-tz'
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+import { format } from 'date-fns'
 import { PageHeader } from '@/components/layout/AppShell'
 import { Card, CardContent, CardDescription, CardTitle } from '@/components/ui/Card'
 import { Input } from '@/components/ui/Input'
 import { Button } from '@/components/ui/Button'
-import { supabase } from '@/lib/supabase'
-import { humanErr } from '@/lib/humanErr'
-import { useCreateRegularisation, useMyRegularisations, type Regularisation } from '@/lib/regularisations'
+import {
+  REG_CATEGORY_LABEL,
+  regWhen,
+  useCreateRegularisation,
+  useMyRegularisations,
+  type RegCategory,
+  type Regularisation,
+} from '@/lib/regularisations'
 
-interface WeekOffRow {
-  id: string
-  off_date: string
-  status: 'pending' | 'approved' | 'rejected' | 'cancelled'
-  reason: string | null
-  decision_note: string | null
-  period_month: string
+const HINT: Record<RegCategory, string> = {
+  missed_punch: 'Forgot to punch in or out? Add the time you actually came in or left.',
+  week_off: 'Your weekly off. One a week (Monday to Sunday), up to 4 a month. Paid once approved.',
+  sick_leave: 'Off sick for the whole day. Paid leave once approved.',
+  casual_leave: 'A personal day off. Unpaid leave once approved.',
 }
 
-const IST = 'Asia/Kolkata'
-const MAX_WEEK_OFFS_PER_MONTH = 4
+const PLACEHOLDER: Record<RegCategory, string> = {
+  missed_punch: 'Why was the original punch missed?',
+  week_off: 'Optional note, e.g. swapped with a colleague',
+  sick_leave: 'What happened? e.g. fever',
+  casual_leave: 'Why do you need the day off?',
+}
 
 export default function RegularisePage() {
+  const [category, setCategory] = useState<RegCategory>('missed_punch')
   const [date, setDate] = useState(format(new Date(), 'yyyy-MM-dd'))
   const [time, setTime] = useState(format(new Date(), 'HH:mm'))
   const [type, setType] = useState<'in' | 'out'>('in')
@@ -34,13 +40,27 @@ export default function RegularisePage() {
 
   const submit = async (e: React.FormEvent) => {
     e.preventDefault()
+    const punch = category === 'missed_punch'
     try {
-      const requested_for = new Date(`${date}T${time}`).toISOString()
-      if (new Date(requested_for).getTime() > Date.now()) {
-        toast.error('That time is in the future. Pick the date and time of the punch you missed.')
+      // A day request only needs the date (sent as midday IST so the date
+      // can't shift with the phone's time zone).
+      const requested_for = punch
+        ? new Date(`${date}T${time}`).toISOString()
+        : new Date(`${date}T12:00:00+05:30`).toISOString()
+      if (punch ? new Date(requested_for).getTime() > Date.now() : date > format(new Date(), 'yyyy-MM-dd')) {
+        toast.error(
+          punch
+            ? 'That time is in the future. Pick the date and time of the punch you missed.'
+            : 'That date is in the future. Regularise a day off after it has happened.',
+        )
         return
       }
-      await create.mutateAsync({ requested_for, type, reason })
+      await create.mutateAsync({
+        requested_for,
+        type: punch ? type : 'in',
+        category,
+        reason: reason.trim() || REG_CATEGORY_LABEL[category],
+      })
       toast.success('Regularisation submitted')
       setReason('')
     } catch (err) {
@@ -50,12 +70,30 @@ export default function RegularisePage() {
 
   return (
     <>
-      <PageHeader title="Regularise punch" description="Request a missed punch correction" />
+      <PageHeader
+        title="Regularise"
+        description="Fix a missed punch, or record a week off, sick leave or casual leave"
+      />
       <div className="grid gap-4 lg:grid-cols-2">
         <Card>
           <CardContent className="flex flex-col gap-3 p-6">
             <CardTitle>New request</CardTitle>
             <form className="flex flex-col gap-3" onSubmit={submit}>
+              <label className="flex flex-col gap-1 text-sm">
+                Category
+                <select
+                  className="h-10 rounded-lg border border-border bg-surface px-3 text-sm"
+                  value={category}
+                  onChange={(e) => setCategory(e.target.value as RegCategory)}
+                >
+                  {(Object.keys(REG_CATEGORY_LABEL) as RegCategory[]).map((c) => (
+                    <option key={c} value={c}>
+                      {REG_CATEGORY_LABEL[c]}
+                    </option>
+                  ))}
+                </select>
+                <span className="text-xs text-muted-foreground">{HINT[category]}</span>
+              </label>
               <div className="grid gap-3 sm:grid-cols-2">
                 <label className="flex flex-col gap-1 text-sm">
                   Date
@@ -67,33 +105,41 @@ export default function RegularisePage() {
                     required
                   />
                 </label>
-                <label className="flex flex-col gap-1 text-sm">
-                  Time
-                  <Input type="time" value={time} onChange={(e) => setTime(e.target.value)} required />
-                </label>
+                {category === 'missed_punch' ? (
+                  <label className="flex flex-col gap-1 text-sm">
+                    Time
+                    <Input type="time" value={time} onChange={(e) => setTime(e.target.value)} required />
+                  </label>
+                ) : null}
               </div>
+              {category === 'missed_punch' ? (
+                <label className="flex flex-col gap-1 text-sm">
+                  Type
+                  <select
+                    className="h-10 rounded-lg border border-border bg-surface px-3 text-sm"
+                    value={type}
+                    onChange={(e) => setType(e.target.value as 'in' | 'out')}
+                  >
+                    <option value="in">Punch in</option>
+                    <option value="out">Punch out</option>
+                  </select>
+                </label>
+              ) : null}
               <label className="flex flex-col gap-1 text-sm">
-                Type
-                <select
-                  className="h-10 rounded-lg border border-border bg-surface px-3 text-sm"
-                  value={type}
-                  onChange={(e) => setType(e.target.value as 'in' | 'out')}
-                >
-                  <option value="in">Punch in</option>
-                  <option value="out">Punch out</option>
-                </select>
-              </label>
-              <label className="flex flex-col gap-1 text-sm">
-                Reason
+                {category === 'week_off' ? 'Note (optional)' : 'Reason'}
                 <textarea
                   className="min-h-[80px] rounded-lg border border-border bg-surface p-3 text-sm"
-                  placeholder="Why was the original punch missed?"
+                  placeholder={PLACEHOLDER[category]}
                   value={reason}
                   onChange={(e) => setReason(e.target.value)}
-                  required
+                  required={category !== 'week_off'}
                 />
               </label>
-              <Button type="submit" loading={create.isPending} disabled={!reason.trim()}>
+              <Button
+                type="submit"
+                loading={create.isPending}
+                disabled={category !== 'week_off' && !reason.trim()}
+              >
                 Submit request
               </Button>
             </form>
@@ -115,142 +161,8 @@ export default function RegularisePage() {
           </CardContent>
         </Card>
       </div>
-
-      <div className="mt-6">
-        <WeekOffCard />
-      </div>
     </>
   )
-}
-
-function WeekOffCard() {
-  const qc = useQueryClient()
-  const [date, setDate] = useState(format(new Date(), 'yyyy-MM-dd'))
-  const [reason, setReason] = useState('')
-
-  const listQ = useQuery<WeekOffRow[]>({
-    queryKey: ['my-week-offs'],
-    staleTime: 30_000,
-    queryFn: async () => {
-      const { data, error } = await supabase
-        .from('v_my_week_offs')
-        .select('id, off_date, status, reason, decision_note, period_month')
-        .order('off_date', { ascending: false })
-      if (error) throw error
-      return (data ?? []) as WeekOffRow[]
-    },
-  })
-
-  const submit = useMutation({
-    mutationFn: async () => {
-      const { error } = await supabase.rpc('submit_week_off', {
-        p_date: date,
-        p_reason: reason.trim() || null,
-      })
-      if (error) throw error
-    },
-    onSuccess: () => {
-      toast.success('Week-off requested')
-      setReason('')
-      qc.invalidateQueries({ queryKey: ['my-week-offs'] })
-    },
-    onError: (err) => toast.error(humanErr(err, 'Submit failed')),
-  })
-
-  const monthKey = startOfMonth(new Date(date + 'T00:00:00'))
-    .toISOString()
-    .slice(0, 7)
-  const monthRows = (listQ.data ?? []).filter(
-    (r) => r.period_month.slice(0, 7) === monthKey && (r.status === 'pending' || r.status === 'approved'),
-  )
-  const used = monthRows.length
-  const remaining = Math.max(0, MAX_WEEK_OFFS_PER_MONTH - used)
-
-  return (
-    <Card>
-      <CardContent className="flex flex-col gap-4 p-6">
-        <div className="flex flex-col gap-1">
-          <CardTitle>Request a week off</CardTitle>
-          <CardDescription>
-            Paid day off. Max {MAX_WEEK_OFFS_PER_MONTH} per calendar month — approved by HR.
-          </CardDescription>
-        </div>
-
-        <div className="grid gap-3 lg:grid-cols-2">
-          <form
-            className="flex flex-col gap-3"
-            onSubmit={(e) => {
-              e.preventDefault()
-              submit.mutate()
-            }}
-          >
-            <div className="grid gap-3 sm:grid-cols-2">
-              <label className="flex flex-col gap-1 text-sm">
-                Date
-                <Input type="date" value={date} onChange={(e) => setDate(e.target.value)} required />
-              </label>
-              <div className="flex flex-col gap-1 text-sm">
-                <span>This month</span>
-                <div className="flex h-10 items-center rounded-lg border border-border bg-muted/40 px-3 text-sm tabular-nums">
-                  <span className={remaining === 0 ? 'text-destructive font-medium' : ''}>
-                    {used}/{MAX_WEEK_OFFS_PER_MONTH}
-                  </span>
-                  <span className="ml-2 text-xs text-muted-foreground">{remaining} remaining</span>
-                </div>
-              </div>
-            </div>
-            <label className="flex flex-col gap-1 text-sm">
-              Reason (optional)
-              <textarea
-                className="min-h-[60px] rounded-lg border border-border bg-surface p-3 text-sm"
-                placeholder="Family event, medical, etc."
-                value={reason}
-                onChange={(e) => setReason(e.target.value)}
-              />
-            </label>
-            <Button type="submit" loading={submit.isPending} disabled={remaining === 0}>
-              {remaining === 0 ? 'Monthly cap reached' : 'Request week off'}
-            </Button>
-          </form>
-
-          <div>
-            <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-              My week-offs
-            </p>
-            {listQ.data && listQ.data.length > 0 ? (
-              <ul className="flex flex-col divide-y divide-border rounded-lg border border-border">
-                {listQ.data.slice(0, 8).map((r) => (
-                  <li key={r.id} className="flex items-center justify-between gap-2 px-3 py-2 text-sm">
-                    <span>
-                      {formatInTimeZone(new Date(r.off_date + 'T00:00:00'), IST, 'EEE, d MMM yyyy')}
-                      {r.reason ? (
-                        <span className="ml-2 text-xs text-muted-foreground">· {r.reason}</span>
-                      ) : null}
-                    </span>
-                    <WeekOffPill status={r.status} />
-                  </li>
-                ))}
-              </ul>
-            ) : (
-              <CardDescription>No week-off requests yet.</CardDescription>
-            )}
-          </div>
-        </div>
-      </CardContent>
-    </Card>
-  )
-}
-
-function WeekOffPill({ status }: { status: WeekOffRow['status'] }) {
-  const cls =
-    status === 'approved'
-      ? 'bg-primary/10 text-primary'
-      : status === 'rejected'
-        ? 'bg-destructive/10 text-destructive'
-        : status === 'cancelled'
-          ? 'bg-muted text-muted-foreground'
-          : 'bg-amber-500/10 text-amber-600'
-  return <span className={`rounded-full px-2 py-0.5 text-xs font-medium capitalize ${cls}`}>{status}</span>
 }
 
 function RegItem({ reg }: { reg: Regularisation }) {
@@ -258,9 +170,7 @@ function RegItem({ reg }: { reg: Regularisation }) {
   return (
     <li className="flex items-start justify-between gap-3 py-3 text-sm">
       <div className="flex flex-col gap-0.5">
-        <span className="font-medium capitalize">
-          {reg.type} · {formatInTimeZone(reg.requested_for, tz, 'd MMM, h:mm a')}
-        </span>
+        <span className="font-medium">{regWhen(reg, tz)}</span>
         <span className="text-xs text-muted-foreground">{reg.reason}</span>
         {reg.decision_note ? (
           <span className="text-xs text-muted-foreground">Note: {reg.decision_note}</span>

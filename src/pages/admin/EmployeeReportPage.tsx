@@ -19,6 +19,7 @@ import {
   type ReportDay,
 } from '@/lib/attendanceReport'
 import { useEmployeeShifts } from '@/lib/shifts'
+import { REG_CATEGORY_LABEL, type RegCategory } from '@/lib/regularisations'
 
 const IST = 'Asia/Kolkata'
 
@@ -26,6 +27,7 @@ interface Reg {
   id: string
   requested_for: string
   type: string
+  category: RegCategory | null
   reason: string | null
   status: string
   decision_note: string | null
@@ -91,7 +93,7 @@ export default function EmployeeReportPage() {
     queryFn: async () => {
       const { data, error } = await supabase
         .from('v_regularisations')
-        .select('id, requested_for, type, reason, status, decision_note')
+        .select('id, requested_for, type, category, reason, status, decision_note')
         .eq('employee_id', id)
         .gte('requested_for', `${from}T00:00:00+05:30`)
         .lte('requested_for', `${to}T23:59:59+05:30`)
@@ -333,11 +335,21 @@ export default function EmployeeReportPage() {
 
             <Section title={`Regularisations (${regsQ.data?.length ?? 0})`}>
               {regsQ.data?.length ? (
-                <Table head={['For', 'Type', 'Reason', 'Status']}>
+                <Table head={['For', 'Category', 'Reason', 'Status']}>
                   {regsQ.data.map((r) => (
                     <tr key={r.id}>
-                      <Td>{formatInTimeZone(r.requested_for, IST, 'd MMM, h:mm a')}</Td>
-                      <Td className="capitalize">{r.type}</Td>
+                      <Td>
+                        {formatInTimeZone(
+                          r.requested_for,
+                          IST,
+                          (r.category ?? 'missed_punch') === 'missed_punch' ? 'd MMM, h:mm a' : 'EEE d MMM',
+                        )}
+                      </Td>
+                      <Td>
+                        {(r.category ?? 'missed_punch') === 'missed_punch'
+                          ? `Missed punch (${r.type})`
+                          : REG_CATEGORY_LABEL[r.category as RegCategory]}
+                      </Td>
                       <Td>{r.reason ?? '—'}</Td>
                       <Td className="capitalize">
                         {r.status}
