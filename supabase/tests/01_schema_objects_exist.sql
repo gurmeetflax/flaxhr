@@ -81,7 +81,7 @@ declare
 begin
   for fn in select unnest(array[
     'public.punch(text,numeric,numeric,text,text,text,integer)',
-    'public.submit_regularisation(timestamptz,text,text,text,text)',
+    'public.submit_regularisation(timestamptz,text,text,text,text,text)',
     'public.decide_regularisation(uuid,text,text)',
     'public.submit_leave_request(uuid,date,date,text,text)',
     'public.decide_leave_request(uuid,text,text)',
