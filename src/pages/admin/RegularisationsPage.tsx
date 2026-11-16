@@ -1,10 +1,9 @@
 import { useState } from 'react'
 import { toast } from 'sonner'
-import { formatInTimeZone } from 'date-fns-tz'
 import { PageHeader } from '@/components/layout/AppShell'
 import { Card, CardContent, CardDescription, CardTitle } from '@/components/ui/Card'
 import { Button } from '@/components/ui/Button'
-import { useDecideRegularisation, useRegularisations, type RegStatus } from '@/lib/regularisations'
+import { regWhen, useDecideRegularisation, useRegularisations, type RegStatus } from '@/lib/regularisations'
 
 export default function RegularisationsPage() {
   const [status, setStatus] = useState<RegStatus | ''>('pending')
@@ -12,7 +11,7 @@ export default function RegularisationsPage() {
   const decide = useDecideRegularisation()
 
   const act = async (id: string, action: 'approved' | 'rejected') => {
-    const note = action === 'rejected' ? window.prompt('Rejection note (optional)') ?? undefined : undefined
+    const note = action === 'rejected' ? (window.prompt('Rejection note (optional)') ?? undefined) : undefined
     try {
       await decide.mutateAsync({ id, status: action, note })
       toast.success(action === 'approved' ? 'Approved' : 'Rejected')
@@ -23,10 +22,7 @@ export default function RegularisationsPage() {
 
   return (
     <>
-      <PageHeader
-        title="Regularisations"
-        description={isLoading ? 'Loading…' : `${list.length} requests`}
-      />
+      <PageHeader title="Regularisations" description={isLoading ? 'Loading…' : `${list.length} requests`} />
       <div className="mb-4 flex flex-wrap gap-2">
         {(['pending', 'approved', 'rejected', 'cancelled', ''] as const).map((s) => (
           <Button
@@ -59,7 +55,7 @@ export default function RegularisationsPage() {
                     </span>
                     <span className="text-sm text-muted-foreground">
                       {r.outlet_name ? `${r.outlet_name} · ` : ''}
-                      {r.type} at {formatInTimeZone(r.requested_for, tz, 'd MMM, h:mm a')}
+                      {regWhen(r, tz)}
                     </span>
                     <span className="text-sm">{r.reason}</span>
                   </div>
@@ -73,11 +69,7 @@ export default function RegularisationsPage() {
                       >
                         Reject
                       </Button>
-                      <Button
-                        size="sm"
-                        onClick={() => act(r.id, 'approved')}
-                        loading={decide.isPending}
-                      >
+                      <Button size="sm" onClick={() => act(r.id, 'approved')} loading={decide.isPending}>
                         Approve
                       </Button>
                     </div>

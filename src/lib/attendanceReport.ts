@@ -109,11 +109,12 @@ export const RULES: string[] = [
   'Shift is 9 hours including break. Punches are paired into shifts; a shift counts on the day it starts, so a night shift (e.g. 6:45pm to 4am) is one day.',
   'Present (P): punch-in and punch-out with at least 4h 30m worked. Field staff: punch-in and punch-out is enough.',
   'Half day (HD): worked under 4h 30m, or a missing punch-in / punch-out, or a single tap at the end of the day. An approved regularisation adds the missing punch.',
-  'Week off (WO): one paid week off per calendar week (Monday to Sunday), at most 4 a month: the rostered off day, or the first day with no punch that week. Any other day off that week is absent. 4 week offs need 20 or more days worked in the month; otherwise one week off per 6 days worked. Working through a week off is paid as a normal working day.',
+  'Week off (WO): one paid week off per calendar week (Monday to Sunday), at most 4 a month: the day you asked for (Regularise > Week off, once approved), else the rostered off day, else the first day with no punch that week. Any other day off that week is absent. 4 week offs need 20 or more days worked in the month; otherwise one week off per 6 days worked. Working through a week off is paid as a normal working day.',
   'Absent (A): any other day with no punch and no approved leave.',
   'Late: arriving more than 15 minutes after the shift start (the rostered shift, or your fixed shift if you are not rostered; over 3 hours late counts as working a different shift, not late). Every 3 lates in the month cost half a day.',
   'Short hours: a full day under the 9-hour working day, or a half day with both punches under 4h 30m, is cut by the minute at salary ÷ days in month ÷ 9 per hour. A half day from a missing punch has no hours to measure, so only the half day is cut.',
   'Overtime: the 9-hour shift plus 1 hour of grace is not paid as overtime. After 10 hours, overtime counts in whole hours only (10h 59m = none, 11h = 1 hour, 12h 30m = 2 hours), paid at salary ÷ days in month ÷ 9 per hour. Shifts over 14 hours are flagged to check.',
+  'Sick leave and casual leave: use Regularise and pick the category. Once approved, sick leave is paid leave (PL) and casual leave is unpaid (UPL). Do not enter a made-up punch for a day off: a punch makes it a worked day.',
   'October 2026 only (first month on the app): a day with an approved regularisation counts as a full day, with no short-hours cut, even if the times were entered wrongly.',
   'Payable days = Present + ½ × Half days + Paid leave + Week offs - late cut. Pay = payable days × salary ÷ days in month + overtime - short hours.',
 ]

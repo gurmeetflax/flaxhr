@@ -1,8 +1,20 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+import { formatInTimeZone } from 'date-fns-tz'
 import { supabase } from '@/lib/supabase'
 import { useAuth } from '@/lib/auth'
 
 export type RegStatus = 'pending' | 'approved' | 'rejected' | 'cancelled'
+
+// What the request is for. A missed punch adds the punch once approved; the
+// others are whole-day requests that attendance (and payroll) read directly.
+export type RegCategory = 'missed_punch' | 'week_off' | 'sick_leave' | 'casual_leave'
+
+export const REG_CATEGORY_LABEL: Record<RegCategory, string> = {
+  missed_punch: 'Missed punch',
+  week_off: 'Week off',
+  sick_leave: 'Sick leave',
+  casual_leave: 'Casual leave',
+}
 
 export interface Regularisation {
   id: string
@@ -10,6 +22,7 @@ export interface Regularisation {
   outlet_id: string | null
   requested_for: string
   type: 'in' | 'out'
+  category: RegCategory
   reason: string
   evidence_path: string | null
   status: RegStatus
@@ -61,6 +74,7 @@ export function useCreateRegularisation() {
     mutationFn: async (input: {
       requested_for: string
       type: 'in' | 'out'
+      category: RegCategory
       reason: string
       outlet_id?: string | null
       evidence_path?: string | null
@@ -71,10 +85,14 @@ export function useCreateRegularisation() {
         p_reason: input.reason,
         p_outlet_id: input.outlet_id ?? null,
         p_evidence_path: input.evidence_path ?? null,
+        p_category: input.category,
       })
       if (error) throw friendly(error)
     },
-    onSuccess: () => qc.invalidateQueries({ queryKey: ['my-regularisations'] }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['my-regularisations'] })
+      qc.invalidateQueries({ queryKey: ['my-attendance-month'] })
+    },
   })
 }
 
@@ -101,7 +119,18 @@ export function useDecideRegularisation() {
 // database now refuses them; say why in plain words.
 function friendly(error: { message: string }): Error {
   if (error.message.includes('FUTURE_TIME')) {
-    return new Error('That date and time is in the future. Regularise only punches you already missed.')
+    return new Error('That date and time is in the future. Regularise only days that have already passed.')
+  }
+  if (error.message.includes('DAY_ALREADY_REQUESTED')) {
+    return new Error('You have already asked for a week off or leave on that day.')
   }
   return new Error(error.message)
+}
+
+// One line for lists: "Week off · Fri 24 Oct" or "In · 24 Oct, 11:05 am".
+export function regWhen(reg: Pick<Regularisation, 'category' | 'type' | 'requested_for'>, tz: string) {
+  const cat = reg.category ?? 'missed_punch'
+  if (cat !== 'missed_punch')
+    return `${REG_CATEGORY_LABEL[cat]} · ${formatInTimeZone(reg.requested_for, tz, 'EEE d MMM')}`
+  return `${reg.type === 'in' ? 'Punch in' : 'Punch out'} · ${formatInTimeZone(reg.requested_for, tz, 'd MMM, h:mm a')}`
 }
