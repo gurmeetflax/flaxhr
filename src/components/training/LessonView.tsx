@@ -1,6 +1,7 @@
 import { AlertTriangle, ExternalLink, Store, Target } from 'lucide-react'
 import { useTeamForMe, useTrainingOutlets, type Lesson } from '@/lib/training'
 import BrandSlide from './BrandSlide'
+import RichText from './RichText'
 import { stepIcon } from './icons'
 
 // Only plain web links are shown or embedded.
@@ -20,16 +21,7 @@ function youTubeEmbed(u: string): string | null {
 }
 
 function Paragraphs({ text }: { text?: string | null }) {
-  if (!text) return null
-  return (
-    <div className="space-y-3 text-sm leading-relaxed text-foreground/90">
-      {text.split(/\n\n+/).map((p, i) => (
-        <p key={i} className="whitespace-pre-line">
-          {p}
-        </p>
-      ))}
-    </div>
-  )
+  return <RichText text={text} className="text-sm leading-relaxed text-foreground/90" />
 }
 
 export default function LessonView({ lesson }: { lesson: Lesson }) {
@@ -193,19 +185,66 @@ function initials(name: string) {
     .join('')
 }
 
-function Person({ name, role, where }: { name: string; role: string; where?: string | null }) {
+export function Avatar({
+  name,
+  photo,
+  size = 'md',
+}: {
+  name: string
+  photo?: string | null
+  size?: 'md' | 'lg'
+}) {
+  const dim = size === 'lg' ? 'h-16 w-16 text-base' : 'h-12 w-12 text-sm'
+  return photo ? (
+    <img
+      src={photo}
+      alt={name}
+      className={`${dim} shrink-0 rounded-full object-cover ring-2 ring-surface`}
+      loading="lazy"
+    />
+  ) : (
+    <div
+      className={`${dim} flex shrink-0 items-center justify-center rounded-full bg-primary/10 font-semibold text-primary ring-2 ring-surface`}
+    >
+      {initials(name)}
+    </div>
+  )
+}
+
+function Tier({
+  label,
+  people,
+  big = false,
+  last = false,
+}: {
+  label: string
+  people: { name: string; role: string; photo_url: string | null }[]
+  big?: boolean
+  last?: boolean
+}) {
+  if (!people.length) return null
   return (
-    <li className="flex items-center gap-3 rounded-xl border border-border bg-surface p-3">
-      <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-primary/10 text-sm font-semibold text-primary">
-        {initials(name)}
-      </div>
-      <div className="min-w-0">
-        <div className="truncate font-medium">{name}</div>
-        <div className="truncate text-xs text-muted-foreground">
-          {role}
-          {where ? ` · ${where}` : ''}
-        </div>
-      </div>
+    <li className="relative pl-6">
+      {!last ? <span aria-hidden className="absolute left-[7px] top-4 h-full w-px bg-border" /> : null}
+      <span
+        aria-hidden
+        className="absolute left-0 top-1.5 h-[15px] w-[15px] rounded-full border-2 border-primary bg-surface"
+      />
+      <div className="mb-2 text-xs font-semibold uppercase tracking-wider text-primary">{label}</div>
+      <ul className={`grid gap-2 ${big ? 'sm:grid-cols-2' : 'grid-cols-1 sm:grid-cols-2 lg:grid-cols-3'}`}>
+        {people.map((p) => (
+          <li
+            key={p.name}
+            className="flex items-center gap-3 rounded-xl border border-border bg-surface p-3 shadow-sm"
+          >
+            <Avatar name={p.name} photo={p.photo_url} size={big ? 'lg' : 'md'} />
+            <div className="min-w-0">
+              <div className="truncate font-semibold">{p.name}</div>
+              <div className="truncate text-xs text-muted-foreground">{p.role}</div>
+            </div>
+          </li>
+        ))}
+      </ul>
     </li>
   )
 }
@@ -215,33 +254,18 @@ function TeamLesson() {
   if (q.isLoading) return <p className="text-sm text-muted-foreground">Loading…</p>
   const t = q.data
   if (!t) return null
+  const region = t.region ? t.region.charAt(0).toUpperCase() + t.region.slice(1) : null
+  const tiers = [
+    { label: 'Leadership', people: t.leadership ?? [], big: true },
+    { label: region ? `${region} team` : 'Regional team', people: t.regional ?? [] },
+    { label: t.outlet ? `At ${t.outlet}` : 'Your outlet', people: t.outlet_leads ?? [] },
+  ].filter((x) => x.people.length)
   return (
-    <div className="flex flex-col gap-4">
-      {t.outlet_leads.length ? (
-        <div>
-          <div className="mb-2 text-xs font-medium uppercase tracking-wider text-muted-foreground">
-            At {t.outlet ?? 'your outlet'}
-          </div>
-          <ul className="grid gap-2 sm:grid-cols-2">
-            {t.outlet_leads.map((p) => (
-              <Person key={p.name} name={p.name} role={p.role} />
-            ))}
-          </ul>
-        </div>
-      ) : null}
-      {t.company_leads.length ? (
-        <div>
-          <div className="mb-2 text-xs font-medium uppercase tracking-wider text-muted-foreground">
-            Company leaders
-          </div>
-          <ul className="grid gap-2 sm:grid-cols-2">
-            {t.company_leads.map((p) => (
-              <Person key={p.name} name={p.name} role={p.role} where={p.outlet} />
-            ))}
-          </ul>
-        </div>
-      ) : null}
-    </div>
+    <ol className="flex flex-col gap-6">
+      {tiers.map((x, i) => (
+        <Tier key={x.label} label={x.label} people={x.people} big={x.big} last={i === tiers.length - 1} />
+      ))}
+    </ol>
   )
 }
 
