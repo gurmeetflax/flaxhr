@@ -1,8 +1,9 @@
 import { useState } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
 import { format, parseISO } from 'date-fns'
+import { GraduationCap } from 'lucide-react'
+import { Button } from '@/components/ui/Button'
 import { useMyTraining } from '@/lib/training'
-import './brand.css'
 
 const KEY = 'flax-training-splash-dismissed'
 
@@ -14,9 +15,9 @@ function dismissedThisSession(): boolean {
   }
 }
 
-// Full-screen welcome when an employee has training to do: a brand splash
-// the first time (nothing started yet), and a reminder after that. It never
-// blocks punching in: "Later" hides it until the app is opened again.
+// Shown when an employee has training to do: a welcome the first time
+// (nothing started yet), and a reminder after that. It never blocks
+// punching in: "Later" hides it until the app is opened again.
 export default function TrainingSplash() {
   const q = useMyTraining()
   const nav = useNavigate()
@@ -51,83 +52,52 @@ export default function TrainingSplash() {
       role="dialog"
       aria-modal="true"
       aria-label="Training"
-      className="flax-brand fixed inset-0 z-[60] flex items-center justify-center overflow-hidden p-4"
-      style={{ backgroundColor: firstTime ? '#FFDC6F' : '#252D63' }}
+      className="fixed inset-0 z-[60] flex items-center justify-center bg-black/40 p-4"
     >
-      <img
-        src={firstTime ? '/brand/leaf-orange.png' : '/brand/leaf-periwinkle.png'}
-        alt=""
-        aria-hidden
-        className="pointer-events-none absolute -bottom-16 -right-16 w-72 rotate-[-18deg] select-none sm:w-96"
-      />
-      <img
-        src="/brand/leaf-navy.png"
-        alt=""
-        aria-hidden
-        className="pointer-events-none absolute -left-20 -top-16 w-56 rotate-[160deg] select-none opacity-90"
-        style={{ display: firstTime ? undefined : 'none' }}
-      />
-      <div
-        className="relative flex w-full max-w-md flex-col gap-5"
-        style={{ color: firstTime ? '#1A1A1D' : '#FFFFFF' }}
-      >
-        <img
-          src={firstTime ? '/brand/logo-flax-badge-ink.png' : '/brand/logo-flax-badge-white.png'}
-          alt="Flax Healthy Living"
-          className="h-20 w-20 object-contain"
-        />
-        <div className="flax-eyebrow font-bold" style={{ color: firstTime ? '#252D63' : '#FFDC6F' }}>
-          {firstTime ? 'Welcome to the team' : 'Training'}
-        </div>
-        <h1 className="flax-brush text-6xl sm:text-7xl" style={{ color: firstTime ? '#252D63' : '#FFDC6F' }}>
-          {firstTime ? 'Flax it up' : 'Keep going'}
-        </h1>
-        {firstTime ? (
-          <p className="text-base leading-relaxed">
-            Before you get going, take a few minutes to meet Flax: who we are, what we make and how we work.
-            You have {pending.length} short {pending.length === 1 ? 'module' : 'modules'} to finish.
-          </p>
-        ) : (
-          <div className="flex flex-col gap-2 text-base leading-relaxed">
-            <p>
-              You have {pending.length} training {pending.length === 1 ? 'module' : 'modules'} to finish
-              {overdue.length ? (
-                <>
-                  , and <strong>{overdue.length} overdue</strong>
-                </>
-              ) : null}
-              .
-            </p>
-            <ul className="flex flex-col gap-1 text-sm opacity-90">
-              {pending.slice(0, 3).map((r) => (
-                <li key={r.assignment_id}>
-                  · {r.title}
-                  {r.due_on ? ` (due ${format(parseISO(r.due_on), 'd MMM')})` : ''}
-                </li>
-              ))}
-            </ul>
+      <div className="flex w-full max-w-md flex-col gap-5 rounded-xl border border-border bg-surface p-6 shadow-xl">
+        <div className="flex items-center gap-3">
+          <div className="flex h-10 w-10 items-center justify-center rounded-full bg-primary/10 text-primary">
+            <GraduationCap className="h-5 w-5" />
           </div>
-        )}
-        <div className="flex flex-col gap-2 sm:flex-row">
-          <button
-            type="button"
-            onClick={start}
-            className="h-12 shrink-0 rounded-full sm:flex-1 px-6 text-sm font-bold uppercase tracking-wider"
-            style={{
-              backgroundColor: firstTime ? '#252D63' : '#FFDC6F',
-              color: firstTime ? '#FFFFFF' : '#252D63',
-            }}
-          >
+          <div>
+            <h1 className="text-lg font-semibold tracking-tight">
+              {firstTime ? 'Welcome to Flax' : 'You have training to finish'}
+            </h1>
+            <p className="text-xs text-muted-foreground">
+              {pending.length} {pending.length === 1 ? 'module' : 'modules'} to complete
+              {overdue.length ? ` · ${overdue.length} overdue` : ''}
+            </p>
+          </div>
+        </div>
+        <p className="text-sm leading-relaxed text-muted-foreground">
+          {firstTime
+            ? 'Before you get started, take a few minutes to learn about Flax and how we work. Each module ends with a short quiz.'
+            : 'Please finish your assigned training. Your progress and scores are shared with HR and your manager.'}
+        </p>
+        <ul className="flex flex-col divide-y divide-border rounded-lg border border-border text-sm">
+          {pending.slice(0, 4).map((r) => {
+            const late = r.due_on && r.due_on < today
+            return (
+              <li key={r.assignment_id} className="flex items-center justify-between gap-2 px-3 py-2.5">
+                <span>{r.title}</span>
+                {r.due_on ? (
+                  <span
+                    className={`shrink-0 text-xs ${late ? 'font-medium text-destructive' : 'text-muted-foreground'}`}
+                  >
+                    {late ? 'Overdue' : `Due ${format(parseISO(r.due_on), 'd MMM')}`}
+                  </span>
+                ) : null}
+              </li>
+            )
+          })}
+        </ul>
+        <div className="flex flex-col gap-2 sm:flex-row-reverse">
+          <Button className="sm:flex-1" size="lg" onClick={start}>
             {firstTime ? 'Start training' : 'Continue training'}
-          </button>
-          <button
-            type="button"
-            onClick={close}
-            className="h-12 rounded-full border px-6 text-sm font-medium"
-            style={{ borderColor: firstTime ? 'rgba(26,26,29,.3)' : 'rgba(255,255,255,.4)' }}
-          >
+          </Button>
+          <Button variant="outline" size="lg" onClick={close}>
             Later
-          </button>
+          </Button>
         </div>
       </div>
     </div>

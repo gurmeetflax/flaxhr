@@ -1,6 +1,6 @@
 -- Training starter content. Everything here is editable in Admin > Training.
 --
---  1. Welcome to Flax       brand introduction slides + quiz (all staff)
+--  1. Welcome to Flax       company introduction slides + quiz (all staff)
 --  2. Your first week       how attendance, pay and the app work (all staff)
 --  3. Lettuce cleaning      SOP from command.flaxfoods.in (kitchen)
 --  4. Base prep             couscous, brown rice, quinoa, sweetcorn SOPs (kitchen)
@@ -21,23 +21,23 @@ select training.save_module_doc($j${
   "pass_mark": 80,
   "sort_order": 1,
   "lessons": [
-    {"kind": "slide", "data": {"theme": "yellow", "leaf": "orange", "eyebrow": "WELCOME", "headline": "FLAX IT UP",
+    {"kind": "slide", "data": {"eyebrow": "WELCOME", "headline": "FLAX IT UP",
       "body": "Welcome to Flax Healthy Living. You've joined the team that makes fresh, bright food every single day. This short deck tells you who we are and how we work."}},
-    {"kind": "slide", "data": {"theme": "paper", "leaf": "navy", "eyebrow": "ESTD 2016", "headline": "WHO WE ARE",
+    {"kind": "slide", "data": {"eyebrow": "ESTD 2016", "headline": "WHO WE ARE",
       "body": "Flax started in 2016 with one simple idea: food that is good for you should also taste great and come fast.\n\nToday we cook across Mumbai (Andheri West, Bandra, Breach Candy, Kala Ghoda, Kalina, Lower Parel, Malad, Marol, Powai), Bangalore (Indiranagar) and Goa."}},
-    {"kind": "slide", "data": {"theme": "teal", "leaf": "periwinkle", "eyebrow": "THE FOOD", "headline": "EAT BRIGHT",
+    {"kind": "slide", "data": {"eyebrow": "THE FOOD", "headline": "EAT BRIGHT",
       "body": "Bowls, salads, smoothies, parfaits and more, built on bases we cook fresh every morning.\n\nEvery dish has a recipe card in Command with exact grams for each ingredient. The guest should get the same dish every time, at every outlet."}},
-    {"kind": "slide", "data": {"theme": "paper", "leaf": "orange", "eyebrow": "FRESH, ALWAYS", "headline": "MADE THIS MORNING",
+    {"kind": "slide", "data": {"eyebrow": "FRESH, ALWAYS", "headline": "MADE THIS MORNING",
       "body": "Bases like quinoa, brown rice and couscous are cooked fresh each day.\n\nCleaned lettuce is used within 24 hours.\n\nCold food is kept at 1 to 5 °C. If it is not fresh, it does not go out."}},
-    {"kind": "slide", "data": {"theme": "pink", "leaf": "navy", "eyebrow": "THE GUEST", "headline": "COME HUNGRY",
+    {"kind": "slide", "data": {"eyebrow": "THE GUEST", "headline": "COME HUNGRY",
       "body": "Greet every guest. Get the order right. Send every dish out looking like the photo on its recipe card.\n\nIf something goes wrong, tell your manager straight away. A complaint fixed fast is a guest who comes back."}},
-    {"kind": "slide", "data": {"theme": "navy", "leaf": "periwinkle", "eyebrow": "HOW WE SOUND", "headline": "SHORT AND WARM",
+    {"kind": "slide", "data": {"eyebrow": "HOW WE SOUND", "headline": "SHORT AND WARM",
       "body": "We talk like a friend, not a poster. We say \"you\". We keep it short.\n\nWe say fresh, bright, made this morning. We never say detox, guilt-free or superfood."}},
-    {"kind": "slide", "data": {"theme": "paper", "leaf": "orange", "eyebrow": "HOW WE LOOK", "headline": "THE FLAX BADGE",
+    {"kind": "slide", "data": {"eyebrow": "HOW WE LOOK", "headline": "THE FLAX BADGE",
       "body": "Our logo is the round FLAX Healthy Living badge, in black or white only.\n\nOur colours are bright but calm: navy, yellow, teal, pink, orange and sky. Never stretch, recolour or redraw the logo."}},
-    {"kind": "slide", "data": {"theme": "sky", "leaf": "navy", "eyebrow": "YOUR TOOLS", "headline": "TWO APPS",
+    {"kind": "slide", "data": {"eyebrow": "YOUR TOOLS", "headline": "TWO APPS",
       "body": "Flax HR: punch in and out, see your roster, regularise, check payslips and do your training.\n\nCommand: recipe cards, SOPs, stock and prep. Your manager will show you the parts you need."}},
-    {"kind": "slide", "data": {"theme": "yellow", "leaf": "periwinkle", "eyebrow": "THAT'S IT", "headline": "LET'S GO",
+    {"kind": "slide", "data": {"eyebrow": "THAT'S IT", "headline": "LET'S GO",
       "body": "Answer a few quick questions to finish this module. You need 80% to pass, and you can try again."}}
   ],
   "questions": [

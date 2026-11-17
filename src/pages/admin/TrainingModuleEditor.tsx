@@ -228,8 +228,7 @@ export default function TrainingModuleEditor() {
 }
 
 function newLesson(kind: LessonKind): Lesson {
-  if (kind === 'slide')
-    return { kind, data: { theme: 'paper', leaf: 'orange', eyebrow: '', headline: '', body: '' } }
+  if (kind === 'slide') return { kind, data: { eyebrow: '', headline: '', body: '' } }
   if (kind === 'steps') return { kind, title: '', body: '', data: { steps: [{ title: '', body: '' }] } }
   if (kind === 'recipe')
     return {
@@ -325,36 +324,11 @@ function LessonEditor({
         ) : lesson.kind === 'slide' ? (
           <div className="grid gap-3 sm:grid-cols-2">
             <label className="flex flex-col gap-1 text-sm">
-              Colour
-              <select
-                className={select}
-                value={d.theme ?? 'paper'}
-                onChange={(e) => setData({ theme: e.target.value as Lesson['data']['theme'] })}
-              >
-                {['paper', 'yellow', 'navy', 'teal', 'pink', 'sky'].map((t) => (
-                  <option key={t}>{t}</option>
-                ))}
-              </select>
-            </label>
-            <label className="flex flex-col gap-1 text-sm">
-              Leaf
-              <select
-                className={select}
-                value={d.leaf ?? ''}
-                onChange={(e) => setData({ leaf: (e.target.value || null) as Lesson['data']['leaf'] })}
-              >
-                <option value="">None</option>
-                {['navy', 'orange', 'periwinkle'].map((t) => (
-                  <option key={t}>{t}</option>
-                ))}
-              </select>
-            </label>
-            <label className="flex flex-col gap-1 text-sm">
-              Small label (caps)
+              Label (e.g. WELCOME)
               <Input value={d.eyebrow ?? ''} onChange={(e) => setData({ eyebrow: e.target.value })} />
             </label>
             <label className="flex flex-col gap-1 text-sm">
-              Headline (3-4 words)
+              Heading
               <Input value={d.headline ?? ''} onChange={(e) => setData({ headline: e.target.value })} />
             </label>
             <label className="flex flex-col gap-1 text-sm sm:col-span-2">

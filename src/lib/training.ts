@@ -20,7 +20,7 @@ export const KIND_LABEL: Record<ModuleKind, string> = {
 }
 
 export const LESSON_KIND_LABEL: Record<LessonKind, string> = {
-  slide: 'Brand slide',
+  slide: 'Slide',
   text: 'Text',
   steps: 'Steps (SOP)',
   recipe: 'Recipe card',
