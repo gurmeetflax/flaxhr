@@ -9,6 +9,7 @@ import Celebration, { type CelebrationData } from '@/components/training/Celebra
 import {
   useMyProgress,
   usePlayerModule,
+  usePracticeGrade,
   useSubmitQuiz,
   useViewLesson,
   type PublicQuestion,
@@ -21,6 +22,7 @@ export default function TrainingModulePage() {
   const q = usePlayerModule(id)
   const view = useViewLesson()
   const submit = useSubmitQuiz()
+  const practice = usePracticeGrade()
   const prog = useMyProgress()
   const [celebrate, setCelebrate] = useState<CelebrationData | null>(null)
   const [step, setStep] = useState(0)
@@ -82,6 +84,10 @@ export default function TrainingModulePage() {
       return
     }
     try {
+      if (preview) {
+        setResult(await practice.mutateAsync({ module: m.id, answers }))
+        return
+      }
       const before = prog.data
       const res = await submit.mutateAsync({ module: m.id, answers })
       setResult(res)
@@ -125,7 +131,7 @@ export default function TrainingModulePage() {
         <h1 className="text-xl font-semibold">{m.title}</h1>
         {preview ? (
           <p className="mt-1 rounded-md bg-amber-500/10 px-2 py-1 text-xs text-amber-700">
-            Preview: this module is not assigned to you, so the quiz will not be scored.
+            Preview: this module is not assigned to you. You can take the quiz as practice; nothing is saved.
           </p>
         ) : null}
         {m.source_url ? (
@@ -219,8 +225,8 @@ export default function TrainingModulePage() {
               <Button variant="outline" onClick={() => goTo(Math.max(0, quizStep - 1))}>
                 <ArrowLeft className="h-4 w-4" /> Lessons
               </Button>
-              <Button onClick={onSubmit} loading={submit.isPending} disabled={preview || !allSeen}>
-                Submit answers
+              <Button onClick={onSubmit} loading={submit.isPending || practice.isPending} disabled={!allSeen}>
+                {preview ? 'Check answers (practice)' : 'Submit answers'}
               </Button>
             </div>
           </CardContent>
@@ -298,7 +304,10 @@ function ResultCard({
             <XCircle className="h-8 w-8 text-destructive" />
           )}
           <div>
-            <CardTitle>{result.passed ? 'Passed' : 'Not passed yet'}</CardTitle>
+            <CardTitle>
+              {result.passed ? 'Passed' : 'Not passed yet'}
+              {result.practice ? ' (practice, not saved)' : ''}
+            </CardTitle>
             <CardDescription>
               {Math.round(result.score)}% ({result.correct} of {result.total} right). Pass mark{' '}
               {result.pass_mark}%.
