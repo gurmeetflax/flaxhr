@@ -112,7 +112,7 @@ export default function TrainingSplash() {
           <button
             type="button"
             onClick={start}
-            className="h-12 flex-1 rounded-full px-6 text-sm font-bold uppercase tracking-wider"
+            className="h-12 shrink-0 rounded-full sm:flex-1 px-6 text-sm font-bold uppercase tracking-wider"
             style={{
               backgroundColor: firstTime ? '#252D63' : '#FFDC6F',
               color: firstTime ? '#FFFFFF' : '#252D63',
