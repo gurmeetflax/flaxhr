@@ -9,6 +9,8 @@ import { Card, CardContent, CardDescription, CardTitle } from '@/components/ui/C
 import { Button } from '@/components/ui/Button'
 import { Input } from '@/components/ui/Input'
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/Tabs'
+import { EmployeeSelect } from '@/components/ui/EmployeeSelect'
+import { Avatar } from '@/components/training/LessonView'
 import { supabase } from '@/lib/supabase'
 import { useDesignations } from '@/lib/designations'
 import {
@@ -17,6 +19,11 @@ import {
   TONE_CLASS,
   scoreTone,
   useAdminLeaderboard,
+  useAdminPeople,
+  useRemoveLeader,
+  useSaveLeader,
+  useSavePersonPhoto,
+  useSetViewer,
   useAdminModules,
   useAdminPaths,
   useAssign,
@@ -35,7 +42,7 @@ import {
   type PathRow,
 } from '@/lib/training'
 
-type Tab = 'scores' | 'leaderboard' | 'outlets' | 'modules' | 'paths'
+type Tab = 'scores' | 'leaderboard' | 'outlets' | 'people' | 'modules' | 'paths'
 
 interface Outlet {
   id: string
@@ -113,6 +120,7 @@ export default function TrainingPage() {
           <TabsTrigger value="scores">Employee scores</TabsTrigger>
           <TabsTrigger value="leaderboard">Leaderboard</TabsTrigger>
           <TabsTrigger value="outlets">Outlets & awards</TabsTrigger>
+          <TabsTrigger value="people">People</TabsTrigger>
           <TabsTrigger value="modules">Modules</TabsTrigger>
           <TabsTrigger value="paths">Paths</TabsTrigger>
         </TabsList>
@@ -120,6 +128,7 @@ export default function TrainingPage() {
       {tab === 'scores' ? <ScoresTab /> : null}
       {tab === 'leaderboard' ? <LeaderboardTab /> : null}
       {tab === 'outlets' ? <OutletsTab /> : null}
+      {tab === 'people' ? <PeopleTab /> : null}
       {tab === 'modules' ? <ModulesTab /> : null}
       {tab === 'paths' ? <PathsTab /> : null}
     </>
@@ -128,7 +137,7 @@ export default function TrainingPage() {
 
 // ------------------------------------------------------------- scores
 
-function ScoresTab() {
+export function ScoresTab({ readOnly = false }: { readOnly?: boolean }) {
   const q = useTrainingOverview()
   const outlets = useOutlets()
   const [search, setSearch] = useState('')
@@ -235,12 +244,20 @@ function ScoresTab() {
           </table>
         </div>
       )}
-      {open ? <EmployeePanel row={open} onClose={() => setOpen(null)} /> : null}
+      {open ? <EmployeePanel row={open} readOnly={readOnly} onClose={() => setOpen(null)} /> : null}
     </>
   )
 }
 
-function EmployeePanel({ row, onClose }: { row: OverviewRow; onClose: () => void }) {
+function EmployeePanel({
+  row,
+  onClose,
+  readOnly,
+}: {
+  row: OverviewRow
+  onClose: () => void
+  readOnly?: boolean
+}) {
   const q = useEmployeeTraining(row.employee_id)
   const unassign = useUnassign()
   const remove = async (id: string, title: string) => {
@@ -302,14 +319,16 @@ function EmployeePanel({ row, onClose }: { row: OverviewRow; onClose: () => void
                   </div>
                   <div className="flex items-center gap-1">
                     <ScorePill score={a.best_score} />
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      onClick={() => remove(a.id, a.title)}
-                      aria-label="Remove"
-                    >
-                      <Trash2 className="h-3.5 w-3.5" />
-                    </Button>
+                    {readOnly ? null : (
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => remove(a.id, a.title)}
+                        aria-label="Remove"
+                      >
+                        <Trash2 className="h-3.5 w-3.5" />
+                      </Button>
+                    )}
                   </div>
                 </div>
                 {a.history.length ? (
@@ -334,7 +353,7 @@ function EmployeePanel({ row, onClose }: { row: OverviewRow; onClose: () => void
 
 // ---------------------------------------------------------- leaderboard
 
-function LeaderboardTab() {
+export function LeaderboardTab() {
   const q = useAdminLeaderboard()
   const outlets = useOutlets()
   const [outlet, setOutlet] = useState('')
@@ -431,7 +450,7 @@ function LeaderboardTab() {
 
 // ------------------------------------------------------- outlets & awards
 
-function OutletsTab() {
+export function OutletsTab({ readOnly = false }: { readOnly?: boolean }) {
   const q = useOutletScores()
   const [month, setMonth] = useState(format(new Date(), 'yyyy-MM'))
   const aw = useAwards(month)
@@ -554,7 +573,7 @@ function OutletsTab() {
           </div>
         )}
       </div>
-      <OutletPhotos />
+      {readOnly ? null : <OutletPhotos />}
     </div>
   )
 }
@@ -610,6 +629,310 @@ function OutletPhotos() {
         ))}
       </ul>
     </div>
+  )
+}
+
+// ---------------------------------------------------------------- people
+
+function PhotoButton({ employee, has }: { employee: string; has: boolean }) {
+  const save = useSavePersonPhoto()
+  const [busy, setBusy] = useState(false)
+  const onFile = async (f: File | undefined) => {
+    if (!f) return
+    setBusy(true)
+    try {
+      await save.mutateAsync({ employee, photo_url: await uploadTrainingImage(f) })
+      toast.success('Photo saved')
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : 'Upload failed')
+    } finally {
+      setBusy(false)
+    }
+  }
+  return (
+    <label className="inline-flex h-8 shrink-0 cursor-pointer items-center gap-1 rounded-lg border border-border px-2.5 text-xs hover:bg-muted">
+      <ImageUp className="h-3.5 w-3.5" /> {busy ? 'Uploading…' : has ? 'Replace photo' : 'Add photo'}
+      <input
+        type="file"
+        accept="image/*"
+        className="hidden"
+        disabled={busy}
+        onChange={(e) => onFile(e.target.files?.[0])}
+      />
+    </label>
+  )
+}
+
+const REGIONS = [
+  { value: '', label: 'Everyone' },
+  { value: 'mumbai', label: 'Mumbai' },
+  { value: 'bangalore', label: 'Bangalore' },
+  { value: 'goa', label: 'Goa' },
+]
+
+function PeopleTab() {
+  const q = useAdminPeople()
+  const emps = useActiveEmployees()
+  const saveLeader = useSaveLeader()
+  const removeLeader = useRemoveLeader()
+  const setViewer = useSetViewer()
+  const [add, setAdd] = useState({ employee: '', title: '', level: 1, region: '' })
+  const [newViewer, setNewViewer] = useState('')
+  const options = (emps.data ?? []).map((e) => ({
+    id: e.id,
+    full_name: e.full_name,
+    employee_code: e.employee_code,
+  }))
+
+  const saveRow = async (r: {
+    employee: string
+    title: string
+    level: number
+    region: string | null
+    sort: number
+  }) => {
+    try {
+      await saveLeader.mutateAsync(r)
+      toast.success('Saved')
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : 'Failed')
+    }
+  }
+
+  if (q.isLoading) return <CardDescription>Loading…</CardDescription>
+  const d = q.data
+  if (!d) return null
+
+  return (
+    <div className="flex flex-col gap-5">
+      <Card>
+        <CardContent className="flex flex-col gap-4 p-5">
+          <div>
+            <CardTitle className="text-base">Leadership hierarchy</CardTitle>
+            <CardDescription className="mt-1">
+              Shown in the "Your leaders" lesson. Leadership is shown to everyone; regional heads to staff in
+              that city; then each person's own outlet leads (automatic).
+            </CardDescription>
+          </div>
+          <ul className="flex flex-col gap-2">
+            {d.leaders.map((l) => (
+              <LeaderRowEditor
+                key={l.employee_id}
+                l={l}
+                onSave={saveRow}
+                onRemove={async () => {
+                  await removeLeader.mutateAsync(l.employee_id)
+                  toast.success('Removed')
+                }}
+              />
+            ))}
+          </ul>
+          <div className="grid gap-2 rounded-lg border border-dashed border-border p-3 sm:grid-cols-[2fr_2fr_1fr_1fr_auto]">
+            <EmployeeSelect
+              options={options}
+              value={add.employee}
+              onChange={(id) => setAdd({ ...add, employee: id })}
+            />
+            <Input
+              placeholder="Title, e.g. Area Manager, Goa"
+              value={add.title}
+              onChange={(e) => setAdd({ ...add, title: e.target.value })}
+            />
+            <select
+              className="h-10 rounded-lg border border-border bg-surface px-3 text-sm"
+              value={add.level}
+              onChange={(e) => setAdd({ ...add, level: Number(e.target.value) })}
+            >
+              <option value={1}>Leadership</option>
+              <option value={2}>Regional</option>
+            </select>
+            <select
+              className="h-10 rounded-lg border border-border bg-surface px-3 text-sm"
+              value={add.region}
+              onChange={(e) => setAdd({ ...add, region: e.target.value })}
+            >
+              {REGIONS.map((r) => (
+                <option key={r.value} value={r.value}>
+                  {r.label}
+                </option>
+              ))}
+            </select>
+            <Button
+              disabled={!add.employee || !add.title.trim()}
+              onClick={async () => {
+                await saveRow({
+                  employee: add.employee,
+                  title: add.title.trim(),
+                  level: add.level,
+                  region: add.region || null,
+                  sort: 99,
+                })
+                setAdd({ employee: '', title: '', level: 1, region: '' })
+              }}
+            >
+              <Plus className="h-4 w-4" /> Add
+            </Button>
+          </div>
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardContent className="flex flex-col gap-3 p-5">
+          <div>
+            <CardTitle className="text-base">Outlet leads</CardTitle>
+            <CardDescription className="mt-1">
+              Managers, captains and kitchen leads, shown to their outlet's staff. Add a clear headshot for
+              each.
+            </CardDescription>
+          </div>
+          <ul className="grid gap-2 sm:grid-cols-2">
+            {d.outlet_leads.map((p) => (
+              <li
+                key={p.employee_id}
+                className="flex items-center gap-3 rounded-lg border border-border p-2.5"
+              >
+                <Avatar name={p.name} photo={p.photo_url} />
+                <div className="min-w-0 flex-1">
+                  <div className="truncate text-sm font-medium">{p.name}</div>
+                  <div className="truncate text-xs text-muted-foreground">
+                    {p.role}
+                    {p.outlet ? ` · ${p.outlet}` : ''}
+                  </div>
+                </div>
+                <PhotoButton employee={p.employee_id} has={!!p.photo_url} />
+              </li>
+            ))}
+          </ul>
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardContent className="flex flex-col gap-3 p-5">
+          <div>
+            <CardTitle className="text-base">Can see everyone's training</CardTitle>
+            <CardDescription className="mt-1">
+              These employees get a read-only "Team training" page in their app: everyone's status, scores,
+              outlet ranking and leaderboard. Admins and HR always have it.
+            </CardDescription>
+          </div>
+          <ul className="flex flex-wrap gap-2">
+            {d.viewers.map((v) => (
+              <li
+                key={v.employee_id}
+                className="flex items-center gap-2 rounded-full border border-border py-1 pl-3 pr-1 text-sm"
+              >
+                {v.name} <span className="text-xs text-muted-foreground">{v.employee_code}</span>
+                <button
+                  type="button"
+                  aria-label={`Remove ${v.name}`}
+                  className="rounded-full p-1 hover:bg-muted"
+                  onClick={() => setViewer.mutate({ employee: v.employee_id, on: false })}
+                >
+                  <X className="h-3.5 w-3.5" />
+                </button>
+              </li>
+            ))}
+          </ul>
+          <div className="flex flex-wrap gap-2">
+            <div className="min-w-[16rem] flex-1">
+              <EmployeeSelect options={options} value={newViewer} onChange={setNewViewer} />
+            </div>
+            <Button
+              variant="outline"
+              disabled={!newViewer}
+              onClick={async () => {
+                await setViewer.mutateAsync({ employee: newViewer, on: true })
+                setNewViewer('')
+                toast.success('Added')
+              }}
+            >
+              <Plus className="h-4 w-4" /> Add
+            </Button>
+          </div>
+        </CardContent>
+      </Card>
+    </div>
+  )
+}
+
+function LeaderRowEditor({
+  l,
+  onSave,
+  onRemove,
+}: {
+  l: {
+    employee_id: string
+    name: string
+    title: string
+    level: 1 | 2
+    region: string | null
+    sort_order: number
+    photo_url: string | null
+  }
+  onSave: (r: {
+    employee: string
+    title: string
+    level: number
+    region: string | null
+    sort: number
+  }) => Promise<void>
+  onRemove: () => Promise<void>
+}) {
+  const [title, setTitle] = useState(l.title)
+  const [level, setLevel] = useState<number>(l.level)
+  const [region, setRegion] = useState(l.region ?? '')
+  const [sort, setSort] = useState(l.sort_order)
+  const dirty = title !== l.title || level !== l.level || region !== (l.region ?? '') || sort !== l.sort_order
+  return (
+    <li className="flex flex-wrap items-center gap-2 rounded-lg border border-border p-2.5">
+      <Avatar name={l.name} photo={l.photo_url} />
+      <div className="min-w-[8rem] text-sm font-medium">{l.name}</div>
+      <Input
+        className="h-8 min-w-[12rem] flex-1 text-sm"
+        value={title}
+        onChange={(e) => setTitle(e.target.value)}
+      />
+      <select
+        className="h-8 rounded-lg border border-border bg-surface px-2 text-xs"
+        value={level}
+        onChange={(e) => setLevel(Number(e.target.value))}
+      >
+        <option value={1}>Leadership</option>
+        <option value={2}>Regional</option>
+      </select>
+      <select
+        className="h-8 rounded-lg border border-border bg-surface px-2 text-xs"
+        value={region}
+        onChange={(e) => setRegion(e.target.value)}
+      >
+        {REGIONS.map((r) => (
+          <option key={r.value} value={r.value}>
+            {r.label}
+          </option>
+        ))}
+      </select>
+      <Input
+        className="h-8 w-16 text-xs"
+        type="number"
+        title="Order"
+        value={sort}
+        onChange={(e) => setSort(Number(e.target.value) || 0)}
+      />
+      <PhotoButton employee={l.employee_id} has={!!l.photo_url} />
+      {dirty ? (
+        <Button
+          size="sm"
+          onClick={() =>
+            onSave({ employee: l.employee_id, title: title.trim(), level, region: region || null, sort })
+          }
+        >
+          Save
+        </Button>
+      ) : null}
+      <Button size="sm" variant="ghost" aria-label="Remove from hierarchy" onClick={onRemove}>
+        <Trash2 className="h-3.5 w-3.5" />
+      </Button>
+    </li>
   )
 }
 

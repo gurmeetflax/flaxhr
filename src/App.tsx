@@ -94,6 +94,8 @@ import MyRosterPage from '@/pages/me/MyRosterPage'
 import LeavePage from '@/pages/me/LeavePage'
 import NotificationsPage from '@/pages/me/NotificationsPage'
 import MyTrainingPage from '@/pages/me/MyTrainingPage'
+import TeamTrainingPage from '@/pages/me/TeamTrainingPage'
+import { useCanViewAll } from '@/lib/training'
 import TrainingModulePage from '@/pages/me/TrainingModulePage'
 import TrainingPage from '@/pages/admin/TrainingPage'
 import TrainingModuleEditor from '@/pages/admin/TrainingModuleEditor'
@@ -154,12 +156,19 @@ const managerNav = [{ to: '/me/team-roster', label: 'Team roster', icon: Calenda
 
 function EmployeeShell() {
   const isManager = useHasRole('manager')
+  const canViewTraining = useCanViewAll().data === true
+  const teamTraining = canViewTraining
+    ? [{ to: '/me/team-training', label: 'Team training', icon: GraduationCap }]
+    : []
+  const base = isManager ? [...employeeNav.slice(0, 4), ...managerNav, ...employeeNav.slice(4)] : employeeNav
+  const nav = [
+    ...base.slice(0, base.findIndex((n) => n.to === '/me/training') + 1),
+    ...teamTraining,
+    ...base.slice(base.findIndex((n) => n.to === '/me/training') + 1),
+  ]
   return (
     <>
-      <AppShell
-        nav={isManager ? [...employeeNav.slice(0, 4), ...managerNav, ...employeeNav.slice(4)] : employeeNav}
-        title="Employee"
-      />
+      <AppShell nav={nav} title="Employee" />
       <TrainingSplash />
     </>
   )
@@ -272,6 +281,7 @@ export default function App() {
         <Route path="/me/grievances" element={<MyGrievancesPage />} />
         <Route path="/me/notifications" element={<NotificationsPage />} />
         <Route path="/me/training" element={<MyTrainingPage />} />
+        <Route path="/me/team-training" element={<TeamTrainingPage />} />
         <Route path="/me/training/:id" element={<TrainingModulePage />} />
       </Route>
 

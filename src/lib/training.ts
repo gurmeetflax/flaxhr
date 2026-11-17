@@ -462,10 +462,18 @@ export interface MyProgress {
   company_board: { name: string; outlet: string | null; points: number; me: boolean }[]
 }
 
+export interface TeamPerson {
+  name: string
+  role: string
+  photo_url: string | null
+}
+
 export interface TeamInfo {
   outlet: string | null
-  outlet_leads: { name: string; role: string }[]
-  company_leads: { name: string; role: string; outlet: string | null }[]
+  region: string | null
+  leadership: TeamPerson[]
+  regional: TeamPerson[]
+  outlet_leads: TeamPerson[]
 }
 
 export interface OutletCard {
@@ -551,5 +559,96 @@ export function useAdminLeaderboard() {
   return useQuery({
     queryKey: ['training', 'admin', 'leaderboard'],
     queryFn: () => rpc<LeaderRow[]>('training_admin_leaderboard'),
+  })
+}
+
+// ------------------------------------------------- viewers, leaders, photos
+
+export interface AdminPeople {
+  leaders: {
+    employee_id: string
+    name: string
+    employee_code: string
+    title: string
+    level: 1 | 2
+    region: string | null
+    sort_order: number
+    photo_url: string | null
+  }[]
+  outlet_leads: {
+    employee_id: string
+    name: string
+    employee_code: string
+    role: string
+    outlet: string | null
+    photo_url: string | null
+  }[]
+  viewers: { employee_id: string; name: string; employee_code: string }[]
+}
+
+export function useCanViewAll() {
+  return useQuery({
+    queryKey: ['training', 'can-view-all'],
+    staleTime: 5 * 60_000,
+    queryFn: () => rpc<boolean>('training_can_view_all'),
+  })
+}
+
+export function useAdminPeople() {
+  return useQuery({
+    queryKey: ['training', 'admin', 'people'],
+    queryFn: () => rpc<AdminPeople>('training_admin_people'),
+  })
+}
+
+function useInvalidate() {
+  const qc = useQueryClient()
+  return () => qc.invalidateQueries({ queryKey: ['training'] })
+}
+
+export function useSaveLeader() {
+  const done = useInvalidate()
+  return useMutation({
+    mutationFn: (v: {
+      employee: string
+      title: string
+      level: number
+      region: string | null
+      sort: number
+    }) =>
+      rpc<null>('training_save_leader', {
+        p_employee: v.employee,
+        p_title: v.title,
+        p_level: v.level,
+        p_region: v.region,
+        p_sort: v.sort,
+      }),
+    onSuccess: done,
+  })
+}
+
+export function useRemoveLeader() {
+  const done = useInvalidate()
+  return useMutation({
+    mutationFn: (employee: string) => rpc<null>('training_remove_leader', { p_employee: employee }),
+    onSuccess: done,
+  })
+}
+
+export function useSavePersonPhoto() {
+  const done = useInvalidate()
+  return useMutation({
+    mutationFn: (v: { employee: string; photo_url: string | null }) =>
+      rpc<null>('training_save_person_photo', { p_employee: v.employee, p_photo_url: v.photo_url }),
+    onSuccess: done,
+  })
+}
+
+export function useSetViewer() {
+  const done = useInvalidate()
+  return useMutation({
+    mutationFn: (v: { employee: string; on: boolean }) =>
+      rpc<null>('training_set_viewer', { p_employee: v.employee, p_on: v.on }),
+    onSuccess: done,
   })
 }

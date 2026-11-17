@@ -1,5 +1,6 @@
 import type { SlideData } from '@/lib/training'
 import { ICONS } from './icons'
+import RichText from './RichText'
 
 // A presentation slide in the app's standard style: neutral card, an icon,
 // an optional photo, normal type. (Older slide data may carry theme / leaf
@@ -35,13 +36,10 @@ export default function BrandSlide({ data, compact = false }: { data: SlideData;
           </h2>
         ) : null}
         {data.body ? (
-          <div
-            className={`max-w-[65ch] space-y-3 text-muted-foreground ${compact ? 'text-xs' : 'text-sm leading-relaxed sm:text-base'}`}
-          >
-            {data.body.split(/\n\n+/).map((p, i) => (
-              <p key={i}>{p}</p>
-            ))}
-          </div>
+          <RichText
+            text={data.body}
+            className={`max-w-[65ch] text-muted-foreground ${compact ? 'text-xs' : 'text-sm leading-relaxed sm:text-base'}`}
+          />
         ) : null}
       </div>
     </div>
