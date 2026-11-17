@@ -209,7 +209,7 @@ function Leaderboards({ p }: { p: MyProgress }) {
             ))}
           </div>
         </div>
-        {rank ? <div className="text-sm text-muted-foreground">You are #{rank}</div> : null}
+        {rank && p.points > 0 ? <div className="text-sm text-muted-foreground">You are #{rank}</div> : null}
         {rows.length ? (
           <ol className="flex flex-col divide-y divide-border rounded-lg border border-border">
             {rows.map((r, i) => (

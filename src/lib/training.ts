@@ -150,6 +150,7 @@ export interface SubmitResult {
   total: number
   pass_mark: number
   results: { question_id: string; correct: boolean; explanation: string | null; answer?: number[] }[]
+  practice?: boolean
 }
 
 export interface AdminModuleRow {
@@ -306,6 +307,14 @@ export function useSubmitQuiz() {
     mutationFn: (v: { module: string; answers: Record<string, number[]> }) =>
       rpc<SubmitResult>('training_submit', { p_module: v.module, p_answers: v.answers }),
     onSuccess: () => qc.invalidateQueries({ queryKey: ['training'] }),
+  })
+}
+
+// Admin preview: grade a quiz without saving anything.
+export function usePracticeGrade() {
+  return useMutation({
+    mutationFn: (v: { module: string; answers: Record<string, number[]> }) =>
+      rpc<SubmitResult>('training_practice_grade', { p_module: v.module, p_answers: v.answers }),
   })
 }
 
