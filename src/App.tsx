@@ -27,6 +27,7 @@ import {
   Briefcase,
   UserPlus,
   FileSignature,
+  GraduationCap,
 } from 'lucide-react'
 import ProtectedRoute from '@/components/ProtectedRoute'
 import { useHasRole } from '@/lib/auth'
@@ -92,6 +93,11 @@ import RegularisePage from '@/pages/me/RegularisePage'
 import MyRosterPage from '@/pages/me/MyRosterPage'
 import LeavePage from '@/pages/me/LeavePage'
 import NotificationsPage from '@/pages/me/NotificationsPage'
+import MyTrainingPage from '@/pages/me/MyTrainingPage'
+import TrainingModulePage from '@/pages/me/TrainingModulePage'
+import TrainingPage from '@/pages/admin/TrainingPage'
+import TrainingModuleEditor from '@/pages/admin/TrainingModuleEditor'
+import TrainingSplash from '@/components/training/TrainingSplash'
 
 const adminNav = [
   { to: '/admin', label: 'Overview', icon: Home },
@@ -113,6 +119,7 @@ const adminNav = [
   { to: '/admin/service-charge', label: 'Service charge', icon: CircleDollarSign },
   { to: '/admin/payroll', label: 'Payroll', icon: Wallet },
   { to: '/admin/overtime', label: 'Overtime', icon: Clock },
+  { to: '/admin/training', label: 'Training', icon: GraduationCap },
   { to: '/admin/evaluations', label: 'Evaluations', icon: ClipboardCheck },
   { to: '/admin/pips', label: 'PIPs', icon: TrendingDown },
   { to: '/admin/cards', label: 'Cards', icon: ShieldAlert },
@@ -129,6 +136,7 @@ const employeeNav = [
   { to: '/me/regularise', label: 'Regularise', icon: CheckSquare },
   { to: '/me/roster', label: 'My roster', icon: CalendarDays },
   { to: '/me/leave', label: 'Leave', icon: Plane },
+  { to: '/me/training', label: 'Training', icon: GraduationCap },
   { to: '/me/payslips', label: 'Payslips', icon: Receipt },
   { to: '/me/policies', label: 'Rules & policies', icon: BookOpen },
   { to: '/me/documents', label: 'Documents', icon: FileSignature },
@@ -147,10 +155,13 @@ const managerNav = [{ to: '/me/team-roster', label: 'Team roster', icon: Calenda
 function EmployeeShell() {
   const isManager = useHasRole('manager')
   return (
-    <AppShell
-      nav={isManager ? [...employeeNav.slice(0, 4), ...managerNav, ...employeeNav.slice(4)] : employeeNav}
-      title="Employee"
-    />
+    <>
+      <AppShell
+        nav={isManager ? [...employeeNav.slice(0, 4), ...managerNav, ...employeeNav.slice(4)] : employeeNav}
+        title="Employee"
+      />
+      <TrainingSplash />
+    </>
   )
 }
 
@@ -209,6 +220,8 @@ export default function App() {
         <Route path="/admin/settings/petpooja" element={<PetpoojaSettingsPage />} />
         <Route path="/admin/service-charge" element={<ServiceChargePage />} />
         <Route path="/admin/service-charge/runs/:id" element={<ServiceChargeRunPage />} />
+        <Route path="/admin/training" element={<TrainingPage />} />
+        <Route path="/admin/training/modules/:id" element={<TrainingModuleEditor />} />
         <Route path="/admin/evaluations" element={<EvaluationsPage />} />
         <Route path="/admin/evaluations/questionnaires/:id" element={<EvaluationBuilderPage />} />
         <Route path="/admin/evaluations/runs/:id" element={<EvaluationRunPage />} />
@@ -258,6 +271,8 @@ export default function App() {
         <Route path="/me/pip" element={<MyPipPage />} />
         <Route path="/me/grievances" element={<MyGrievancesPage />} />
         <Route path="/me/notifications" element={<NotificationsPage />} />
+        <Route path="/me/training" element={<MyTrainingPage />} />
+        <Route path="/me/training/:id" element={<TrainingModulePage />} />
       </Route>
 
       <Route path="*" element={<NotFoundPage />} />

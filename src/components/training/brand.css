@@ -1,0 +1,33 @@
+/* Flax brand faces for training slides and the welcome splash only. */
+@font-face {
+  font-family: 'Flood Std';
+  src: url('/brand/FloodStd-Regular.otf') format('opentype');
+  font-display: swap;
+}
+@font-face {
+  font-family: 'Acherus Grotesque';
+  src: url('/brand/AcherusGrotesque-Regular.otf') format('opentype');
+  font-weight: 400;
+  font-display: swap;
+}
+@font-face {
+  font-family: 'Acherus Grotesque';
+  src: url('/brand/AcherusGrotesque-Bold.otf') format('opentype');
+  font-weight: 700;
+  font-display: swap;
+}
+
+.flax-brand {
+  font-family: 'Acherus Grotesque', system-ui, sans-serif;
+}
+.flax-brush {
+  font-family: 'Flood Std', 'Acherus Grotesque', system-ui, sans-serif;
+  text-transform: uppercase;
+  line-height: 0.92;
+  font-weight: 400;
+}
+.flax-eyebrow {
+  font-size: 11px;
+  letter-spacing: 0.22em;
+  text-transform: uppercase;
+}

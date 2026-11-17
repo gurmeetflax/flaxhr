@@ -4,7 +4,7 @@ import tailwindcss from '@tailwindcss/vite'
 import { VitePWA } from 'vite-plugin-pwa'
 import path from 'node:path'
 
-import { cloudflare } from "@cloudflare/vite-plugin";
+import { cloudflare } from '@cloudflare/vite-plugin'
 
 export default defineConfig({
   plugins: [
@@ -36,7 +36,8 @@ export default defineConfig({
         globPatterns: ['**/*.{js,css,html,svg,png,woff2}'],
         // Excel export library is admin-only and loaded on demand; don't
         // make every phone download it on install.
-        globIgnores: ['**/exceljs*.js'],
+        // Brand slide art (training) loads when a slide is opened.
+        globIgnores: ['**/exceljs*.js', 'brand/**'],
         // Never cache Supabase API or auth — punch must always hit the network.
         navigateFallbackDenylist: [/^\/api/, /^\/auth/],
         runtimeCaching: [
