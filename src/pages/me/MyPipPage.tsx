@@ -39,16 +39,12 @@ export default function MyPipPage() {
                 </span>
                 . Most recent score:{' '}
                 <span className="font-mono">
-                  {pip.score_pct_at_trigger != null
-                    ? `${Number(pip.score_pct_at_trigger).toFixed(0)}%`
-                    : '—'}
+                  {pip.score_pct_at_trigger != null ? `${Number(pip.score_pct_at_trigger).toFixed(0)}%` : '—'}
                 </span>
                 .
               </p>
               {pip.notes ? (
-                <p className="rounded border border-border bg-muted/30 p-3 text-sm">
-                  {pip.notes}
-                </p>
+                <p className="rounded border border-border bg-muted/30 p-3 text-sm">{pip.notes}</p>
               ) : null}
               <p className="text-xs text-muted-foreground">
                 Talk to your manager and HR. Improvement is measured on the next evaluation.

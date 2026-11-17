@@ -44,7 +44,7 @@ export default function MyGrievancesPage() {
       setSubject('')
       setDescription('')
     } catch (e) {
-      const msg = e instanceof Error ? e.message : (e as { message?: string })?.message ?? 'Failed'
+      const msg = e instanceof Error ? e.message : ((e as { message?: string })?.message ?? 'Failed')
       toast.error(msg)
     }
   }
@@ -65,8 +65,8 @@ export default function MyGrievancesPage() {
               <div>
                 <CardTitle>Raise a grievance</CardTitle>
                 <CardDescription className="mt-1">
-                  Pick the closest category. You can submit anonymously — but
-                  HR can't follow up with you if you do.
+                  Pick the closest category. You can submit anonymously — but HR can't follow up with you if
+                  you do.
                 </CardDescription>
               </div>
             </div>
@@ -79,7 +79,9 @@ export default function MyGrievancesPage() {
                   className="flex h-10 w-full rounded-lg border border-input bg-surface px-3 text-base sm:text-sm"
                 >
                   {GRIEVANCE_CATEGORIES.map((c) => (
-                    <option key={c.code} value={c.code}>{c.label}</option>
+                    <option key={c.code} value={c.code}>
+                      {c.label}
+                    </option>
                   ))}
                 </select>
               </div>
@@ -169,20 +171,23 @@ export default function MyGrievancesPage() {
                       <span className="rounded bg-muted px-2 py-0.5 capitalize text-muted-foreground">
                         {g.severity}
                       </span>
-                      <span className={
-                        'rounded px-2 py-0.5 font-medium ' +
-                        (g.status === 'resolved' ? 'bg-primary/10 text-primary' :
-                         g.status === 'dismissed' ? 'bg-muted text-muted-foreground' :
-                         g.status === 'under_review' ? 'bg-warning/10 text-warning' :
-                         'bg-destructive/10 text-destructive')
-                      }>
+                      <span
+                        className={
+                          'rounded px-2 py-0.5 font-medium ' +
+                          (g.status === 'resolved'
+                            ? 'bg-primary/10 text-primary'
+                            : g.status === 'dismissed'
+                              ? 'bg-muted text-muted-foreground'
+                              : g.status === 'under_review'
+                                ? 'bg-warning/10 text-warning'
+                                : 'bg-destructive/10 text-destructive')
+                        }
+                      >
                         {STATUS_LABEL[g.status]}
                       </span>
                     </div>
                     {g.resolution ? (
-                      <p className="mt-1 text-xs text-muted-foreground">
-                        Resolution: {g.resolution}
-                      </p>
+                      <p className="mt-1 text-xs text-muted-foreground">Resolution: {g.resolution}</p>
                     ) : null}
                   </li>
                 ))}

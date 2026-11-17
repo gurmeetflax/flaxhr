@@ -242,42 +242,65 @@ function OutletsLesson() {
   const q = useTrainingOutlets()
   if (q.isLoading) return <p className="text-sm text-muted-foreground">Loading…</p>
   const rows = q.data ?? []
-  const cities = [...new Set(rows.map((o) => o.city ?? ''))]
+  const city = (c: string | null) => (c ? c.charAt(0).toUpperCase() + c.slice(1) : '')
+  const cafes = rows.filter((o) => o.format === 'cafe')
+  const kitchens = rows.filter((o) => o.format !== 'cafe')
+  const cities = [...new Set(kitchens.map((o) => o.city ?? ''))]
   return (
-    <div className="flex flex-col gap-3">
-      {cities.map((city) => (
-        <div key={city}>
-          {city ? (
-            <div className="mb-1 text-xs font-medium uppercase tracking-wider text-muted-foreground">
-              {city}
-            </div>
-          ) : null}
-          <ul className="divide-y divide-border rounded-lg border border-border bg-surface">
-            {rows
-              .filter((o) => (o.city ?? '') === city)
-              .map((o) => (
-                <li key={o.id} className="flex items-center gap-3 px-3 py-2 text-sm">
-                  {o.photo_url ? (
-                    <img
-                      src={o.photo_url}
-                      alt=""
-                      className="h-9 w-9 shrink-0 rounded-md object-cover"
-                      loading="lazy"
-                    />
-                  ) : (
-                    <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-md bg-primary/10 text-primary">
-                      <Store className="h-4 w-4" />
-                    </div>
-                  )}
-                  <div className="min-w-0">
-                    <div className="truncate font-medium">{o.name}</div>
-                    {o.note ? <div className="truncate text-xs text-muted-foreground">{o.note}</div> : null}
+    <div className="flex flex-col gap-5">
+      {cafes.length ? (
+        <div>
+          <div className="mb-2 text-xs font-semibold uppercase tracking-wider text-primary">Our cafés</div>
+          <ul className="grid gap-3 sm:grid-cols-2">
+            {cafes.map((o) => (
+              <li key={o.id} className="overflow-hidden rounded-xl border border-border bg-surface shadow-sm">
+                {o.photo_url ? (
+                  <img src={o.photo_url} alt={o.name} className="h-40 w-full object-cover" loading="lazy" />
+                ) : (
+                  <div className="flex h-24 items-center justify-center bg-primary/10 text-primary">
+                    <Store className="h-8 w-8" />
                   </div>
-                </li>
-              ))}
+                )}
+                <div className="p-3">
+                  <div className="font-semibold">{o.name}</div>
+                  <div className="text-xs text-muted-foreground">{o.note ?? city(o.city)}</div>
+                </div>
+              </li>
+            ))}
           </ul>
         </div>
-      ))}
+      ) : null}
+      {kitchens.length ? (
+        <div className="flex flex-col gap-3">
+          <div className="text-xs font-semibold uppercase tracking-wider text-primary">Delivery kitchens</div>
+          {cities.map((c) => (
+            <div key={c}>
+              {c ? <div className="mb-1 text-xs font-medium text-muted-foreground">{city(c)}</div> : null}
+              <ul className="divide-y divide-border rounded-lg border border-border bg-surface">
+                {kitchens
+                  .filter((o) => (o.city ?? '') === c)
+                  .map((o) => (
+                    <li key={o.id} className="flex items-center gap-3 px-3 py-2 text-sm">
+                      {o.photo_url ? (
+                        <img
+                          src={o.photo_url}
+                          alt=""
+                          className="h-9 w-9 shrink-0 rounded-md object-cover"
+                          loading="lazy"
+                        />
+                      ) : (
+                        <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-md bg-primary/10 text-primary">
+                          <Store className="h-4 w-4" />
+                        </div>
+                      )}
+                      <div className="truncate font-medium">{o.name}</div>
+                    </li>
+                  ))}
+              </ul>
+            </div>
+          ))}
+        </div>
+      ) : null}
     </div>
   )
 }

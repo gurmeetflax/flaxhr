@@ -57,9 +57,7 @@ export default function LeavePage() {
       setReason('')
     } catch (err) {
       const msg =
-        err instanceof Error
-          ? err.message
-          : (err as { message?: string })?.message ?? JSON.stringify(err)
+        err instanceof Error ? err.message : ((err as { message?: string })?.message ?? JSON.stringify(err))
       toast.error(humanise(msg))
     }
   }
@@ -80,9 +78,7 @@ export default function LeavePage() {
                     <div className="text-xs text-muted-foreground">{b.code}</div>
                     <div className="font-medium">{b.name}</div>
                     <div className="text-2xl font-semibold">{b.balance}</div>
-                    <div className="text-xs text-muted-foreground">
-                      {b.is_paid ? 'Paid' : 'Unpaid'}
-                    </div>
+                    <div className="text-xs text-muted-foreground">{b.is_paid ? 'Paid' : 'Unpaid'}</div>
                   </li>
                 ))}
               </ul>
@@ -133,7 +129,9 @@ export default function LeavePage() {
                 onChange={(e) => setReason(e.target.value)}
                 required
               />
-              <Button type="submit" loading={submit.isPending} disabled={!typeId || !reason.trim()}>Submit request</Button>
+              <Button type="submit" loading={submit.isPending} disabled={!typeId || !reason.trim()}>
+                Submit request
+              </Button>
             </form>
           </CardContent>
         </Card>
@@ -150,8 +148,7 @@ export default function LeavePage() {
                     <div className="flex flex-col gap-0.5">
                       <span className="font-medium">
                         {r.leave_name} · {r.start_date}
-                        {r.start_date !== r.end_date ? ` → ${r.end_date}` : ''}
-                        {' '}({r.days}d)
+                        {r.start_date !== r.end_date ? ` → ${r.end_date}` : ''} ({r.days}d)
                       </span>
                       {r.reason ? <span className="text-xs text-muted-foreground">{r.reason}</span> : null}
                       {r.decision_note ? (
@@ -164,10 +161,10 @@ export default function LeavePage() {
                         (r.status === 'approved'
                           ? 'bg-primary/10 text-primary'
                           : r.status === 'rejected'
-                          ? 'bg-destructive/10 text-destructive'
-                          : r.status === 'cancelled'
-                          ? 'bg-muted text-muted-foreground'
-                          : 'bg-amber-500/10 text-amber-600')
+                            ? 'bg-destructive/10 text-destructive'
+                            : r.status === 'cancelled'
+                              ? 'bg-muted text-muted-foreground'
+                              : 'bg-amber-500/10 text-amber-600')
                       }
                     >
                       {r.status}

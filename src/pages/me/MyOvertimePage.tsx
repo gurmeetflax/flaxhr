@@ -9,9 +9,7 @@ import { useMyOvertimeDaily, useMyOvertimeMonthly } from '@/lib/overtime'
 const IST = 'Asia/Kolkata'
 
 export default function MyOvertimePage() {
-  const [periodMonth, setPeriodMonth] = useState<string>(
-    format(startOfMonth(new Date()), 'yyyy-MM-dd'),
-  )
+  const [periodMonth, setPeriodMonth] = useState<string>(format(startOfMonth(new Date()), 'yyyy-MM-dd'))
 
   const monthly = useMyOvertimeMonthly()
   const daily = useMyOvertimeDaily(periodMonth)
@@ -21,7 +19,10 @@ export default function MyOvertimePage() {
 
   return (
     <>
-      <PageHeader title="My overtime" description="Regular shift 9 hrs · 1 hr grace · anything more counts as OT." />
+      <PageHeader
+        title="My overtime"
+        description="Regular shift 9 hrs · 1 hr grace · anything more counts as OT."
+      />
 
       <div className="mb-4 max-w-xs">
         <Input
@@ -34,8 +35,16 @@ export default function MyOvertimePage() {
       <div className="mb-4 grid gap-3 sm:grid-cols-4">
         <Stat label="Total worked (hrs)" value={current ? current.worked_hours_total.toFixed(2) : '—'} />
         <Stat label="OT days" value={current ? String(current.ot_days) : '—'} />
-        <Stat label="OT hours" value={current ? current.ot_hours_total.toFixed(2) : '—'} tone={current && current.ot_hours_total > 0 ? 'good' : undefined} />
-        <Stat label="OT payable" value={current ? `₹${current.ot_amount_total.toFixed(2)}` : '—'} tone={current && current.ot_amount_total > 0 ? 'good' : undefined} />
+        <Stat
+          label="OT hours"
+          value={current ? current.ot_hours_total.toFixed(2) : '—'}
+          tone={current && current.ot_hours_total > 0 ? 'good' : undefined}
+        />
+        <Stat
+          label="OT payable"
+          value={current ? `₹${current.ot_amount_total.toFixed(2)}` : '—'}
+          tone={current && current.ot_amount_total > 0 ? 'good' : undefined}
+        />
       </div>
 
       <Card className="mb-4">
@@ -49,18 +58,12 @@ export default function MyOvertimePage() {
                 <li key={d.work_date} className="flex items-center justify-between py-2">
                   <span>
                     {formatInTimeZone(new Date(d.work_date + 'T00:00:00'), IST, 'EEE, dd MMM')}
-                    <span className="ml-2 text-xs text-muted-foreground">
-                      {d.outlet_name ?? ''}
-                    </span>
+                    <span className="ml-2 text-xs text-muted-foreground">{d.outlet_name ?? ''}</span>
                   </span>
                   <span className="tabular-nums">
                     {d.worked_hours.toFixed(2)} hrs
-                    <span className="ml-3 font-medium text-primary">
-                      +{d.ot_hours.toFixed(2)} OT
-                    </span>
-                    <span className="ml-3 text-xs text-muted-foreground">
-                      ₹{d.ot_amount.toFixed(2)}
-                    </span>
+                    <span className="ml-3 font-medium text-primary">+{d.ot_hours.toFixed(2)} OT</span>
+                    <span className="ml-3 text-xs text-muted-foreground">₹{d.ot_amount.toFixed(2)}</span>
                   </span>
                 </li>
               ))}

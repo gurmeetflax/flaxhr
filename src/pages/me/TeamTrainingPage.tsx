@@ -28,7 +28,7 @@ export default function TeamTrainingPage() {
         </TabsList>
       </Tabs>
       {tab === 'scores' ? <ScoresTab readOnly /> : null}
-      {tab === 'leaderboard' ? <LeaderboardTab /> : null}
+      {tab === 'leaderboard' ? <LeaderboardTab readOnly /> : null}
       {tab === 'outlets' ? <OutletsTab readOnly /> : null}
     </>
   )

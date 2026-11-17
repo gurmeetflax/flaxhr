@@ -5,6 +5,8 @@ import { Award, CheckCircle2, Clock, Crown, GraduationCap, Lock, Medal, Trophy }
 import { PageHeader } from '@/components/layout/AppShell'
 import { Card, CardContent, CardDescription, CardTitle } from '@/components/ui/Card'
 import { BADGE_ICON, KIND_ICON } from '@/components/training/icons'
+import PrizesCard from '@/components/training/PrizesCard'
+import OutletLeagueCard from '@/components/training/OutletLeagueCard'
 import {
   KIND_LABEL,
   STATUS_LABEL,
@@ -39,6 +41,7 @@ export default function MyTrainingPage() {
         </Card>
       ) : (
         <div className="flex flex-col gap-4">
+          <PrizesCard />
           {prog.data ? <ProgressCard p={prog.data} /> : null}
           <div>
             <div className="mb-2 text-sm font-medium">Your modules</div>
@@ -49,6 +52,7 @@ export default function MyTrainingPage() {
             </div>
           </div>
           {prog.data ? <Leaderboards p={prog.data} /> : null}
+          <OutletLeagueCard />
         </div>
       )}
     </>

@@ -3,7 +3,7 @@ import { useLocation, useNavigate } from 'react-router-dom'
 import { format, parseISO } from 'date-fns'
 import { GraduationCap } from 'lucide-react'
 import { Button } from '@/components/ui/Button'
-import { useMyTraining } from '@/lib/training'
+import { useMonthPrizes, useMyTraining } from '@/lib/training'
 
 const KEY = 'flax-training-splash-dismissed'
 
@@ -20,6 +20,7 @@ function dismissedThisSession(): boolean {
 // punching in: "Later" hides it until the app is opened again.
 export default function TrainingSplash() {
   const q = useMyTraining()
+  const prizes = useMonthPrizes().data?.prizes ?? []
   const nav = useNavigate()
   const loc = useLocation()
   const [hidden, setHidden] = useState(dismissedThisSession)
@@ -74,6 +75,12 @@ export default function TrainingSplash() {
             ? 'Before you get started, take a few minutes to learn about Flax and how we work. Each module ends with a short quiz.'
             : 'Please finish your assigned training. Your progress and scores are shared with HR and your manager.'}
         </p>
+        {prizes.length ? (
+          <div className="rounded-lg bg-primary/10 px-3 py-2 text-sm">
+            <span className="font-semibold text-primary">Top 3 this month win:</span>{' '}
+            {prizes.map((p) => p.title).join(' · ')}
+          </div>
+        ) : null}
         <ul className="flex flex-col divide-y divide-border rounded-lg border border-border text-sm">
           {pending.slice(0, 4).map((r) => {
             const late = r.due_on && r.due_on < today

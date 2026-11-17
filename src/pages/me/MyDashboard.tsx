@@ -22,12 +22,7 @@ import { useMyRoster } from '@/lib/roster'
 import { useMyDashboardSummary } from '@/lib/dashboards'
 import { useMySC } from '@/lib/serviceCharge'
 import { PageHeader } from '@/components/layout/AppShell'
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardTitle,
-} from '@/components/ui/Card'
+import { Card, CardContent, CardDescription, CardTitle } from '@/components/ui/Card'
 import { Button } from '@/components/ui/Button'
 
 export default function MyDashboard() {
@@ -47,14 +42,8 @@ export default function MyDashboard() {
   return (
     <>
       <PageHeader
-        title={
-          employee?.full_name ? `Hi, ${employee.full_name.split(' ')[0]}` : 'My space'
-        }
-        description={
-          employee?.employee_code
-            ? `Employee code ${employee.employee_code}`
-            : undefined
-        }
+        title={employee?.full_name ? `Hi, ${employee.full_name.split(' ')[0]}` : 'My space'}
+        description={employee?.employee_code ? `Employee code ${employee.employee_code}` : undefined}
       />
 
       <div className="grid gap-4 sm:grid-cols-2">
@@ -64,36 +53,14 @@ export default function MyDashboard() {
           <CardContent className="flex flex-col gap-3 p-6">
             <div>
               <CardTitle>This month</CardTitle>
-              <CardDescription>
-                {format(new Date(), 'MMM yyyy')} · attendance summary
-              </CardDescription>
+              <CardDescription>{format(new Date(), 'MMM yyyy')} · attendance summary</CardDescription>
             </div>
             <div className="grid grid-cols-3 gap-2 text-sm">
-              <Stat
-                label="Present"
-                value={summary?.month_present_days}
-                icon={CheckCircle2}
-                tone="ok"
-              />
-              <Stat
-                label="Absent"
-                value={summary?.month_absent_days}
-                icon={XCircle}
-                tone="bad"
-              />
-              <Stat
-                label="Late"
-                value={summary?.month_late_days}
-                icon={Clock4}
-                tone="warn"
-              />
+              <Stat label="Present" value={summary?.month_present_days} icon={CheckCircle2} tone="ok" />
+              <Stat label="Absent" value={summary?.month_absent_days} icon={XCircle} tone="bad" />
+              <Stat label="Late" value={summary?.month_late_days} icon={Clock4} tone="warn" />
             </div>
-            <Button
-              variant="ghost"
-              size="sm"
-              className="self-start"
-              onClick={() => navigate('/me/history')}
-            >
+            <Button variant="ghost" size="sm" className="self-start" onClick={() => navigate('/me/history')}>
               See full history <ArrowRight className="h-3.5 w-3.5" />
             </Button>
           </CardContent>
@@ -103,20 +70,13 @@ export default function MyDashboard() {
           <CardContent className="flex flex-col gap-3 p-6">
             <div>
               <CardTitle>Leave</CardTitle>
-              <CardDescription>
-                {totalPaidBalance.toFixed(2)} paid days available
-              </CardDescription>
+              <CardDescription>{totalPaidBalance.toFixed(2)} paid days available</CardDescription>
             </div>
             {balances.length > 0 ? (
               <ul className="grid grid-cols-3 gap-2 text-xs">
                 {balances.slice(0, 6).map((b) => (
-                  <li
-                    key={b.leave_type_id}
-                    className="rounded-lg border border-border p-2"
-                  >
-                    <div className="text-[10px] uppercase text-muted-foreground">
-                      {b.code}
-                    </div>
+                  <li key={b.leave_type_id} className="rounded-lg border border-border p-2">
+                    <div className="text-[10px] uppercase text-muted-foreground">{b.code}</div>
                     <div className="text-base font-semibold">{b.balance}</div>
                   </li>
                 ))}
@@ -126,11 +86,7 @@ export default function MyDashboard() {
               <Button size="sm" onClick={() => navigate('/me/leave?apply=1')}>
                 <Plane className="h-4 w-4" /> Apply for leave
               </Button>
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={() => navigate('/me/leave')}
-              >
+              <Button variant="ghost" size="sm" onClick={() => navigate('/me/leave')}>
                 My requests
               </Button>
             </div>
@@ -148,14 +104,9 @@ export default function MyDashboard() {
             ) : (
               <ul className="flex flex-col divide-y divide-border text-sm">
                 {upcoming.map((r) => (
-                  <li
-                    key={r.id}
-                    className="flex items-center justify-between py-2"
-                  >
+                  <li key={r.id} className="flex items-center justify-between py-2">
                     <div className="flex flex-col">
-                      <span className="font-medium">
-                        {format(new Date(r.work_date), 'EEE, d MMM')}
-                      </span>
+                      <span className="font-medium">{format(new Date(r.work_date), 'EEE, d MMM')}</span>
                       <span className="text-xs text-muted-foreground">
                         {r.shift_name ?? 'Shift'}
                         {r.start_time
@@ -168,12 +119,7 @@ export default function MyDashboard() {
                 ))}
               </ul>
             )}
-            <Button
-              variant="ghost"
-              size="sm"
-              className="self-start"
-              onClick={() => navigate('/me/roster')}
-            >
+            <Button variant="ghost" size="sm" className="self-start" onClick={() => navigate('/me/roster')}>
               Full roster <ArrowRight className="h-3.5 w-3.5" />
             </Button>
           </CardContent>
@@ -216,8 +162,7 @@ export default function MyDashboard() {
           <CardContent className="p-6">
             <CardTitle>No employee profile yet</CardTitle>
             <CardDescription className="mt-1">
-              Your login works but no employee record is linked. Ask an admin to
-              complete your onboarding.
+              Your login works but no employee record is linked. Ask an admin to complete your onboarding.
             </CardDescription>
           </CardContent>
         </Card>
@@ -233,13 +178,10 @@ function SCStat({ label, value, accent }: { label: string; value: string; accent
   return (
     <div
       className={
-        'rounded-lg border p-2 ' +
-        (accent ? 'border-primary/30 bg-primary/5' : 'border-border bg-muted/20')
+        'rounded-lg border p-2 ' + (accent ? 'border-primary/30 bg-primary/5' : 'border-border bg-muted/20')
       }
     >
-      <div className="text-[10px] uppercase tracking-wide text-muted-foreground">
-        {label}
-      </div>
+      <div className="text-[10px] uppercase tracking-wide text-muted-foreground">{label}</div>
       <div className="font-mono text-sm font-semibold">{value}</div>
     </div>
   )
@@ -278,9 +220,7 @@ function TodayCard({
             <div className="font-medium">{shiftLabel}</div>
           </div>
           <div>
-            <div className="text-xs uppercase text-muted-foreground">
-              Last punch
-            </div>
+            <div className="text-xs uppercase text-muted-foreground">Last punch</div>
             <div className="font-medium">{lastPunch}</div>
           </div>
         </div>
@@ -313,7 +253,7 @@ function FeedbackCard() {
       toast.success('Thanks — feedback sent to HR.')
       setMessage('')
     } catch (err) {
-      const msg = err instanceof Error ? err.message : (err as { message?: string })?.message ?? 'Failed'
+      const msg = err instanceof Error ? err.message : ((err as { message?: string })?.message ?? 'Failed')
       toast.error(msg)
     } finally {
       setBusy(false)
@@ -372,10 +312,7 @@ function FeedbackCard() {
 
 function WhatsAppFab() {
   const { data: number = '' } = useAppSetting<string>('hr_whatsapp_number', '')
-  const { data: prefill = 'Hi HR, ' } = useAppSetting<string>(
-    'hr_whatsapp_default_message',
-    'Hi HR, ',
-  )
+  const { data: prefill = 'Hi HR, ' } = useAppSetting<string>('hr_whatsapp_default_message', 'Hi HR, ')
   const cleanNumber = (number ?? '').replace(/[^\d]/g, '')
   if (!cleanNumber) return null
 
@@ -392,11 +329,7 @@ function WhatsAppFab() {
         right: 'max(1.5rem, env(safe-area-inset-right))',
       }}
     >
-      <svg
-        viewBox="0 0 32 32"
-        className="h-7 w-7 fill-current"
-        aria-hidden
-      >
+      <svg viewBox="0 0 32 32" className="h-7 w-7 fill-current" aria-hidden>
         <path d="M19.11 17.205c-.372 0-1.088 1.39-1.518 1.39a.63.63 0 0 1-.315-.1c-.802-.402-1.504-.817-2.163-1.447-.545-.516-1.146-1.29-1.46-1.963a.426.426 0 0 1-.073-.215c0-.33.99-.945.99-1.49 0-.143-.73-2.09-.832-2.335-.143-.372-.214-.487-.6-.487-.187 0-.36-.043-.53-.043-.302 0-.53.115-.746.315-.688.645-1.032 1.318-1.06 2.264v.114c-.015.99.472 1.977 1.017 2.78 1.23 1.82 2.506 3.41 4.554 4.34.616.287 2.035.946 2.722.946.444 0 1.39-.16 1.776-.776.17-.374.245-.644.245-1.045 0-.473-2.005-1.247-2.508-1.247zm-2.95 7.668c-1.418 0-2.85-.388-4.082-1.117l-2.937.94.948-2.864a8.05 8.05 0 0 1-1.305-4.408c0-4.494 3.654-8.144 8.148-8.144 4.494 0 8.144 3.65 8.144 8.144 0 4.494-3.65 8.148-8.144 8.148zm0-17.85c-5.358 0-9.71 4.354-9.71 9.71 0 1.832.51 3.546 1.395 5.005L5 27.978l5.708-1.46a9.64 9.64 0 0 0 4.452 1.087c5.357 0 9.708-4.351 9.708-9.71 0-5.355-4.35-9.703-9.708-9.703z" />
       </svg>
     </a>
@@ -423,9 +356,7 @@ function Stat({
   return (
     <div className="rounded-lg border border-border p-3">
       <div className="mb-1 flex items-center gap-2">
-        <span
-          className={`grid h-6 w-6 place-items-center rounded-md ${toneClass}`}
-        >
+        <span className={`grid h-6 w-6 place-items-center rounded-md ${toneClass}`}>
           <Icon className="h-3.5 w-3.5" />
         </span>
         <span className="text-xs uppercase text-muted-foreground">{label}</span>
