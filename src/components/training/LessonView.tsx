@@ -1,4 +1,4 @@
-import { AlertTriangle, ExternalLink, MapPin, Store, Target } from 'lucide-react'
+import { AlertTriangle, ExternalLink, Store, Target } from 'lucide-react'
 import { useTeamForMe, useTrainingOutlets, type Lesson } from '@/lib/training'
 import BrandSlide from './BrandSlide'
 import { stepIcon } from './icons'
@@ -248,34 +248,43 @@ function TeamLesson() {
 function OutletsLesson() {
   const q = useTrainingOutlets()
   if (q.isLoading) return <p className="text-sm text-muted-foreground">Loading…</p>
+  const rows = q.data ?? []
+  const cities = [...new Set(rows.map((o) => o.city ?? ''))]
   return (
-    <ul className="grid gap-3 sm:grid-cols-2">
-      {(q.data ?? []).map((o) => (
-        <li key={o.id} className="flex flex-col overflow-hidden rounded-xl border border-border bg-surface">
-          {o.photo_url ? (
-            <img src={o.photo_url} alt={o.name} className="h-36 w-full object-cover" loading="lazy" />
-          ) : (
-            <div className="flex h-24 items-center justify-center bg-muted/50 text-muted-foreground">
-              <Store className="h-8 w-8" />
+    <div className="flex flex-col gap-3">
+      {cities.map((city) => (
+        <div key={city}>
+          {city ? (
+            <div className="mb-1 text-xs font-medium uppercase tracking-wider text-muted-foreground">
+              {city}
             </div>
-          )}
-          <div className="flex flex-1 flex-col gap-1 p-3 text-sm">
-            <div className="font-medium">{o.name}</div>
-            {o.city ? <div className="text-xs text-muted-foreground">{o.city}</div> : null}
-            {o.note ? <p className="text-xs text-muted-foreground">{o.note}</p> : null}
-            {o.lat != null && o.lng != null ? (
-              <a
-                href={`https://www.google.com/maps/search/?api=1&query=${o.lat},${o.lng}`}
-                target="_blank"
-                rel="noreferrer"
-                className="mt-auto inline-flex items-center gap-1 pt-1 text-xs underline"
-              >
-                <MapPin className="h-3.5 w-3.5" /> Open in Maps
-              </a>
-            ) : null}
-          </div>
-        </li>
+          ) : null}
+          <ul className="divide-y divide-border rounded-lg border border-border bg-surface">
+            {rows
+              .filter((o) => (o.city ?? '') === city)
+              .map((o) => (
+                <li key={o.id} className="flex items-center gap-3 px-3 py-2 text-sm">
+                  {o.photo_url ? (
+                    <img
+                      src={o.photo_url}
+                      alt=""
+                      className="h-9 w-9 shrink-0 rounded-md object-cover"
+                      loading="lazy"
+                    />
+                  ) : (
+                    <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-md bg-primary/10 text-primary">
+                      <Store className="h-4 w-4" />
+                    </div>
+                  )}
+                  <div className="min-w-0">
+                    <div className="truncate font-medium">{o.name}</div>
+                    {o.note ? <div className="truncate text-xs text-muted-foreground">{o.note}</div> : null}
+                  </div>
+                </li>
+              ))}
+          </ul>
+        </div>
       ))}
-    </ul>
+    </div>
   )
 }

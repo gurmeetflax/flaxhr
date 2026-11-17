@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { Link, useParams } from 'react-router-dom'
-import { ArrowLeft, ArrowRight, CheckCircle2, ExternalLink, RotateCcw, XCircle } from 'lucide-react'
+import { ArrowLeft, ArrowRight, CheckCircle2, RotateCcw, XCircle } from 'lucide-react'
 import { toast } from 'sonner'
 import { Card, CardContent, CardDescription, CardTitle } from '@/components/ui/Card'
 import { Button } from '@/components/ui/Button'
@@ -133,17 +133,6 @@ export default function TrainingModulePage() {
           <p className="mt-1 rounded-md bg-amber-500/10 px-2 py-1 text-xs text-amber-700">
             Preview: this module is not assigned to you. You can take the quiz as practice; nothing is saved.
           </p>
-        ) : null}
-        {m.source_url ? (
-          <a
-            href={m.source_url}
-            target="_blank"
-            rel="noreferrer"
-            className="mt-1 inline-flex items-center gap-1 text-xs text-muted-foreground underline"
-          >
-            {m.recipe_card_key ? `Recipe card: ${m.recipe_card_key}` : 'Source'} in Command{' '}
-            <ExternalLink className="h-3 w-3" />
-          </a>
         ) : null}
       </div>
 
