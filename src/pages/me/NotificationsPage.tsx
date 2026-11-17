@@ -44,13 +44,7 @@ export default function NotificationsPage() {
             ) : (
               <ul className="divide-y divide-border">
                 {items.map((n) => (
-                  <li
-                    key={n.id}
-                    className={cn(
-                      'px-4 py-3 transition-colors',
-                      !n.read_at && 'bg-primary/5',
-                    )}
-                  >
+                  <li key={n.id} className={cn('px-4 py-3 transition-colors', !n.read_at && 'bg-primary/5')}>
                     <div className="flex items-start gap-3">
                       {!n.read_at ? (
                         <span className="mt-1 h-2 w-2 shrink-0 rounded-full bg-primary" aria-hidden />
@@ -65,9 +59,7 @@ export default function NotificationsPage() {
                           </span>
                         </div>
                         {n.body ? (
-                          <p className="mt-1 whitespace-pre-wrap text-sm text-muted-foreground">
-                            {n.body}
-                          </p>
+                          <p className="mt-1 whitespace-pre-wrap text-sm text-muted-foreground">{n.body}</p>
                         ) : null}
                         <div className="mt-1 text-[11px] uppercase tracking-wide text-muted-foreground">
                           {n.type}
@@ -121,8 +113,8 @@ function PreferencesCard() {
         <div>
           <CardTitle>Preferences</CardTitle>
           <CardDescription className="mt-1">
-            Choose where you receive notifications. Turning a channel off mutes
-            future deliveries on that channel; existing items stay visible.
+            Choose where you receive notifications. Turning a channel off mutes future deliveries on that
+            channel; existing items stay visible.
           </CardDescription>
         </div>
         <PrefRow

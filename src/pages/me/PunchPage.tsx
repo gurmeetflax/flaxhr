@@ -8,12 +8,7 @@ import { PageHeader } from '@/components/layout/AppShell'
 import { Card, CardContent, CardDescription, CardTitle } from '@/components/ui/Card'
 import { Button } from '@/components/ui/Button'
 import { useMyEmployee } from '@/lib/auth'
-import {
-  useMyOutlet,
-  useMyTodayPunches,
-  useNextPunchType,
-  usePunch,
-} from '@/lib/attendance'
+import { useMyOutlet, useMyTodayPunches, useNextPunchType, usePunch } from '@/lib/attendance'
 import {
   ensureNativeLocationPermission,
   GeoError,
@@ -77,13 +72,11 @@ export default function PunchPage() {
   // When the user has multiple allowed outlets, pick the closest one
   // they're inside the geofence of. Falls back to closest overall so
   // the distance pill stays meaningful even when out of range.
-  const pick = coords && myOutlets.length > 0
-    ? pickOutletForPunch(myOutlets, coords.lat, coords.lng)
-    : null
+  const pick = coords && myOutlets.length > 0 ? pickOutletForPunch(myOutlets, coords.lat, coords.lng) : null
   const useOutlet = pick?.outlet ?? null
 
   const distance = useOutlet
-    ? pick?.distance_m ?? null
+    ? (pick?.distance_m ?? null)
     : coords && outlet?.lat != null && outlet?.lng != null
       ? haversineMeters(coords, { lat: outlet.lat, lng: outlet.lng })
       : null
@@ -101,8 +94,7 @@ export default function PunchPage() {
   // from the permission; in a browser a ~2 km reading is the giveaway.
   const approximateOnly =
     precision === 'approximate' || (!IS_NATIVE && coords !== null && coords.accuracy >= 1500)
-  const accuracyPoor =
-    coords !== null && coords.accuracy > Math.max(radius * 2, 150)
+  const accuracyPoor = coords !== null && coords.accuracy > Math.max(radius * 2, 150)
   const tz = outlet?.timezone ?? 'Asia/Kolkata'
   const showOutletPicker = myOutlets.length > 1
 
@@ -172,9 +164,7 @@ export default function PunchPage() {
   return (
     <>
       <PageHeader
-        title={
-          employee?.full_name ? `Hi, ${employee.full_name.split(' ')[0]}` : 'Punch in / out'
-        }
+        title={employee?.full_name ? `Hi, ${employee.full_name.split(' ')[0]}` : 'Punch in / out'}
         description={
           showOutletPicker && useOutlet
             ? `Punching at: ${useOutlet.outlet_name ?? useOutlet.outlet_id}` +
@@ -223,17 +213,15 @@ export default function PunchPage() {
                     {nextType === 'in' ? 'Punch in' : 'Punch out'}
                   </p>
                 </div>
-                <DistancePill
-                  distance={distance}
-                  radius={radius}
-                  loading={!hasGeo && !geoError}
-                />
+                <DistancePill distance={distance} radius={radius} loading={!hasGeo && !geoError} />
               </div>
 
               {geoError ? (
                 <p className="text-sm text-destructive">{geoError}</p>
               ) : (
-                <p className={`flex items-center gap-2 text-sm ${accuracyPoor ? 'text-amber-600' : 'text-muted-foreground'}`}>
+                <p
+                  className={`flex items-center gap-2 text-sm ${accuracyPoor ? 'text-amber-600' : 'text-muted-foreground'}`}
+                >
                   <MapPin className="h-4 w-4" />
                   {hasGeo
                     ? `Accuracy ±${Math.round(coords!.accuracy)} m${accuracyPoor ? ' · low GPS accuracy' : ''}`
@@ -249,9 +237,9 @@ export default function PunchPage() {
                       {IS_NATIVE ? (
                         <>
                           <div className="mt-1 text-amber-800">
-                            Precise location is off for Flax HR, so the reading can't get better than
-                            ±2 km. Tap the button and choose <b>Precise</b>. If no prompt appears, open
-                            phone <b>Settings → Apps → Flax HR → Permissions → Location</b> and turn on{' '}
+                            Precise location is off for Flax HR, so the reading can't get better than ±2 km.
+                            Tap the button and choose <b>Precise</b>. If no prompt appears, open phone{' '}
+                            <b>Settings → Apps → Flax HR → Permissions → Location</b> and turn on{' '}
                             <b>Use precise location</b>.
                           </div>
                           <Button
@@ -276,10 +264,11 @@ export default function PunchPage() {
                         </>
                       ) : (
                         <div className="mt-1 text-amber-800">
-                          Chrome only has approximate location, so the reading can't get better than
-                          ±2 km. Fix: phone <b>Settings → Apps → Chrome → Permissions → Location</b> → turn
-                          on <b>Use precise location</b>. Then in Chrome tap <b>⋮ → Settings → Site
-                          settings → Location</b> and allow hr.flaxfoods.in. Reload this page.
+                          Chrome only has approximate location, so the reading can't get better than ±2 km.
+                          Fix: phone <b>Settings → Apps → Chrome → Permissions → Location</b> → turn on{' '}
+                          <b>Use precise location</b>. Then in Chrome tap{' '}
+                          <b>⋮ → Settings → Site settings → Location</b> and allow hr.flaxfoods.in. Reload
+                          this page.
                         </div>
                       )}
                     </>
@@ -287,10 +276,9 @@ export default function PunchPage() {
                     <>
                       <div className="font-medium">Can't verify your location.</div>
                       <div className="mt-1 text-amber-800">
-                        Your phone is reporting a ±{Math.round(coords!.accuracy)} m fix — far wider than
-                        the {radius} m geofence. Try: step outside / near a window, turn on
-                        high-accuracy / precise location, and switch off battery saver. Wait 10–20 s
-                        for the fix to tighten.
+                        Your phone is reporting a ±{Math.round(coords!.accuracy)} m fix — far wider than the{' '}
+                        {radius} m geofence. Try: step outside / near a window, turn on high-accuracy /
+                        precise location, and switch off battery saver. Wait 10–20 s for the fix to tighten.
                       </div>
                     </>
                   )}
@@ -342,9 +330,7 @@ export default function PunchPage() {
                       return
                     }
                     if (!canPunch) {
-                      toast.error(
-                        `Outside geofence — you're ${distance} m away (allowed: ${radius} m).`,
-                      )
+                      toast.error(`Outside geofence — you're ${distance} m away (allowed: ${radius} m).`)
                       return
                     }
                     void submitWith(undefined, coords.lat, coords.lng)
@@ -423,9 +409,7 @@ export default function PunchPage() {
                   ))}
                 </ul>
               )}
-              <p className="text-xs text-muted-foreground">
-                {format(new Date(), 'EEEE, d MMM yyyy')}
-              </p>
+              <p className="text-xs text-muted-foreground">{format(new Date(), 'EEEE, d MMM yyyy')}</p>
             </CardContent>
           </Card>
 
@@ -459,27 +443,17 @@ function DistancePill({
   loading: boolean
 }) {
   if (loading) {
-    return (
-      <span className="rounded-full bg-muted px-3 py-1 text-xs text-muted-foreground">
-        Locating…
-      </span>
-    )
+    return <span className="rounded-full bg-muted px-3 py-1 text-xs text-muted-foreground">Locating…</span>
   }
   if (distance === null) {
-    return (
-      <span className="rounded-full bg-muted px-3 py-1 text-xs text-muted-foreground">
-        No location
-      </span>
-    )
+    return <span className="rounded-full bg-muted px-3 py-1 text-xs text-muted-foreground">No location</span>
   }
   const inside = distance <= radius
   return (
     <span
       className={
         'rounded-full px-3 py-1 text-xs font-medium ' +
-        (inside
-          ? 'bg-primary/10 text-primary'
-          : 'bg-destructive/10 text-destructive')
+        (inside ? 'bg-primary/10 text-primary' : 'bg-destructive/10 text-destructive')
       }
     >
       {distance} m / {radius} m
@@ -499,4 +473,3 @@ function geoMessage(err: GeoError): string {
       return 'This device does not support location services.'
   }
 }
-

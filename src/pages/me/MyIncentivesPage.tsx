@@ -33,10 +33,7 @@ export default function MyIncentivesPage() {
 
   return (
     <>
-      <PageHeader
-        title="My incentives"
-        description="Service-charge payouts from finalised monthly runs."
-      />
+      <PageHeader title="My incentives" description="Service-charge payouts from finalised monthly runs." />
       <Card className="mb-3">
         <CardContent className="flex items-center justify-between gap-3 p-6">
           <div>
@@ -62,9 +59,17 @@ export default function MyIncentivesPage() {
               </thead>
               <tbody>
                 {isLoading ? (
-                  <tr><td colSpan={6} className="px-4 py-6 text-center text-muted-foreground">Loading…</td></tr>
+                  <tr>
+                    <td colSpan={6} className="px-4 py-6 text-center text-muted-foreground">
+                      Loading…
+                    </td>
+                  </tr>
                 ) : data.length === 0 ? (
-                  <tr><td colSpan={6} className="px-4 py-6 text-center text-muted-foreground">No incentives yet.</td></tr>
+                  <tr>
+                    <td colSpan={6} className="px-4 py-6 text-center text-muted-foreground">
+                      No incentives yet.
+                    </td>
+                  </tr>
                 ) : (
                   data.map((r) => (
                     <tr key={`${r.run_id}-${r.period_month}`} className="border-t border-border">
@@ -75,7 +80,9 @@ export default function MyIncentivesPage() {
                       </td>
                       <td className="px-4 py-3 font-mono">{Number(r.days_present).toFixed(1)}</td>
                       <td className="px-4 py-3 font-mono">{Number(r.total_points).toFixed(2)}</td>
-                      <td className="px-4 py-3 font-mono font-semibold">₹{Number(r.sc_payable).toFixed(2)}</td>
+                      <td className="px-4 py-3 font-mono font-semibold">
+                        ₹{Number(r.sc_payable).toFixed(2)}
+                      </td>
                     </tr>
                   ))
                 )}

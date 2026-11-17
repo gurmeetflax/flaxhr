@@ -9,7 +9,11 @@ export default function MyRosterPage() {
     <>
       <PageHeader title="My roster" description="Upcoming published shifts" />
       {isLoading ? (
-        <Card><CardContent className="p-6"><CardDescription>Loading…</CardDescription></CardContent></Card>
+        <Card>
+          <CardContent className="p-6">
+            <CardDescription>Loading…</CardDescription>
+          </CardContent>
+        </Card>
       ) : rows.length === 0 ? (
         <Card>
           <CardContent className="p-6">
@@ -25,8 +29,8 @@ export default function MyRosterPage() {
                 <div className="flex flex-col gap-0.5">
                   <span className="font-medium">{format(new Date(r.work_date), 'EEEE, d MMM')}</span>
                   <span className="text-sm text-muted-foreground">
-                    {r.shift_name ?? 'Shift'} ·{' '}
-                    {r.start_time?.slice(0, 5) ?? '—'}–{r.end_time?.slice(0, 5) ?? '—'}
+                    {r.shift_name ?? 'Shift'} · {r.start_time?.slice(0, 5) ?? '—'}–
+                    {r.end_time?.slice(0, 5) ?? '—'}
                   </span>
                   <span className="text-xs text-muted-foreground">{r.outlet_name ?? r.outlet_id}</span>
                 </div>

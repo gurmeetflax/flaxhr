@@ -76,6 +76,11 @@ export interface LessonData extends SlideData {
   steps?: StepItem[]
   ingredients?: RecipeIngredient[]
   plating?: string
+  veg?: boolean
+  kcal?: number
+  protein_g?: number
+  allergens?: string[]
+  category?: string
 }
 
 export interface Lesson {
@@ -650,5 +655,90 @@ export function useSetViewer() {
     mutationFn: (v: { employee: string; on: boolean }) =>
       rpc<null>('training_set_viewer', { p_employee: v.employee, p_on: v.on }),
     onSuccess: done,
+  })
+}
+
+// ---------------------------------------------------------- monthly prizes
+
+export interface MonthPrizes {
+  month: string
+  ends: string
+  prizes: { rank: number; title: string }[]
+  me: { rank: number; points: number } | null
+  board: { rank: number; points: number; me: boolean; name: string; outlet: string | null }[]
+}
+
+export interface MonthWinners {
+  month: string
+  prizes: { rank: number; title: string }[]
+  winners: {
+    rank: number
+    employee_id: string
+    name: string
+    employee_code: string
+    outlet: string | null
+    points: number
+    passed: number
+    prize: string | null
+    paid_at: string | null
+    paid_to: string | null
+  }[]
+  paid: { rank: number; name: string; points: number; prize: string; paid_at: string }[]
+}
+
+export function useMonthPrizes() {
+  return useQuery({
+    queryKey: ['training', 'month-prizes'],
+    queryFn: () => rpc<MonthPrizes>('training_month_prizes'),
+  })
+}
+
+export function useMonthWinners(month: string) {
+  return useQuery({
+    queryKey: ['training', 'admin', 'month-winners', month],
+    queryFn: () => rpc<MonthWinners>('training_month_winners', { p_month: `${month}-01` }),
+  })
+}
+
+export function useMarkPrizePaid() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: (v: { month: string; rank: number; paid: boolean }) =>
+      rpc<null>('training_mark_prize_paid', { p_month: `${v.month}-01`, p_rank: v.rank, p_paid: v.paid }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['training'] }),
+  })
+}
+
+export function useSavePrizes() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: (v: [string, string, string]) =>
+      rpc<null>('training_save_prizes', { p_first: v[0], p_second: v[1], p_third: v[2] }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['training'] }),
+  })
+}
+
+export interface LeagueMonth {
+  month: string
+  start: string
+  status: 'final' | 'provisional' | string
+  my_outlet: string | null
+  rows: {
+    rank: number | null
+    outlet_id: string
+    outlet: string
+    score: number | null
+    grade: string | null
+    rating: number | null
+    complaints: number | null
+    eligible: boolean
+  }[]
+}
+
+export function useOutletLeague() {
+  return useQuery({
+    queryKey: ['training', 'outlet-league'],
+    staleTime: 10 * 60_000,
+    queryFn: () => rpc<LeagueMonth[]>('training_outlet_league', { p_months: 2 }),
   })
 }

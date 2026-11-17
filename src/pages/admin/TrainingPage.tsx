@@ -11,6 +11,7 @@ import { Input } from '@/components/ui/Input'
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/Tabs'
 import { EmployeeSelect } from '@/components/ui/EmployeeSelect'
 import { Avatar } from '@/components/training/LessonView'
+import OutletLeagueCard from '@/components/training/OutletLeagueCard'
 import { supabase } from '@/lib/supabase'
 import { useDesignations } from '@/lib/designations'
 import {
@@ -19,6 +20,9 @@ import {
   TONE_CLASS,
   scoreTone,
   useAdminLeaderboard,
+  useMarkPrizePaid,
+  useMonthWinners,
+  useSavePrizes,
   useAdminPeople,
   useRemoveLeader,
   useSaveLeader,
@@ -353,7 +357,7 @@ function EmployeePanel({
 
 // ---------------------------------------------------------- leaderboard
 
-export function LeaderboardTab() {
+export function LeaderboardTab({ readOnly = false }: { readOnly?: boolean }) {
   const q = useAdminLeaderboard()
   const outlets = useOutlets()
   const [outlet, setOutlet] = useState('')
@@ -361,6 +365,7 @@ export function LeaderboardTab() {
   const anyPoints = rows.some((r) => r.points > 0)
   return (
     <div className="flex flex-col gap-3">
+      <MonthlyPrizes readOnly={readOnly} />
       <div className="flex flex-wrap items-center justify-between gap-3">
         <p className="text-xs text-muted-foreground">
           Points per passed module: quiz score, +50 first try, +25 on time. Same board staff see in the app
@@ -448,6 +453,120 @@ export function LeaderboardTab() {
   )
 }
 
+function MonthlyPrizes({ readOnly }: { readOnly: boolean }) {
+  const [month, setMonth] = useState(() => format(new Date(), 'yyyy-MM'))
+  const q = useMonthWinners(month)
+  const mark = useMarkPrizePaid()
+  const save = useSavePrizes()
+  const [edit, setEdit] = useState<[string, string, string] | null>(null)
+  const d = q.data
+  const titles = (d?.prizes ?? []).map((p) => p.title)
+  return (
+    <Card className="border-primary/30">
+      <CardContent className="flex flex-col gap-3 p-5">
+        <div className="flex flex-wrap items-end justify-between gap-3">
+          <div>
+            <CardTitle className="flex items-center gap-2 text-base">
+              <Trophy className="h-4 w-4 text-amber-500" /> Monthly prizes
+            </CardTitle>
+            <CardDescription className="mt-1">
+              Top 3 by points earned in the month (ties go to whoever got there first). Prizes:{' '}
+              {titles.join(' · ') || '—'}
+            </CardDescription>
+          </div>
+          <div className="flex items-end gap-2">
+            {!readOnly ? (
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={() => setEdit([titles[0] ?? '', titles[1] ?? '', titles[2] ?? ''])}
+              >
+                <Pencil className="h-3.5 w-3.5" /> Prizes
+              </Button>
+            ) : null}
+            <Input type="month" value={month} onChange={(e) => e.target.value && setMonth(e.target.value)} />
+          </div>
+        </div>
+        {edit ? (
+          <div className="grid gap-2 rounded-lg border border-dashed border-border p-3 sm:grid-cols-[1fr_1fr_1fr_auto]">
+            {(['1st', '2nd', '3rd'] as const).map((label, i) => (
+              <Input
+                key={label}
+                placeholder={`${label} prize`}
+                value={edit[i]}
+                onChange={(e) => {
+                  const n = [...edit] as [string, string, string]
+                  n[i] = e.target.value
+                  setEdit(n)
+                }}
+              />
+            ))}
+            <Button
+              disabled={edit.some((x) => !x.trim())}
+              onClick={async () => {
+                await save.mutateAsync(edit.map((x) => x.trim()) as [string, string, string])
+                setEdit(null)
+                toast.success('Prizes saved')
+              }}
+            >
+              Save
+            </Button>
+          </div>
+        ) : null}
+        {q.isLoading ? (
+          <CardDescription>Loading…</CardDescription>
+        ) : d && d.winners.length ? (
+          <ul className="flex flex-col gap-2">
+            {d.winners.map((w) => (
+              <li
+                key={w.rank}
+                className="flex flex-wrap items-center gap-3 rounded-lg border border-border p-3 text-sm"
+              >
+                <span
+                  className={`flex h-8 w-8 items-center justify-center rounded-full text-xs font-bold ${
+                    w.rank === 1
+                      ? 'bg-amber-400 text-white'
+                      : w.rank === 2
+                        ? 'bg-zinc-300'
+                        : 'bg-amber-700/80 text-white'
+                  }`}
+                >
+                  {w.rank}
+                </span>
+                <div className="min-w-[10rem] flex-1">
+                  <div className="font-semibold">{w.name}</div>
+                  <div className="text-xs text-muted-foreground">
+                    {w.employee_code}
+                    {w.outlet ? ` · ${w.outlet}` : ''} · {w.points} points · {w.passed} modules
+                  </div>
+                </div>
+                <div className="text-sm font-medium">{w.prize ?? '—'}</div>
+                {w.paid_at ? (
+                  <span className="rounded-full bg-emerald-500/10 px-2.5 py-1 text-xs font-medium text-emerald-700">
+                    Paid {format(parseISO(w.paid_at), 'd MMM')}
+                    {w.paid_to && w.paid_to !== w.name ? ` to ${w.paid_to}` : ''}
+                  </span>
+                ) : null}
+                {!readOnly ? (
+                  <Button
+                    size="sm"
+                    variant={w.paid_at ? 'ghost' : 'outline'}
+                    onClick={() => mark.mutate({ month, rank: w.rank, paid: !w.paid_at })}
+                  >
+                    {w.paid_at ? 'Undo' : 'Mark paid'}
+                  </Button>
+                ) : null}
+              </li>
+            ))}
+          </ul>
+        ) : (
+          <CardDescription>No points earned in this month yet.</CardDescription>
+        )}
+      </CardContent>
+    </Card>
+  )
+}
+
 // ------------------------------------------------------- outlets & awards
 
 export function OutletsTab({ readOnly = false }: { readOnly?: boolean }) {
@@ -456,6 +575,7 @@ export function OutletsTab({ readOnly = false }: { readOnly?: boolean }) {
   const aw = useAwards(month)
   return (
     <div className="flex flex-col gap-4">
+      <OutletLeagueCard />
       <Card>
         <CardContent className="flex flex-col gap-4 p-5">
           <div className="flex flex-wrap items-end justify-between gap-3">
