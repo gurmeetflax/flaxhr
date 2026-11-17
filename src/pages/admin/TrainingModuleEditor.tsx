@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
-import { ArrowDown, ArrowLeft, ArrowUp, Eye, EyeOff, Plus, Trash2 } from 'lucide-react'
+import { ArrowDown, ArrowLeft, ArrowUp, Eye, EyeOff, ImageUp, Plus, Trash2, X } from 'lucide-react'
+import { ICONS } from '@/components/training/icons'
 import { toast } from 'sonner'
 import { PageHeader } from '@/components/layout/AppShell'
 import { Card, CardContent, CardDescription, CardTitle } from '@/components/ui/Card'
@@ -17,6 +18,8 @@ import {
   type LessonKind,
   type ModuleDoc,
   type ModuleKind,
+  uploadTrainingImage,
+  useAdminPaths,
 } from '@/lib/training'
 
 const EMPTY: ModuleDoc = {
@@ -54,6 +57,10 @@ export default function TrainingModuleEditor() {
   }, [q.data])
 
   const set = (patch: Partial<ModuleDoc>) => setDoc((d) => ({ ...d, ...patch }))
+  const paths = useAdminPaths()
+  const allStaff = paths.data?.find((p) => p.name === 'All staff: welcome')?.id
+  // New modules go to everyone by default; nobody assigns by hand.
+  const pathIds = doc.path_ids ?? (isNew && allStaff ? [allStaff] : [])
   const setLesson = (i: number, l: Lesson) => set({ lessons: doc.lessons.map((x, k) => (k === i ? l : x)) })
   const setQuestion = (i: number, qq: AdminQuestion) =>
     set({ questions: doc.questions.map((x, k) => (k === i ? qq : x)) })
@@ -65,7 +72,7 @@ export default function TrainingModuleEditor() {
     )
     if (bad >= 0) return toast.error(`Question ${bad + 1} needs a prompt, 2+ options and a right answer`)
     try {
-      const newId = await save.mutateAsync(doc)
+      const newId = await save.mutateAsync({ ...doc, path_ids: pathIds })
       toast.success('Saved')
       if (isNew) nav(`/admin/training/modules/${newId}`, { replace: true })
     } catch (e) {
@@ -172,6 +179,36 @@ export default function TrainingModuleEditor() {
               />
               Active (untick to archive: it disappears for staff, scores are kept)
             </label>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardContent className="flex flex-col gap-2 p-5">
+            <CardTitle className="text-base">Auto-assign to</CardTitle>
+            <CardDescription>
+              Everyone who matches a ticked path gets this module automatically when you save, and new joiners
+              get it the day they join. Paths are edited in Training &gt; Paths.
+            </CardDescription>
+            <div className="flex flex-col gap-1.5 pt-1">
+              {(paths.data ?? []).map((p) => (
+                <label key={p.id} className="flex items-center gap-2 text-sm">
+                  <input
+                    type="checkbox"
+                    checked={pathIds.includes(p.id!)}
+                    onChange={(e) =>
+                      set({
+                        path_ids: e.target.checked ? [...pathIds, p.id!] : pathIds.filter((x) => x !== p.id),
+                      })
+                    }
+                  />
+                  {p.name}
+                  <span className="text-xs text-muted-foreground">
+                    {p.roster_groups?.join(', ') ?? 'everyone'}
+                    {p.is_active ? '' : ' · path is off'}
+                  </span>
+                </label>
+              ))}
+            </div>
           </CardContent>
         </Card>
 
@@ -339,6 +376,17 @@ function LessonEditor({
                 onChange={(e) => setData({ body: e.target.value })}
               />
             </label>
+            <div className="flex flex-col gap-1 text-sm sm:col-span-2">
+              Icon
+              <IconPicker value={d.icon ?? null} onChange={(icon) => setData({ icon })} />
+            </div>
+            <div className="sm:col-span-2">
+              <ImageField
+                label="Photo (optional)"
+                value={d.image_url ?? ''}
+                onChange={(image_url) => setData({ image_url })}
+              />
+            </div>
           </div>
         ) : (
           <>
@@ -357,19 +405,28 @@ function LessonEditor({
                 onChange={(e) => onChange({ ...lesson, body: e.target.value })}
               />
             </label>
-            {['video', 'image', 'pdf', 'recipe'].includes(lesson.kind) ? (
+            {lesson.kind === 'video' || lesson.kind === 'pdf' ? (
               <label className="flex flex-col gap-1 text-sm">
-                {lesson.kind === 'video'
-                  ? 'Video link (YouTube or a video file)'
-                  : lesson.kind === 'pdf'
-                    ? 'PDF link'
-                    : 'Photo link'}
+                {lesson.kind === 'video' ? 'Video link (YouTube or a video file)' : 'PDF link'}
                 <Input
                   placeholder="https://…"
                   value={lesson.media_url ?? ''}
                   onChange={(e) => onChange({ ...lesson, media_url: e.target.value })}
                 />
               </label>
+            ) : ['text', 'image', 'recipe', 'steps'].includes(lesson.kind) ? (
+              <ImageField
+                label={lesson.kind === 'image' ? 'Photo' : 'Photo (optional)'}
+                value={lesson.media_url ?? ''}
+                onChange={(media_url) => onChange({ ...lesson, media_url })}
+              />
+            ) : null}
+            {lesson.kind === 'team' || lesson.kind === 'outlets' ? (
+              <p className="rounded-md bg-muted/50 px-3 py-2 text-xs text-muted-foreground">
+                {lesson.kind === 'team'
+                  ? "Fills itself in: the leads at the employee's own outlet, then company leaders, from Employees."
+                  : 'Fills itself in: every active outlet with its photo and a map link. Add outlet photos in Training > Outlets & awards.'}
+              </p>
             ) : null}
             {lesson.kind === 'steps' ? (
               <div className="flex flex-col gap-2">
@@ -417,6 +474,22 @@ function LessonEditor({
                       >
                         <Trash2 className="h-3.5 w-3.5" />
                       </Button>
+                    </div>
+                    <div className="flex flex-col gap-2 sm:col-span-3">
+                      <IconPicker
+                        compact
+                        value={s.icon ?? null}
+                        onChange={(icon) =>
+                          setData({ steps: d.steps!.map((x, k) => (k === i ? { ...x, icon } : x)) })
+                        }
+                      />
+                      <ImageField
+                        label="Step photo (optional)"
+                        value={s.image_url ?? ''}
+                        onChange={(image_url) =>
+                          setData({ steps: d.steps!.map((x, k) => (k === i ? { ...x, image_url } : x)) })
+                        }
+                      />
                     </div>
                     <textarea
                       className={`${textarea} min-h-[56px] sm:col-span-3`}
@@ -613,5 +686,102 @@ function QuestionEditor({
         />
       </CardContent>
     </Card>
+  )
+}
+
+function IconPicker({
+  value,
+  onChange,
+  compact = false,
+}: {
+  value: string | null
+  onChange: (v: string | null) => void
+  compact?: boolean
+}) {
+  return (
+    <div className="flex flex-wrap items-center gap-1">
+      <button
+        type="button"
+        onClick={() => onChange(null)}
+        className={`rounded-md border px-2 py-1 text-xs ${!value ? 'border-primary bg-primary/10 text-primary' : 'border-border'}`}
+      >
+        {compact ? 'Auto' : 'None'}
+      </button>
+      {Object.entries(ICONS).map(([key, Icon]) => (
+        <button
+          key={key}
+          type="button"
+          title={key}
+          aria-label={key}
+          onClick={() => onChange(key)}
+          className={`flex h-8 w-8 items-center justify-center rounded-md border ${
+            value === key
+              ? 'border-primary bg-primary/10 text-primary'
+              : 'border-border text-muted-foreground'
+          }`}
+        >
+          <Icon className="h-4 w-4" />
+        </button>
+      ))}
+    </div>
+  )
+}
+
+function ImageField({
+  label,
+  value,
+  onChange,
+}: {
+  label: string
+  value: string
+  onChange: (v: string | null) => void
+}) {
+  const [busy, setBusy] = useState(false)
+  const onFile = async (f: File | undefined) => {
+    if (!f) return
+    setBusy(true)
+    try {
+      onChange(await uploadTrainingImage(f))
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : 'Upload failed')
+    } finally {
+      setBusy(false)
+    }
+  }
+  return (
+    <div className="flex flex-col gap-1 text-sm">
+      {label}
+      <div className="flex flex-wrap items-center gap-2">
+        {value ? (
+          <div className="relative">
+            <img src={value} alt="" className="h-16 w-24 rounded-md border border-border object-cover" />
+            <button
+              type="button"
+              aria-label="Remove photo"
+              onClick={() => onChange(null)}
+              className="absolute -right-2 -top-2 rounded-full border border-border bg-surface p-0.5"
+            >
+              <X className="h-3 w-3" />
+            </button>
+          </div>
+        ) : null}
+        <label className="inline-flex h-8 cursor-pointer items-center gap-1 rounded-lg border border-border px-3 text-xs hover:bg-muted">
+          <ImageUp className="h-3.5 w-3.5" /> {busy ? 'Uploading…' : value ? 'Replace' : 'Upload photo'}
+          <input
+            type="file"
+            accept="image/*"
+            className="hidden"
+            disabled={busy}
+            onChange={(e) => onFile(e.target.files?.[0])}
+          />
+        </label>
+        <Input
+          className="h-8 min-w-[12rem] flex-1 text-xs"
+          placeholder="or paste an image link"
+          value={value}
+          onChange={(e) => onChange(e.target.value || null)}
+        />
+      </div>
+    </div>
   )
 }

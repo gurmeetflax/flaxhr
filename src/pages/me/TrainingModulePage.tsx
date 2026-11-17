@@ -5,7 +5,9 @@ import { toast } from 'sonner'
 import { Card, CardContent, CardDescription, CardTitle } from '@/components/ui/Card'
 import { Button } from '@/components/ui/Button'
 import LessonView from '@/components/training/LessonView'
+import Celebration, { type CelebrationData } from '@/components/training/Celebration'
 import {
+  useMyProgress,
   usePlayerModule,
   useSubmitQuiz,
   useViewLesson,
@@ -19,6 +21,8 @@ export default function TrainingModulePage() {
   const q = usePlayerModule(id)
   const view = useViewLesson()
   const submit = useSubmitQuiz()
+  const prog = useMyProgress()
+  const [celebrate, setCelebrate] = useState<CelebrationData | null>(null)
   const [step, setStep] = useState(0)
   const [visited, setVisited] = useState<string[]>([])
   const [answers, setAnswers] = useState<Record<string, number[]>>({})
@@ -78,7 +82,23 @@ export default function TrainingModulePage() {
       return
     }
     try {
-      setResult(await submit.mutateAsync({ module: m.id, answers }))
+      const before = prog.data
+      const res = await submit.mutateAsync({ module: m.id, answers })
+      setResult(res)
+      if (res.passed && m.assignment) {
+        const after = (await prog.refetch()).data
+        if (after) {
+          setCelebrate({
+            score: res.score,
+            points: after.points - (before?.points ?? 0),
+            level: after.level,
+            levelUp: !!before && before.level !== after.level,
+            badges: after.badges.filter(
+              (b) => b.earned && !before?.badges.find((x) => x.key === b.key && x.earned),
+            ),
+          })
+        }
+      }
     } catch (e) {
       toast.error(e instanceof Error ? e.message : 'Could not submit')
     }
@@ -91,6 +111,7 @@ export default function TrainingModulePage() {
 
   return (
     <div ref={top} className="mx-auto flex max-w-3xl scroll-mt-20 flex-col gap-4">
+      {celebrate ? <Celebration data={celebrate} onClose={() => setCelebrate(null)} /> : null}
       <div className="flex items-center justify-between gap-2">
         <Link to="/me/training" className="inline-flex items-center gap-1 text-sm text-muted-foreground">
           <ArrowLeft className="h-4 w-4" /> Training

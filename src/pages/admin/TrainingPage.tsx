@@ -2,7 +2,7 @@ import { useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { useQuery } from '@tanstack/react-query'
 import { format, parseISO } from 'date-fns'
-import { Award, Eye, Pencil, Plus, Trash2, Trophy, UserPlus, X } from 'lucide-react'
+import { Award, Eye, ImageUp, Pencil, Plus, Store, Trash2, Trophy, UserPlus, X } from 'lucide-react'
 import { toast } from 'sonner'
 import { PageHeader } from '@/components/layout/AppShell'
 import { Card, CardContent, CardDescription, CardTitle } from '@/components/ui/Card'
@@ -23,6 +23,9 @@ import {
   useDeletePath,
   useEmployeeTraining,
   useOutletScores,
+  useSaveOutletMedia,
+  useTrainingOutlets,
+  uploadTrainingImage,
   useSavePath,
   useTrainingOverview,
   useUnassign,
@@ -451,6 +454,61 @@ function OutletsTab() {
           </div>
         )}
       </div>
+      <OutletPhotos />
+    </div>
+  )
+}
+
+function OutletPhotos() {
+  const q = useTrainingOutlets()
+  const save = useSaveOutletMedia()
+  const [busy, setBusy] = useState<string | null>(null)
+  const onFile = async (outlet: string, note: string | null, f: File | undefined) => {
+    if (!f) return
+    setBusy(outlet)
+    try {
+      const url = await uploadTrainingImage(f)
+      await save.mutateAsync({ outlet, photo_url: url, note })
+      toast.success('Photo saved')
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : 'Upload failed')
+    } finally {
+      setBusy(null)
+    }
+  }
+  return (
+    <div>
+      <div className="mb-1 text-sm font-medium">Outlet photos</div>
+      <p className="mb-2 text-xs text-muted-foreground">
+        Shown to staff in the "Our outlets" lesson. A clear photo of the storefront works best.
+      </p>
+      <ul className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+        {(q.data ?? []).map((o) => (
+          <li key={o.id} className="overflow-hidden rounded-lg border border-border bg-surface">
+            {o.photo_url ? (
+              <img src={o.photo_url} alt={o.name} className="h-28 w-full object-cover" />
+            ) : (
+              <div className="flex h-28 items-center justify-center bg-muted/50 text-muted-foreground">
+                <Store className="h-7 w-7" />
+              </div>
+            )}
+            <div className="flex items-center justify-between gap-2 p-3 text-sm">
+              <span className="truncate font-medium">{o.name}</span>
+              <label className="inline-flex h-8 shrink-0 cursor-pointer items-center gap-1 rounded-lg border border-border px-2.5 text-xs hover:bg-muted">
+                <ImageUp className="h-3.5 w-3.5" />{' '}
+                {busy === o.id ? 'Uploading…' : o.photo_url ? 'Replace' : 'Upload'}
+                <input
+                  type="file"
+                  accept="image/*"
+                  className="hidden"
+                  disabled={busy === o.id}
+                  onChange={(e) => onFile(o.id, o.note, e.target.files?.[0])}
+                />
+              </label>
+            </div>
+          </li>
+        ))}
+      </ul>
     </div>
   )
 }

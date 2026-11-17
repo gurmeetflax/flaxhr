@@ -1,6 +1,7 @@
-import { AlertTriangle, ExternalLink } from 'lucide-react'
-import type { Lesson } from '@/lib/training'
+import { AlertTriangle, ExternalLink, MapPin, Store, Target } from 'lucide-react'
+import { useTeamForMe, useTrainingOutlets, type Lesson } from '@/lib/training'
 import BrandSlide from './BrandSlide'
+import { stepIcon } from './icons'
 
 // Only plain web links are shown or embedded.
 function safeUrl(u: string | null | undefined): string | null {
@@ -45,32 +46,65 @@ export default function LessonView({ lesson }: { lesson: Lesson }) {
       {lesson.title ? <h2 className="text-lg font-semibold">{lesson.title}</h2> : null}
       <Paragraphs text={lesson.body} />
 
+      {media && (lesson.kind === 'text' || lesson.kind === 'steps') ? (
+        <img
+          src={media}
+          alt={lesson.title ?? ''}
+          className="w-full rounded-lg border border-border object-cover"
+          loading="lazy"
+        />
+      ) : null}
+
       {lesson.kind === 'steps' && lesson.data.steps?.length ? (
-        <ol className="flex flex-col gap-2">
-          {lesson.data.steps.map((s, i) => (
-            <li
-              key={i}
-              className={`rounded-lg border p-3 text-sm ${s.ccp ? 'border-amber-500/50 bg-amber-500/5' : 'border-border'}`}
-            >
-              <div className="flex flex-wrap items-center gap-2">
-                <span className="flex h-6 w-6 items-center justify-center rounded-full bg-primary/10 text-xs font-semibold text-primary">
-                  {i + 1}
-                </span>
-                <span className="font-medium">{s.title}</span>
-                {s.ccp ? (
-                  <span className="inline-flex items-center gap-1 rounded-full bg-amber-500/15 px-2 py-0.5 text-[11px] font-medium text-amber-700">
-                    <AlertTriangle className="h-3 w-3" /> Critical step
-                  </span>
+        <ol className="grid gap-3 sm:grid-cols-2">
+          {lesson.data.steps.map((s, i) => {
+            const Icon = stepIcon(s.title, s.body, s.icon)
+            return (
+              <li
+                key={i}
+                className={`flex flex-col overflow-hidden rounded-xl border bg-surface text-sm ${
+                  s.ccp ? 'border-amber-500/60' : 'border-border'
+                }`}
+              >
+                {s.image_url ? (
+                  <img src={s.image_url} alt={s.title} className="h-36 w-full object-cover" loading="lazy" />
                 ) : null}
-                {s.target ? (
-                  <span className="ml-auto rounded-md bg-muted px-2 py-0.5 text-xs">Target: {s.target}</span>
-                ) : null}
-              </div>
-              {s.body ? <p className="mt-1.5 text-muted-foreground">{s.body}</p> : null}
-            </li>
-          ))}
+                <div className="flex flex-1 flex-col gap-2 p-4">
+                  <div className="flex items-start gap-3">
+                    <div
+                      className={`relative flex h-11 w-11 shrink-0 items-center justify-center rounded-full ${
+                        s.ccp ? 'bg-amber-500/15 text-amber-700' : 'bg-primary/10 text-primary'
+                      }`}
+                    >
+                      <Icon className="h-5 w-5" />
+                      <span className="absolute -right-1 -top-1 flex h-5 w-5 items-center justify-center rounded-full border border-border bg-surface text-[10px] font-semibold text-foreground">
+                        {i + 1}
+                      </span>
+                    </div>
+                    <div className="min-w-0">
+                      <div className="font-medium">{s.title}</div>
+                      {s.ccp ? (
+                        <span className="mt-0.5 inline-flex items-center gap-1 rounded-full bg-amber-500/15 px-2 py-0.5 text-[11px] font-medium text-amber-700">
+                          <AlertTriangle className="h-3 w-3" /> Critical step
+                        </span>
+                      ) : null}
+                    </div>
+                  </div>
+                  {s.body ? <p className="text-muted-foreground">{s.body}</p> : null}
+                  {s.target ? (
+                    <div className="mt-auto inline-flex w-fit items-center gap-1.5 rounded-md bg-muted px-2 py-1 text-xs font-medium">
+                      <Target className="h-3.5 w-3.5" /> {s.target}
+                    </div>
+                  ) : null}
+                </div>
+              </li>
+            )
+          })}
         </ol>
       ) : null}
+
+      {lesson.kind === 'team' ? <TeamLesson /> : null}
+      {lesson.kind === 'outlets' ? <OutletsLesson /> : null}
 
       {lesson.kind === 'recipe' ? (
         <div className="flex flex-col gap-3">
@@ -147,5 +181,101 @@ export default function LessonView({ lesson }: { lesson: Lesson }) {
         </div>
       ) : null}
     </div>
+  )
+}
+
+function initials(name: string) {
+  return name
+    .split(/\s+/)
+    .filter(Boolean)
+    .slice(0, 2)
+    .map((w) => w[0]?.toUpperCase())
+    .join('')
+}
+
+function Person({ name, role, where }: { name: string; role: string; where?: string | null }) {
+  return (
+    <li className="flex items-center gap-3 rounded-xl border border-border bg-surface p-3">
+      <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-primary/10 text-sm font-semibold text-primary">
+        {initials(name)}
+      </div>
+      <div className="min-w-0">
+        <div className="truncate font-medium">{name}</div>
+        <div className="truncate text-xs text-muted-foreground">
+          {role}
+          {where ? ` · ${where}` : ''}
+        </div>
+      </div>
+    </li>
+  )
+}
+
+function TeamLesson() {
+  const q = useTeamForMe()
+  if (q.isLoading) return <p className="text-sm text-muted-foreground">Loading…</p>
+  const t = q.data
+  if (!t) return null
+  return (
+    <div className="flex flex-col gap-4">
+      {t.outlet_leads.length ? (
+        <div>
+          <div className="mb-2 text-xs font-medium uppercase tracking-wider text-muted-foreground">
+            At {t.outlet ?? 'your outlet'}
+          </div>
+          <ul className="grid gap-2 sm:grid-cols-2">
+            {t.outlet_leads.map((p) => (
+              <Person key={p.name} name={p.name} role={p.role} />
+            ))}
+          </ul>
+        </div>
+      ) : null}
+      {t.company_leads.length ? (
+        <div>
+          <div className="mb-2 text-xs font-medium uppercase tracking-wider text-muted-foreground">
+            Company leaders
+          </div>
+          <ul className="grid gap-2 sm:grid-cols-2">
+            {t.company_leads.map((p) => (
+              <Person key={p.name} name={p.name} role={p.role} where={p.outlet} />
+            ))}
+          </ul>
+        </div>
+      ) : null}
+    </div>
+  )
+}
+
+function OutletsLesson() {
+  const q = useTrainingOutlets()
+  if (q.isLoading) return <p className="text-sm text-muted-foreground">Loading…</p>
+  return (
+    <ul className="grid gap-3 sm:grid-cols-2">
+      {(q.data ?? []).map((o) => (
+        <li key={o.id} className="flex flex-col overflow-hidden rounded-xl border border-border bg-surface">
+          {o.photo_url ? (
+            <img src={o.photo_url} alt={o.name} className="h-36 w-full object-cover" loading="lazy" />
+          ) : (
+            <div className="flex h-24 items-center justify-center bg-muted/50 text-muted-foreground">
+              <Store className="h-8 w-8" />
+            </div>
+          )}
+          <div className="flex flex-1 flex-col gap-1 p-3 text-sm">
+            <div className="font-medium">{o.name}</div>
+            {o.city ? <div className="text-xs text-muted-foreground">{o.city}</div> : null}
+            {o.note ? <p className="text-xs text-muted-foreground">{o.note}</p> : null}
+            {o.lat != null && o.lng != null ? (
+              <a
+                href={`https://www.google.com/maps/search/?api=1&query=${o.lat},${o.lng}`}
+                target="_blank"
+                rel="noreferrer"
+                className="mt-auto inline-flex items-center gap-1 pt-1 text-xs underline"
+              >
+                <MapPin className="h-3.5 w-3.5" /> Open in Maps
+              </a>
+            ) : null}
+          </div>
+        </li>
+      ))}
+    </ul>
   )
 }
