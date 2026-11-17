@@ -77,7 +77,13 @@ export default function TrainingModulePage() {
   const total = lessons.length + (hasQuiz ? 1 : 0)
   const passedAlready = m.assignment?.status === 'passed'
 
+  const unread = lessons.map((l, i) => ({ l, i })).filter(({ l }) => !seen.has(l.id))
+
   const onSubmit = async () => {
+    if (unread.length) {
+      toast.error(`Open every lesson first. Not read yet: lesson ${unread.map((u) => u.i + 1).join(', ')}.`)
+      return
+    }
     const missing = m.questions.filter((x) => !(answers[x.id]?.length ?? 0))
     if (missing.length) {
       toast.error(`Answer every question first (${missing.length} left).`)
@@ -198,7 +204,12 @@ export default function TrainingModulePage() {
             </div>
             {!allSeen ? (
               <p className="rounded-md bg-amber-500/10 px-3 py-2 text-sm text-amber-700">
-                Read every lesson before the quiz.
+                Open every lesson before you submit. Not read yet:{' '}
+                {unread.map((u) => (
+                  <button key={u.l.id} type="button" className="mx-0.5 underline" onClick={() => goTo(u.i)}>
+                    lesson {u.i + 1}
+                  </button>
+                ))}
               </p>
             ) : null}
             {m.questions.map((qq, i) => (
@@ -214,7 +225,7 @@ export default function TrainingModulePage() {
               <Button variant="outline" onClick={() => goTo(Math.max(0, quizStep - 1))}>
                 <ArrowLeft className="h-4 w-4" /> Lessons
               </Button>
-              <Button onClick={onSubmit} loading={submit.isPending || practice.isPending} disabled={!allSeen}>
+              <Button onClick={onSubmit} loading={submit.isPending || practice.isPending}>
                 {preview ? 'Check answers (practice)' : 'Submit answers'}
               </Button>
             </div>

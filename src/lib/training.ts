@@ -531,3 +531,25 @@ export async function uploadTrainingImage(file: File): Promise<string> {
   if (error) throw new Error(error.message)
   return supabase.storage.from('training-media').getPublicUrl(path).data.publicUrl
 }
+
+export interface LeaderRow {
+  employee_id: string
+  name: string
+  employee_code: string
+  outlet_id: string | null
+  outlet: string | null
+  designation: string | null
+  points: number
+  passed: number
+  assigned: number
+  rk: number
+  level: string
+  badges: number
+}
+
+export function useAdminLeaderboard() {
+  return useQuery({
+    queryKey: ['training', 'admin', 'leaderboard'],
+    queryFn: () => rpc<LeaderRow[]>('training_admin_leaderboard'),
+  })
+}

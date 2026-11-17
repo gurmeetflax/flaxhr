@@ -16,6 +16,7 @@ import {
   STATUS_LABEL,
   TONE_CLASS,
   scoreTone,
+  useAdminLeaderboard,
   useAdminModules,
   useAdminPaths,
   useAssign,
@@ -34,7 +35,7 @@ import {
   type PathRow,
 } from '@/lib/training'
 
-type Tab = 'scores' | 'outlets' | 'modules' | 'paths'
+type Tab = 'scores' | 'leaderboard' | 'outlets' | 'modules' | 'paths'
 
 interface Outlet {
   id: string
@@ -110,12 +111,14 @@ export default function TrainingPage() {
       <Tabs value={tab} onValueChange={(v) => setTab(v as Tab)} className="mb-4">
         <TabsList>
           <TabsTrigger value="scores">Employee scores</TabsTrigger>
+          <TabsTrigger value="leaderboard">Leaderboard</TabsTrigger>
           <TabsTrigger value="outlets">Outlets & awards</TabsTrigger>
           <TabsTrigger value="modules">Modules</TabsTrigger>
           <TabsTrigger value="paths">Paths</TabsTrigger>
         </TabsList>
       </Tabs>
       {tab === 'scores' ? <ScoresTab /> : null}
+      {tab === 'leaderboard' ? <LeaderboardTab /> : null}
       {tab === 'outlets' ? <OutletsTab /> : null}
       {tab === 'modules' ? <ModulesTab /> : null}
       {tab === 'paths' ? <PathsTab /> : null}
@@ -325,6 +328,103 @@ function EmployeePanel({ row, onClose }: { row: OverviewRow; onClose: () => void
           </ul>
         )}
       </div>
+    </div>
+  )
+}
+
+// ---------------------------------------------------------- leaderboard
+
+function LeaderboardTab() {
+  const q = useAdminLeaderboard()
+  const outlets = useOutlets()
+  const [outlet, setOutlet] = useState('')
+  const rows = (q.data ?? []).filter((r) => !outlet || r.outlet_id === outlet)
+  const anyPoints = rows.some((r) => r.points > 0)
+  return (
+    <div className="flex flex-col gap-3">
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <p className="text-xs text-muted-foreground">
+          Points per passed module: quiz score, +50 first try, +25 on time. Same board staff see in the app
+          (they see first name and initial only).
+        </p>
+        <select
+          className="h-10 rounded-lg border border-border bg-surface px-3 text-sm"
+          value={outlet}
+          onChange={(e) => setOutlet(e.target.value)}
+        >
+          <option value="">All outlets</option>
+          {outlets.data?.map((o) => (
+            <option key={o.id} value={o.id}>
+              {o.display_name ?? o.id}
+            </option>
+          ))}
+        </select>
+      </div>
+      {q.isLoading ? (
+        <CardDescription>Loading…</CardDescription>
+      ) : !anyPoints ? (
+        <Card>
+          <CardContent className="p-6">
+            <CardDescription>
+              Nobody has passed a module yet, so there are no points. The board fills in as staff pass
+              quizzes.
+            </CardDescription>
+          </CardContent>
+        </Card>
+      ) : (
+        <div className="overflow-x-auto rounded-lg border border-border bg-surface">
+          <table className="w-full text-sm">
+            <thead className="bg-muted/50 text-left text-xs text-muted-foreground">
+              <tr>
+                <th className="px-3 py-2 font-medium">#</th>
+                <th className="px-3 py-2 font-medium">Employee</th>
+                <th className="px-3 py-2 font-medium">Outlet</th>
+                <th className="px-3 py-2 font-medium">Level</th>
+                <th className="px-3 py-2 font-medium">Done</th>
+                <th className="px-3 py-2 font-medium">Badges</th>
+                <th className="px-3 py-2 text-right font-medium">Points</th>
+              </tr>
+            </thead>
+            <tbody>
+              {rows
+                .filter((r) => r.points > 0)
+                .map((r, i) => (
+                  <tr key={r.employee_id} className="border-t border-border">
+                    <td className="px-3 py-2">
+                      <span
+                        className={`inline-flex h-6 w-6 items-center justify-center rounded-full text-xs font-semibold ${
+                          i === 0
+                            ? 'bg-amber-400 text-white'
+                            : i === 1
+                              ? 'bg-zinc-300'
+                              : i === 2
+                                ? 'bg-amber-700/70 text-white'
+                                : 'bg-muted'
+                        }`}
+                      >
+                        {outlet ? i + 1 : r.rk}
+                      </span>
+                    </td>
+                    <td className="px-3 py-2">
+                      <div className="font-medium">{r.name}</div>
+                      <div className="text-xs text-muted-foreground">
+                        {r.employee_code}
+                        {r.designation ? ` · ${r.designation}` : ''}
+                      </div>
+                    </td>
+                    <td className="px-3 py-2">{r.outlet ?? '—'}</td>
+                    <td className="px-3 py-2">{r.level}</td>
+                    <td className="px-3 py-2 tabular-nums">
+                      {r.passed}/{r.assigned}
+                    </td>
+                    <td className="px-3 py-2 tabular-nums">{r.badges} / 6</td>
+                    <td className="px-3 py-2 text-right font-semibold tabular-nums">{r.points}</td>
+                  </tr>
+                ))}
+            </tbody>
+          </table>
+        </div>
+      )}
     </div>
   )
 }
