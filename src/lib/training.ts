@@ -76,6 +76,11 @@ export interface LessonData extends SlideData {
   steps?: StepItem[]
   ingredients?: RecipeIngredient[]
   plating?: string
+  veg?: boolean
+  kcal?: number
+  protein_g?: number
+  allergens?: string[]
+  category?: string
 }
 
 export interface Lesson {

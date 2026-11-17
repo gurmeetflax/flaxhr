@@ -98,40 +98,9 @@ export default function LessonView({ lesson }: { lesson: Lesson }) {
       {lesson.kind === 'team' ? <TeamLesson /> : null}
       {lesson.kind === 'outlets' ? <OutletsLesson /> : null}
 
-      {lesson.kind === 'recipe' ? (
-        <div className="flex flex-col gap-3">
-          {lesson.data.ingredients?.length ? (
-            <div className="overflow-x-auto rounded-lg border border-border">
-              <table className="w-full text-sm">
-                <thead className="bg-muted/50 text-left text-xs text-muted-foreground">
-                  <tr>
-                    <th className="px-3 py-2 font-medium">Ingredient</th>
-                    <th className="px-3 py-2 font-medium">Small</th>
-                    <th className="px-3 py-2 font-medium">Large</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {lesson.data.ingredients.map((g, i) => (
-                    <tr key={i} className="border-t border-border">
-                      <td className="px-3 py-2">{g.name}</td>
-                      <td className="px-3 py-2 tabular-nums">{g.qty_s || '—'}</td>
-                      <td className="px-3 py-2 tabular-nums">{g.qty_l || '—'}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          ) : null}
-          {lesson.data.plating ? (
-            <div className="rounded-lg bg-muted/40 p-3 text-sm">
-              <div className="mb-1 font-medium">Plating</div>
-              <p className="whitespace-pre-line text-muted-foreground">{lesson.data.plating}</p>
-            </div>
-          ) : null}
-        </div>
-      ) : null}
+      {lesson.kind === 'recipe' ? <RecipeCard lesson={lesson} media={media} /> : null}
 
-      {media && (lesson.kind === 'image' || lesson.kind === 'recipe') ? (
+      {media && lesson.kind === 'image' ? (
         <img
           src={media}
           alt={lesson.title ?? ''}
@@ -309,6 +278,74 @@ function OutletsLesson() {
           </ul>
         </div>
       ))}
+    </div>
+  )
+}
+
+function RecipeCard({ lesson, media }: { lesson: Lesson; media: string | null }) {
+  const d = lesson.data
+  const ings = d.ingredients ?? []
+  const sized = ings.some((g) => g.qty_l)
+  return (
+    <div className="flex flex-col gap-3">
+      {media ? (
+        <img
+          src={media}
+          alt={lesson.title ?? ''}
+          className="max-h-72 w-full rounded-xl border border-border object-cover"
+          loading="lazy"
+        />
+      ) : null}
+      <div className="flex flex-wrap gap-1.5 text-xs">
+        {d.veg != null ? (
+          <span
+            className={`inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 font-medium ${
+              d.veg ? 'border-emerald-600/40 text-emerald-700' : 'border-red-600/40 text-red-700'
+            }`}
+          >
+            <span className={`h-2 w-2 rounded-full ${d.veg ? 'bg-emerald-600' : 'bg-red-600'}`} />
+            {d.veg ? 'Veg' : 'Non-veg'}
+          </span>
+        ) : null}
+        {d.category ? <span className="rounded-full bg-muted px-2.5 py-1">{d.category}</span> : null}
+        {d.kcal ? <span className="rounded-full bg-muted px-2.5 py-1">{Math.round(d.kcal)} kcal</span> : null}
+        {d.protein_g ? (
+          <span className="rounded-full bg-muted px-2.5 py-1">{Math.round(d.protein_g)} g protein</span>
+        ) : null}
+        {d.allergens?.length ? (
+          <span className="rounded-full bg-amber-500/15 px-2.5 py-1 text-amber-800">
+            Allergens: {d.allergens.join(', ')}
+          </span>
+        ) : null}
+      </div>
+      {ings.length ? (
+        <div className="overflow-x-auto rounded-lg border border-border">
+          <table className="w-full text-sm">
+            <thead className="bg-muted/50 text-left text-xs text-muted-foreground">
+              <tr>
+                <th className="px-3 py-2 font-medium">Ingredient</th>
+                <th className="px-3 py-2 font-medium">{sized ? 'Small' : 'Quantity'}</th>
+                {sized ? <th className="px-3 py-2 font-medium">Large</th> : null}
+              </tr>
+            </thead>
+            <tbody>
+              {ings.map((g, i) => (
+                <tr key={i} className="border-t border-border">
+                  <td className="px-3 py-2">{g.name}</td>
+                  <td className="px-3 py-2 font-medium tabular-nums">{g.qty_s || '—'}</td>
+                  {sized ? <td className="px-3 py-2 font-medium tabular-nums">{g.qty_l || '—'}</td> : null}
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      ) : null}
+      {d.plating ? (
+        <div className="rounded-lg bg-muted/40 p-3 text-sm">
+          <div className="mb-1 font-medium">Plating</div>
+          <RichText text={d.plating} className="text-muted-foreground" />
+        </div>
+      ) : null}
     </div>
   )
 }
