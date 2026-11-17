@@ -1,14 +1,16 @@
--- Training: "Know our food". The menu families, how a bowl is built, and
--- 8 signature dishes with their recipe (ingredients and grams), photo,
--- calories, protein and allergens, from the Food Database (public.dishes)
--- as it stood on 17 Nov 2026. Given to all staff through the
--- "All staff: welcome" path.
+-- Training: "Know our food". The menu families, small vs large portions,
+-- and 8 signature dishes from command's chef-approved recipe cards
+-- (Inventory project: flax_outlet_recipe with the approved changes in
+-- flax_recipe_override applied, packaging left out) as they stood on
+-- 17 Nov 2026. Photos, calories, protein and allergens come from the Food
+-- Database menu listing. Given to all staff through "All staff: welcome".
 
 select training.save_module_doc($j${
  "code": "food-signature-dishes",
  "title": "Know our food",
- "summary": "Our menu, how a bowl is built, and 8 signature dishes with exact grams.",
+ "summary": "Our menu, small and large portions, and 8 signature dishes from the chef-approved recipe cards.",
  "kind": "recipe",
+ "source_url": "https://command.flaxfoods.in",
  "est_minutes": 15,
  "pass_mark": 70,
  "sort_order": 5,
@@ -27,8 +29,8 @@ select training.save_module_doc($j${
    "data": {
     "icon": "chef",
     "eyebrow": "HOW IT'S BUILT",
-    "headline": "BUILD A BOWL",
-    "body": "Most bowls, salads and wraps are built the same way:\n\n- **Base or greens:** lettuce mix, brown rice, quinoa or buckwheat noodles\n- **Protein:** 60 g grilled paneer, chicken or tofu. The **High protein meals** get 120 g.\n- **Veggies and crunch:** roasted and fresh veggies, beans, flax seeds, ragi chips\n- **Dressing:** weighed every time"
+    "headline": "SMALL AND LARGE",
+    "body": "Bowls and salads come in two sizes. The recipe card gives grams for each.\n\n- **Protein:** 60 g in a small, 120 g in a large\n- **Dressing:** 50 g in a small, 100 g in a large\n- **Greens:** 40 g in a small, 80 g in a large\n- **Crunch and toppings:** seeds, ragi chips, microgreens, as on the card"
    }
   },
   {
@@ -37,66 +39,79 @@ select training.save_module_doc($j${
     "icon": "scale",
     "eyebrow": "GET IT RIGHT",
     "headline": "SAME DISH EVERY TIME",
-    "body": "Weigh every ingredient to the gram on the recipe card. A guest should get the same dish at every outlet, every day.\n\n**Veg and non-veg:** use separate boards, tongs and containers, and never mix them.\n\n**Allergens:** every dish lists them. If a guest asks, check before you answer."
+    "body": "The recipe cards below are the chef-approved cards. Weigh every ingredient to the gram, so a guest gets the same dish at every outlet, every day.\n\n**Veg and non-veg:** use separate boards, tongs and containers, and never mix them.\n\n**Allergens:** if a guest asks, check before you answer."
    }
   },
   {
    "kind": "recipe",
-   "title": "Shawarma Paneer Bowl (small)",
-   "body": "Shawarma paneer, roasted garlic hummus, potato wedges, pickled veggies, olives, roasted red pepper and chickpea salad, hydroponic greens and ragi chips, with orange chipotle tahini.",
+   "title": "Shawarma Paneer Bowl",
+   "body": "Shawarma paneer, roasted garlic hummus, potato wedges, pickled veggies, olives, roasted red pepper and chickpeas, greens, ragi chips and microgreens, with orange chipotle tahini.",
    "data": {
     "ingredients": [
      {
       "name": "Lettuce Mix",
-      "qty_s": "35 g"
+      "qty_s": "40 g",
+      "qty_l": "80 g"
      },
      {
       "name": "Boiled Chickpeas",
-      "qty_s": "30 g"
+      "qty_s": "30 g",
+      "qty_l": "60 g"
      },
      {
-      "name": "Roasted Red Bell Peppers",
-      "qty_s": "5 g"
-     },
-     {
-      "name": "Black Olive Slice",
-      "qty_s": "5 g"
+      "name": "Roasted Red Bell Pepper",
+      "qty_s": "5 g",
+      "qty_l": "5 g"
      },
      {
       "name": "Grilled Paneer",
-      "qty_s": "60 g"
+      "qty_s": "60 g",
+      "qty_l": "120 g"
      },
      {
       "name": "Shawarma Marination",
-      "qty_s": "15 g"
+      "qty_s": "15 g",
+      "qty_l": "20 g"
      },
      {
       "name": "Pickle Veg",
-      "qty_s": "20 g"
+      "qty_s": "30 g",
+      "qty_l": "30 g"
      },
      {
       "name": "Baked Potato Wedges",
-      "qty_s": "30 g"
+      "qty_s": "30 g",
+      "qty_l": "60 g"
      },
      {
       "name": "Orange Chipotle Tahina",
-      "qty_s": "50 g"
+      "qty_s": "50 g",
+      "qty_l": "100 g"
      },
      {
       "name": "Roasted Garlic Hummus",
-      "qty_s": "50 g"
+      "qty_s": "50 g",
+      "qty_l": "80 g"
      },
      {
       "name": "Flax Seeds",
-      "qty_s": "2 g"
+      "qty_s": "2 g",
+      "qty_l": "2 g"
      },
      {
       "name": "Ragi Chips",
-      "qty_s": "15 g"
+      "qty_s": "20 g",
+      "qty_l": "20 g"
      },
      {
-      "name": "Lettuce Mix",
-      "qty_s": "50 g"
+      "name": "Black Olive Slice",
+      "qty_s": "5 g",
+      "qty_l": "5 g"
+     },
+     {
+      "name": "Microgreens",
+      "qty_s": "5 g",
+      "qty_l": "5 g"
      }
     ],
     "veg": true,
@@ -108,276 +123,280 @@ select training.save_module_doc($j${
   },
   {
    "kind": "recipe",
-   "title": "Noods Chicken Bowl",
-   "body": "Buckwheat noodles, satay chicken, broccoli, mushroom, beansprouts, edamame, red cabbage, carrots, spring onion and fried onions, with our nutty ginger dressing.",
-   "data": {
-    "ingredients": [
-     {
-      "name": "Grilled Chicken",
-      "qty_s": "60 g"
-     },
-     {
-      "name": "Peanut Sauce",
-      "qty_s": "15 g"
-     },
-     {
-      "name": "Boiled Buckwheat Noodles",
-      "qty_s": "160 g"
-     },
-     {
-      "name": "Red Cabbage",
-      "qty_s": "20 g"
-     },
-     {
-      "name": "Carrot English",
-      "qty_s": "30 g"
-     },
-     {
-      "name": "Blanched Broccoli",
-      "qty_s": "30 g"
-     },
-     {
-      "name": "Grilled Mushroom",
-      "qty_s": "30 g"
-     },
-     {
-      "name": "Edamame Frozen",
-      "qty_s": "20 g"
-     },
-     {
-      "name": "Bean Sprouts",
-      "qty_s": "20 g"
-     },
-     {
-      "name": "Spring Onion",
-      "qty_s": "5 g"
-     },
-     {
-      "name": "Fried Onions",
-      "qty_s": "5 g"
-     },
-     {
-      "name": "Nutty Ginger Dressing",
-      "qty_s": "50 g"
-     },
-     {
-      "name": "Peanut Sauce",
-      "qty_s": "50 g"
-     }
-    ],
-    "veg": false,
-    "kcal": 804,
-    "protein_g": 43,
-    "category": "Non-veg Super Bowls"
-   },
-   "media_url": "https://otergzwwbcoaqruwajud.supabase.co/storage/v1/object/public/plan-images/dishes/noods-chicken-bowl/1777616822914-92x4ho.jpg"
-  },
-  {
-   "kind": "recipe",
-   "title": "BBQ Chicken Salad",
-   "body": "BBQ chicken, roasted red pepper, caramelised onion, tomato, mixed greens, mixed beans, cheddar, cream cheese, olives, jalapeño and croutons, with garlic mustard dressing.",
+   "title": "Mexican Bowl",
+   "body": "Grilled paneer, guacamole, salsa crudo, mixed beans, sweet corn, greens, ragi chips, Greek yoghurt and microgreens, with smoky-sweet chipotle mango dressing.",
    "data": {
     "ingredients": [
      {
       "name": "Lettuce Mix",
-      "qty_s": "35 g"
+      "qty_s": "40 g",
+      "qty_l": "80 g"
      },
      {
-      "name": "Grilled Chicken",
-      "qty_s": "60 g"
+      "name": "Boiled Sweet Corn",
+      "qty_s": "30 g",
+      "qty_l": "60 g"
      },
-     {
-      "name": "Bbq Sauce",
-      "qty_s": "20 g"
-     },
-     {
-      "name": "Boiled Black Beans",
-      "qty_s": "20 g"
-     },
-     {
-      "name": "Boiled Black Eyed Beans",
-      "qty_s": "20 g"
-     },
-     {
-      "name": "Boiled Kidney Beans",
-      "qty_s": "20 g"
-     },
-     {
-      "name": "Caramalized Onions",
-      "qty_s": "20 g"
-     },
-     {
-      "name": "Black Olive Slice",
-      "qty_s": "20 g"
-     },
-     {
-      "name": "Roasted Red Bell Peppers",
-      "qty_s": "20 g"
-     },
-     {
-      "name": "Spring Onion",
-      "qty_s": "5 g"
-     },
-     {
-      "name": "Tomato",
-      "qty_s": "20 g"
-     },
-     {
-      "name": "Roasted Tomato",
-      "qty_s": "50 g"
-     },
-     {
-      "name": "Cheddar Cheese Slice",
-      "qty_s": "1 pc"
-     },
-     {
-      "name": "Cream Cheese Spread",
-      "qty_s": "50 g"
-     },
-     {
-      "name": "Jalapeno Sliced",
-      "qty_s": "20 g"
-     },
-     {
-      "name": "Croutons",
-      "qty_s": "40 g"
-     },
-     {
-      "name": "Garlic Mustard Dressing",
-      "qty_s": "50 g"
-     }
-    ],
-    "veg": false,
-    "kcal": 420,
-    "protein_g": 32,
-    "category": "Non-veg Signature Salads"
-   },
-   "media_url": "https://otergzwwbcoaqruwajud.supabase.co/storage/v1/object/public/plan-images/dishes/bbq-chicken-salad/1777548140694-sj9vhy.jpg"
-  },
-  {
-   "kind": "recipe",
-   "title": "Asian Cottage Cheese",
-   "body": "Grilled cottage cheese on brown rice with crisp carrot and red cabbage slaw, nutty ginger and Korean dressings.",
-   "data": {
-    "ingredients": [
      {
       "name": "Grilled Paneer",
-      "qty_s": "120 g"
+      "qty_s": "60 g",
+      "qty_l": "120 g"
      },
      {
-      "name": "Chipotle Paste",
-      "qty_s": "30 g"
+      "name": "Salsa Crudo",
+      "qty_s": "40 g",
+      "qty_l": "80 g"
      },
      {
-      "name": "Boiled Brown Rice",
-      "qty_s": "120 g"
+      "name": "Ragi Chips",
+      "qty_s": "15 g",
+      "qty_l": "20 g"
      },
      {
-      "name": "Lemon Olive Oil Dressing",
-      "qty_s": "10 g"
-     },
-     {
-      "name": "Spring Onion",
-      "qty_s": "5 g"
-     },
-     {
-      "name": "Carrot",
-      "qty_s": "40 g"
-     },
-     {
-      "name": "Red Cabbage",
-      "qty_s": "40 g"
-     },
-     {
-      "name": "Nutty Ginger Dressing",
-      "qty_s": "60 g"
-     },
-     {
-      "name": "Korean Dressing",
-      "qty_s": "50 g"
-     },
-     {
-      "name": "Flax Seeds",
-      "qty_s": "2 g"
-     }
-    ],
-    "veg": true,
-    "kcal": 637,
-    "protein_g": 24,
-    "category": "Veg High Protein Meals",
-    "allergens": [
-     "Dairy",
-     "Soy"
-    ]
-   },
-   "media_url": "https://otergzwwbcoaqruwajud.supabase.co/storage/v1/object/public/plan-images/dishes/asian-cottage-cheese/1777544516088-83cyuj.jpg"
-  },
-  {
-   "kind": "recipe",
-   "title": "Chipotle Chicken Meal",
-   "body": "Chipotle grilled chicken with hearty mixed beans and veggies, finished with a smoky-sweet chipotle mango dressing.",
-   "data": {
-    "ingredients": [
-     {
-      "name": "Grilled Chicken",
-      "qty_s": "120 g"
+      "name": "Greek Yoghurt",
+      "qty_s": "50 g",
+      "qty_l": "50 g"
      },
      {
       "name": "Chipotle Mango Dressing",
-      "qty_s": "20 g"
+      "qty_s": "50 g",
+      "qty_l": "100 g"
      },
      {
-      "name": "Chipotle Paste",
-      "qty_s": "20 g"
+      "name": "Flax Seeds",
+      "qty_s": "2 g",
+      "qty_l": "2 g"
      },
      {
-      "name": "Boiled Black Beans",
+      "name": "Guacamole",
+      "qty_s": "40 g",
+      "qty_l": "80 g"
+     },
+     {
+      "name": "Microgreens",
+      "qty_s": "5 g",
+      "qty_l": "5 g"
+     },
+     {
+      "name": "Mixed Beans",
+      "qty_s": "30 g",
+      "qty_l": "60 g"
+     }
+    ],
+    "veg": true,
+    "kcal": 635,
+    "protein_g": 27,
+    "category": "Veg Super Bowls"
+   },
+   "media_url": "https://otergzwwbcoaqruwajud.supabase.co/storage/v1/object/public/plan-images/dishes/mexican-bowl/1777543750215-wdjeaa.png"
+  },
+  {
+   "kind": "recipe",
+   "title": "Mediterranean Bowl",
+   "body": "Grilled paneer, couscous, roasted vegetables, broccoli, beetroot hummus and roasted garlic hummus, feta, walnuts and greens, with basil pesto dressing.",
+   "data": {
+    "ingredients": [
+     {
+      "name": "Lettuce Mix",
+      "qty_s": "40 g",
+      "qty_l": "80 g"
+     },
+     {
+      "name": "Grilled Paneer",
+      "qty_s": "60 g",
+      "qty_l": "120 g"
+     },
+     {
+      "name": "Boiled Couscous",
+      "qty_s": "30 g",
+      "qty_l": "60 g"
+     },
+     {
+      "name": "Roasted Vegetable",
+      "qty_s": "30 g",
+      "qty_l": "60 g"
+     },
+     {
+      "name": "Blanched Broccoli",
+      "qty_s": "20 g",
+      "qty_l": "40 g"
+     },
+     {
+      "name": "Basil Pesto Dressing",
+      "qty_s": "50 g",
+      "qty_l": "100 g"
+     },
+     {
+      "name": "Cheese Feta",
+      "qty_s": "15 g",
+      "qty_l": "15 g"
+     },
+     {
+      "name": "Roasted Walnut",
+      "qty_s": "15 g",
+      "qty_l": "15 g"
+     },
+     {
+      "name": "Flax Seeds",
+      "qty_s": "2 g",
+      "qty_l": "2 g"
+     },
+     {
+      "name": "Beetroot Hummus",
+      "qty_s": "40 g",
+      "qty_l": "80 g"
+     },
+     {
+      "name": "Microgreens",
+      "qty_s": "5 g",
+      "qty_l": "5 g"
+     },
+     {
+      "name": "Roasted Garlic Hummus",
+      "qty_s": "40 g",
+      "qty_l": "80 g"
+     }
+    ],
+    "veg": true,
+    "kcal": 626,
+    "protein_g": 20,
+    "category": "Veg Super Bowls"
+   },
+   "media_url": "https://otergzwwbcoaqruwajud.supabase.co/storage/v1/object/public/plan-images/dishes/mediterranean-bowl/1777542059995-lgflz4.jpg"
+  },
+  {
+   "kind": "recipe",
+   "title": "Flax Caesar Salad",
+   "body": "Grilled chicken, avocado, croutons, greens, parmesan, dried cranberries and pumpkin seeds, with creamy ranch dressing.",
+   "data": {
+    "ingredients": [
+     {
+      "name": "Lettuce Mix",
+      "qty_s": "40 g",
+      "qty_l": "80 g"
+     },
+     {
+      "name": "Grilled Chicken",
+      "qty_s": "60 g",
+      "qty_l": "120 g"
+     },
+     {
+      "name": "Imported Avocado",
+      "qty_s": "60 g",
+      "qty_l": "60 g"
+     },
+     {
+      "name": "Cranberry Dried",
+      "qty_s": "15 g",
+      "qty_l": "15 g"
+     },
+     {
+      "name": "Cheese Parmesan",
+      "qty_s": "20 g",
+      "qty_l": "20 g"
+     },
+     {
+      "name": "Croutons",
+      "qty_s": "20 g",
+      "qty_l": "20 g"
+     },
+     {
+      "name": "Pumpkin Seed",
+      "qty_s": "15 g",
+      "qty_l": "15 g"
+     },
+     {
+      "name": "Creamy Ranch Dressing",
+      "qty_s": "50 g",
+      "qty_l": "100 g"
+     },
+     {
+      "name": "Microgreens",
+      "qty_s": "5 g",
+      "qty_l": "5 g"
+     }
+    ],
+    "veg": false,
+    "kcal": 493,
+    "protein_g": 36,
+    "category": "Non-veg Signature Salads"
+   },
+   "media_url": "https://otergzwwbcoaqruwajud.supabase.co/storage/v1/object/public/plan-images/dishes/flax-caesar-salad/1777555136316-m64y28.jpg"
+  },
+  {
+   "kind": "recipe",
+   "title": "Quinoa and Avocado Salad",
+   "body": "Quinoa, avocado, chickpeas, greens, tomato, cucumber, red bell pepper, onion, dragon fruit, feta and walnuts, with lemon olive oil dressing.",
+   "data": {
+    "ingredients": [
+     {
+      "name": "Lettuce Mix",
+      "qty_s": "40 g"
+     },
+     {
+      "name": "Boiled Quinoa",
+      "qty_s": "100 g"
+     },
+     {
+      "name": "Imported Avocado",
+      "qty_s": "120 g"
+     },
+     {
+      "name": "English Cucumber",
       "qty_s": "30 g"
      },
      {
-      "name": "Boiled Black Eyed Beans",
+      "name": "Red Bell Pepper",
       "qty_s": "30 g"
      },
      {
-      "name": "Boiled Kidney Beans",
+      "name": "Onion Big",
       "qty_s": "30 g"
+     },
+     {
+      "name": "Roasted Walnut",
+      "qty_s": "15 g"
+     },
+     {
+      "name": "Dragon Fruit",
+      "qty_s": "60 g"
+     },
+     {
+      "name": "Micro Greens",
+      "qty_s": "5 g"
+     },
+     {
+      "name": "Boiled Chickpeas",
+      "qty_s": "30 g"
+     },
+     {
+      "name": "Cheese Feta",
+      "qty_s": "15 g"
      },
      {
       "name": "Lemon Olive Oil Dressing",
-      "qty_s": "20 g"
-     },
-     {
-      "name": "Onion",
-      "qty_s": "20 g"
+      "qty_s": "50 g"
      },
      {
       "name": "Tomato",
       "qty_s": "20 g"
-     },
-     {
-      "name": "Red Bell Pepper",
-      "qty_s": "20 g"
-     },
-     {
-      "name": "Flax Seeds",
-      "qty_s": "2 g"
      }
     ],
-    "veg": false,
-    "kcal": 503,
-    "protein_g": 34,
-    "category": "Non-veg High Protein Meals"
+    "veg": true,
+    "kcal": 647,
+    "protein_g": 19,
+    "category": "Veg Signature Salads"
    },
-   "media_url": "https://otergzwwbcoaqruwajud.supabase.co/storage/v1/object/public/plan-images/dishes/chipotle-chicken-meal/1777549953568-ffh40g.jpg"
+   "media_url": "https://otergzwwbcoaqruwajud.supabase.co/storage/v1/object/public/plan-images/dishes/quinoa-avocado-salad/1777547312923-tzajwl.jpg"
   },
   {
    "kind": "recipe",
    "title": "Shawarma Paneer Wrap",
-   "body": "Shawarma paneer in a multigrain tortilla with hummus, pickled veggies, greens, potato wedges and feta, finished with orange tahini dressing.",
+   "body": "Shawarma paneer in a multigrain wrap with sun-dried tomato hummus, greens, potato wedges, pickled veggies, onion, tomato, feta and jalapeño, with orange tahini.",
    "data": {
     "ingredients": [
      {
-      "name": "Multigrain Wrap 8 Inch",
+      "name": "Multigrain Wrap 10 Inch",
       "qty_s": "1 pc"
      },
      {
@@ -409,7 +428,11 @@ select training.save_module_doc($j${
       "qty_s": "15 g"
      },
      {
-      "name": "Fajita Vegetable",
+      "name": "Onion Big",
+      "qty_s": "20 g"
+     },
+     {
+      "name": "Tomato",
       "qty_s": "20 g"
      },
      {
@@ -435,20 +458,20 @@ select training.save_module_doc($j${
   {
    "kind": "recipe",
    "title": "Avocado and Garlic Butter Rye Toast",
-   "body": "Sourdough toast with roasted garlic butter, chunky mashed avocado, micro greens and flax seeds.",
+   "body": "Sourdough toast with roasted garlic butter, chunky avocado, red radish, micro greens and flax seeds.",
    "data": {
     "ingredients": [
      {
       "name": "Sourdough Bread Slice",
-      "qty_s": "1 slice"
+      "qty_s": "1 pc"
      },
      {
       "name": "Garlic Butter",
       "qty_s": "20 g"
      },
      {
-      "name": "Guacamole",
-      "qty_s": "120 g"
+      "name": "Imported Avocado",
+      "qty_s": "100 g"
      },
      {
       "name": "Radish Red",
@@ -473,7 +496,7 @@ select training.save_module_doc($j${
   {
    "kind": "recipe",
    "title": "Mocha Smoothie Bowl",
-   "body": "Dark chocolate, coffee, banana, zucchini and dates blended into a bowl, topped with almonds, granola and dark chocolate.",
+   "body": "Mocha smoothie topped with banana, granola, whole almonds and choco chips.",
    "data": {
     "ingredients": [
      {
@@ -486,15 +509,15 @@ select training.save_module_doc($j${
      },
      {
       "name": "Granola",
-      "qty_s": "20 g"
+      "qty_s": "30 g"
      },
      {
       "name": "Almond Whole",
       "qty_s": "15 g"
      },
      {
-      "name": "Dark Chocolate 15 Ns",
-      "qty_s": "5 g"
+      "name": "Choco Chips",
+      "qty_s": "15 g"
      }
     ],
     "veg": true,
@@ -511,19 +534,19 @@ select training.save_module_doc($j${
  ],
  "questions": [
   {
-   "prompt": "How much grilled chicken goes into the Noods Chicken Bowl?",
+   "prompt": "How much grilled paneer goes into a small Shawarma Paneer Bowl?",
    "options": [
     "30 g",
     "60 g",
-    "120 g",
-    "200 g"
+    "90 g",
+    "120 g"
    ],
    "correct": [
     1
    ]
   },
   {
-   "prompt": "How much grilled chicken goes into the Chipotle Chicken Meal (a high protein meal)?",
+   "prompt": "How much grilled paneer goes into a large Mediterranean Bowl?",
    "options": [
     "60 g",
     "90 g",
@@ -533,81 +556,96 @@ select training.save_module_doc($j${
    "correct": [
     2
    ],
-   "explanation": "High protein meals get 120 g of protein; bowls, salads and wraps get 60 g."
+   "explanation": "Small bowls get 60 g of protein, large bowls 120 g."
   },
   {
-   "prompt": "Which noodles are in the Noods Chicken Bowl?",
+   "prompt": "How much chipotle mango dressing goes into a large Mexican Bowl?",
    "options": [
-    "Rice noodles",
-    "Buckwheat noodles",
-    "Egg noodles",
-    "Wheat noodles"
-   ],
-   "correct": [
-    1
-   ]
-  },
-  {
-   "prompt": "What is the base of the Asian Cottage Cheese meal?",
-   "options": [
-    "Quinoa",
-    "Boiled brown rice",
-    "Couscous",
-    "Buckwheat noodles"
-   ],
-   "correct": [
-    1
-   ],
-   "explanation": "120 g of boiled brown rice."
-  },
-  {
-   "prompt": "Which hummus goes into the Shawarma Paneer Bowl?",
-   "options": [
-    "Roasted garlic hummus",
-    "Beetroot hummus",
-    "Plain hummus",
-    "No hummus"
-   ],
-   "correct": [
-    0
-   ]
-  },
-  {
-   "prompt": "How much guacamole goes on the Avocado and Garlic Butter Rye Toast?",
-   "options": [
-    "40 g",
+    "50 g",
     "80 g",
-    "120 g",
-    "200 g"
+    "100 g",
+    "150 g"
    ],
    "correct": [
     2
    ]
   },
   {
-   "prompt": "Which dressing goes on the BBQ Chicken Salad?",
-   "options": [
-    "Garlic mustard dressing",
-    "Caesar dressing",
-    "Nutty ginger dressing",
-    "Lemon olive oil"
-   ],
-   "correct": [
-    0
-   ]
-  },
-  {
-   "prompt": "What goes on top of the Mocha Smoothie Bowl?",
+   "prompt": "Which of these go into the Mexican Bowl?",
    "kind": "multi",
    "options": [
-    "Granola",
-    "Whole almonds",
-    "Dark chocolate",
+    "Guacamole",
+    "Mixed beans",
+    "Greek yoghurt",
     "Croutons"
    ],
    "correct": [
     0,
     1,
+    2
+   ]
+  },
+  {
+   "prompt": "Which grain is in the Mediterranean Bowl?",
+   "options": [
+    "Quinoa",
+    "Boiled couscous",
+    "Brown rice",
+    "Buckwheat noodles"
+   ],
+   "correct": [
+    1
+   ]
+  },
+  {
+   "prompt": "Which hummus goes into the Mediterranean Bowl now?",
+   "kind": "multi",
+   "options": [
+    "Beetroot hummus",
+    "Roasted garlic hummus",
+    "Sun-dried tomato hummus",
+    "Pumpkin moutabel"
+   ],
+   "correct": [
+    0,
+    1
+   ],
+   "explanation": "The chef changed this card: beetroot and roasted garlic hummus replaced sun-dried tomato hummus and pumpkin moutabel."
+  },
+  {
+   "prompt": "Which dressing goes on the Quinoa and Avocado Salad?",
+   "options": [
+    "Lemon olive oil dressing",
+    "Garlic mustard dressing",
+    "Creamy ranch dressing",
+    "Basil pesto dressing"
+   ],
+   "correct": [
+    0
+   ],
+   "explanation": "The card now uses lemon olive oil dressing instead of garlic mustard."
+  },
+  {
+   "prompt": "How much avocado goes on the Avocado and Garlic Butter Rye Toast?",
+   "options": [
+    "60 g",
+    "100 g",
+    "120 g",
+    "240 g"
+   ],
+   "correct": [
+    1
+   ]
+  },
+  {
+   "prompt": "How much granola goes on the Mocha Smoothie Bowl?",
+   "options": [
+    "15 g",
+    "20 g",
+    "30 g",
+    "50 g"
+   ],
+   "correct": [
     2
    ]
   },
@@ -624,18 +662,6 @@ select training.save_module_doc($j${
     0,
     1,
     2
-   ]
-  },
-  {
-   "prompt": "A guest wants a veg version of a chicken bowl. Which protein is used instead?",
-   "options": [
-    "Grilled paneer or tofu",
-    "Extra cheese only",
-    "No protein",
-    "Boiled egg"
-   ],
-   "correct": [
-    0
    ]
   }
  ]
