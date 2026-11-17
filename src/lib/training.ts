@@ -6,7 +6,16 @@ import { supabase } from '@/lib/supabase'
 // answers never reach the employee's browser before they pass.
 
 export type ModuleKind = 'brand' | 'onboarding' | 'recipe' | 'sop' | 'service' | 'hygiene' | 'other'
-export type LessonKind = 'slide' | 'text' | 'video' | 'image' | 'pdf' | 'recipe' | 'steps'
+export type LessonKind =
+  | 'slide'
+  | 'text'
+  | 'video'
+  | 'image'
+  | 'pdf'
+  | 'recipe'
+  | 'steps'
+  | 'team'
+  | 'outlets'
 export type AssignmentStatus = 'assigned' | 'in_progress' | 'passed' | 'failed'
 
 export const KIND_LABEL: Record<ModuleKind, string> = {
@@ -27,6 +36,8 @@ export const LESSON_KIND_LABEL: Record<LessonKind, string> = {
   video: 'Video',
   image: 'Image',
   pdf: 'PDF',
+  team: 'Your leaders (automatic)',
+  outlets: 'Our outlets (automatic)',
 }
 
 export const STATUS_LABEL: Record<AssignmentStatus, string> = {
@@ -42,6 +53,8 @@ export interface SlideData {
   eyebrow?: string
   headline?: string
   body?: string
+  icon?: string | null
+  image_url?: string | null
 }
 
 export interface StepItem {
@@ -49,6 +62,8 @@ export interface StepItem {
   body?: string
   target?: string
   ccp?: boolean
+  icon?: string | null
+  image_url?: string | null
 }
 
 export interface RecipeIngredient {
@@ -170,6 +185,7 @@ export interface ModuleDoc {
   sort_order?: number
   lessons: Lesson[]
   questions: AdminQuestion[]
+  path_ids?: string[]
 }
 
 export interface PathRow {
@@ -411,4 +427,98 @@ export function useAwards(month: string) {
     queryKey: ['training', 'admin', 'awards', month],
     queryFn: () => rpc<Awards>('training_awards', { p_month: `${month}-01` }),
   })
+}
+
+// ------------------------------------------------------- pictures & points
+
+export interface Badge {
+  key: string
+  name: string
+  hint: string
+  earned: boolean
+}
+
+export interface MyProgress {
+  points: number
+  level: 'Starter' | 'Learner' | 'Pro' | 'Champion'
+  level_floor: number
+  next_level: number | null
+  next_level_name: string | null
+  passed: number
+  assigned: number
+  badges: Badge[]
+  rank_outlet: number | null
+  rank_company: number | null
+  outlet_board: { name: string; points: number; me: boolean }[]
+  company_board: { name: string; outlet: string | null; points: number; me: boolean }[]
+}
+
+export interface TeamInfo {
+  outlet: string | null
+  outlet_leads: { name: string; role: string }[]
+  company_leads: { name: string; role: string; outlet: string | null }[]
+}
+
+export interface OutletCard {
+  id: string
+  name: string
+  city: string | null
+  address: string | null
+  lat: number | null
+  lng: number | null
+  format: string | null
+  photo_url: string | null
+  note: string | null
+}
+
+export function useMyProgress() {
+  return useQuery({
+    queryKey: ['training', 'progress'],
+    queryFn: () => rpc<MyProgress>('training_my_progress'),
+  })
+}
+
+export function useTeamForMe(enabled = true) {
+  return useQuery({
+    queryKey: ['training', 'team'],
+    enabled,
+    staleTime: 5 * 60_000,
+    queryFn: () => rpc<TeamInfo>('training_team_for_me'),
+  })
+}
+
+export function useTrainingOutlets(enabled = true) {
+  return useQuery({
+    queryKey: ['training', 'outlets-cards'],
+    enabled,
+    staleTime: 5 * 60_000,
+    queryFn: () => rpc<OutletCard[]>('training_outlets'),
+  })
+}
+
+export function useSaveOutletMedia() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: (v: { outlet: string; photo_url: string | null; note?: string | null }) =>
+      rpc<null>('training_save_outlet_media', {
+        p_outlet: v.outlet,
+        p_photo_url: v.photo_url,
+        p_note: v.note ?? null,
+      }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['training', 'outlets-cards'] }),
+  })
+}
+
+// Upload a photo for training (admins / HR only) and return its public URL.
+export async function uploadTrainingImage(file: File): Promise<string> {
+  if (!file.type.startsWith('image/')) throw new Error('Pick an image file')
+  if (file.size > 8 * 1024 * 1024) throw new Error('Image is over 8 MB')
+  const ext = (file.name.split('.').pop() || 'jpg').toLowerCase().replace(/[^a-z0-9]/g, '') || 'jpg'
+  const path = `${new Date().toISOString().slice(0, 7)}/${crypto.randomUUID()}.${ext}`
+  const { error } = await supabase.storage.from('training-media').upload(path, file, {
+    contentType: file.type,
+    upsert: false,
+  })
+  if (error) throw new Error(error.message)
+  return supabase.storage.from('training-media').getPublicUrl(path).data.publicUrl
 }
