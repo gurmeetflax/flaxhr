@@ -7,7 +7,8 @@
 // Body: {} send · {"dry_run": true} return the text only ·
 //       {"test_to": "<chat id>"} send to one chat instead ·
 //       {"list_groups": "hr"} find group ids by name ·
-//       {"monthly_winners": true, "month"?: "2026-11-01"} announce a month's top 3 (default last month).
+//       {"monthly_winners": true, "month"?: "2026-11-01"} announce a month's top 3 (default last month) ·
+//       {"badge_messages": true, "dry_run"?: true} message each employee their new badges / level.
 
 import 'jsr:@supabase/functions-js/edge-runtime.d.ts'
 import { createClient } from 'jsr:@supabase/supabase-js@2'
@@ -24,7 +25,7 @@ const admin = createClient(Deno.env.get('SUPABASE_URL')!, Deno.env.get('SUPABASE
 const json = (b: unknown, s = 200) =>
   new Response(JSON.stringify(b), { status: s, headers: { 'Content-Type': 'application/json' } })
 
-type Person = { name: string; outlet: string | null; points: number; passed?: number }
+type Person = { name: string; outlet: string | null; points: number; passed?: number; done?: boolean }
 type Summary = {
   from: string
   to: string
@@ -38,6 +39,7 @@ type Summary = {
   overdue_people: number
   overdue_modules: number
   not_started: number
+  all_done?: number
   top_week: Person[]
   month_top: (Person & { rank: number; prize: string | null })[]
   most_overdue: { name: string; outlet: string | null; overdue: number }[]
@@ -76,7 +78,10 @@ function render(s: Summary): string {
     `${plural(s.passed, 'module')} passed by ${plural(s.learners, 'person')}`.replace('persons', 'people') +
       ` · ${plural(s.attempts, 'quiz attempt')}`,
   )
-  L.push(`${s.active} of ${s.staff} staff active this week · ${s.not_started} not started yet`)
+  L.push(
+    `${s.active} of ${s.staff} staff active this week · ${s.not_started} not started yet` +
+      (s.all_done != null ? ` · ${s.all_done} finished everything ✅` : ''),
+  )
   L.push(
     `Company completion ${s.completion ?? 0}% · ${s.overdue_modules ? `${plural(s.overdue_modules, 'module')} overdue (${plural(s.overdue_people, 'person')})`.replace('persons', 'people') : 'nothing overdue'}`,
   )
@@ -86,7 +91,7 @@ function render(s: Summary): string {
   if (s.top_week.length) {
     s.top_week.forEach((p, i) =>
       L.push(
-        `${i + 1}. ${p.name}${p.outlet ? ` (${short(p.outlet)})` : ''}: ${p.points} pts, ${plural(p.passed ?? 0, 'module')}`,
+        `${i + 1}. ${p.name}${p.done ? ' ✅' : ''}${p.outlet ? ` (${short(p.outlet)})` : ''}: ${p.points} pts, ${plural(p.passed ?? 0, 'module')}`,
       ),
     )
   } else L.push('Nobody passed a module this week.')
@@ -97,7 +102,7 @@ function render(s: Summary): string {
   if (s.month_top.length) {
     s.month_top.forEach((p) =>
       L.push(
-        `${medal[p.rank - 1] ?? p.rank + '.'} ${p.name}${p.outlet ? ` (${short(p.outlet)})` : ''}: ${p.points} pts${p.prize ? ` · ${p.prize}` : ''}`,
+        `${medal[p.rank - 1] ?? p.rank + '.'} ${p.name}${p.done ? ' ✅' : ''}${p.outlet ? ` (${short(p.outlet)})` : ''}: ${p.points} pts${p.prize ? ` · ${p.prize}` : ''}`,
       ),
     )
   } else L.push('No points yet this month.')
@@ -119,6 +124,7 @@ function render(s: Summary): string {
   }
 
   L.push('')
+  if (s.all_done != null) L.push('✅ = finished all their training')
   L.push(`Full scores: ${APP}`)
   return L.join('\n')
 }
@@ -164,6 +170,96 @@ function renderWinners(w: Winners): string {
   return L.join('\n')
 }
 
+// ---------- personal badge / level messages ----------
+const BADGES: Record<string, [string, string]> = {
+  first_pass: ['First step', 'you passed your first module'],
+  first_try: ['Sharp', 'you passed a quiz on the first try'],
+  perfect: ['Perfect score', 'you scored 100% on a quiz'],
+  on_time: ['On time', 'you finished 3 modules before they were due'],
+  safety: ['Safety star', 'you passed every food safety and SOP module'],
+  all_done: ['All done ✅', 'you finished all your training'],
+}
+const LEVELS = ['Learner', 'Pro', 'Champion']
+const ME = 'https://hr.flaxfoods.in/me/training'
+
+type Pending = {
+  employee_id: string
+  first_name: string
+  phone: string
+  keys: string[]
+  points: number
+  passed: number
+  assigned: number
+  month_rank: number | null
+}
+
+function renderBadges(p: Pending): string {
+  const badges = p.keys.filter((k) => BADGES[k])
+  const level = LEVELS.filter((l) => p.keys.includes('level:' + l)).pop()
+  const L: string[] = []
+  if (badges.length === 1) {
+    const [name, why] = BADGES[badges[0]]
+    L.push(`🏅 Well done ${p.first_name}! You earned the *${name}* badge: ${why}.`)
+  } else if (badges.length > 1) {
+    L.push(`🏅 Well done ${p.first_name}! You earned ${badges.length} badges:`)
+    badges.forEach((k) => L.push(`• *${BADGES[k][0]}*: ${BADGES[k][1]}`))
+  } else {
+    L.push(`🎉 Well done ${p.first_name}!`)
+  }
+  if (level) L.push(`⬆️ You reached *${level}* level.`)
+  L.push('')
+  L.push(
+    `You have ${p.points.toLocaleString('en-IN')} points${p.month_rank ? ` and you're #${p.month_rank} this month` : ''}.` +
+      (p.month_rank && p.month_rank <= 3 ? ' The top 3 at the end of the month win a prize!' : ''),
+  )
+  if (!p.keys.includes('all_done') && p.assigned > p.passed) {
+    L.push(`${p.assigned - p.passed} more ${p.assigned - p.passed === 1 ? 'module' : 'modules'} to go.`)
+  }
+  L.push(`See your badges: ${ME}`)
+  return L.join('\n')
+}
+
+const toChat = (phone: string) => {
+  const d = phone.replace(/\D/g, '')
+  return d.length === 10 ? '91' + d : d
+}
+
+async function badgeMessages(body: Record<string, unknown>) {
+  const { data, error } = await admin.rpc('training_badge_messages_pending', { p_limit: 30 })
+  if (error) return json({ ok: false, error: error.message }, 500)
+  const rows = (data ?? []) as Pending[]
+  const out: { employee: string; sent: boolean; error?: string; text?: string }[] = []
+  for (const p of rows) {
+    const text = renderBadges(p)
+    if (body.dry_run) {
+      out.push({ employee: p.first_name, sent: false, text })
+      continue
+    }
+    try {
+      await sendText(body.test_to ? String(body.test_to) : toChat(p.phone), text)
+      // Test sends don't count as told.
+      if (!body.test_to) {
+        const { error: e } = await admin.rpc('training_badge_messages_mark', {
+          p_employee: p.employee_id,
+          p_keys: p.keys,
+        })
+        if (e) throw new Error(e.message)
+      }
+      out.push({ employee: p.first_name, sent: true })
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : String(e)
+      // A number WhatsApp rejects (4xx) won't work next time either: count it
+      // as told so it isn't retried every 15 minutes. Retry anything else.
+      if (!body.test_to && /^Whapi 4\d\d/.test(msg)) {
+        await admin.rpc('training_badge_messages_mark', { p_employee: p.employee_id, p_keys: p.keys })
+      }
+      out.push({ employee: p.first_name, sent: false, error: msg })
+    }
+    if (body.test_to) break
+  }
+  return json({ ok: true, dry_run: !!body.dry_run, results: out })
+}
+
 async function sendText(to: string, body: string) {
   const r = await fetch(WHAPI + '/messages/text', {
     method: 'POST',
@@ -198,6 +294,11 @@ Deno.serve(async (req) => {
       ok: true,
       groups: out.filter((g) => q === 'true' || (g.name ?? '').toLowerCase().includes(q)),
     })
+  }
+
+  if (body.badge_messages) {
+    if (!TOKEN && !body.dry_run) return json({ ok: false, error: 'WHAPI_TOKEN secret not set' }, 500)
+    return await badgeMessages(body)
   }
 
   let text: string
