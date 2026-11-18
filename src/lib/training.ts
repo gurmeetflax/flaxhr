@@ -463,8 +463,8 @@ export interface MyProgress {
   badges: Badge[]
   rank_outlet: number | null
   rank_company: number | null
-  outlet_board: { name: string; points: number; me: boolean }[]
-  company_board: { name: string; outlet: string | null; points: number; me: boolean }[]
+  outlet_board: { name: string; points: number; me: boolean; done?: boolean }[]
+  company_board: { name: string; outlet: string | null; points: number; me: boolean; done?: boolean }[]
 }
 
 export interface TeamPerson {
@@ -711,7 +711,7 @@ export interface MonthPrizes {
   ends: string
   prizes: { rank: number; title: string }[]
   me: { rank: number; points: number } | null
-  board: { rank: number; points: number; me: boolean; name: string; outlet: string | null }[]
+  board: { rank: number; points: number; me: boolean; name: string; outlet: string | null; done?: boolean }[]
 }
 
 export interface MonthWinners {

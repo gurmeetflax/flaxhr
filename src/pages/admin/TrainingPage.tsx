@@ -13,6 +13,7 @@ import { EmployeeSelect } from '@/components/ui/EmployeeSelect'
 import { Avatar } from '@/components/training/LessonView'
 import OutletLeagueCard from '@/components/training/OutletLeagueCard'
 import ScoreBreakdown from '@/components/training/ScoreBreakdown'
+import DoneTick from '@/components/training/DoneTick'
 import { supabase } from '@/lib/supabase'
 import { useDesignations } from '@/lib/designations'
 import {
@@ -219,7 +220,9 @@ export function ScoresTab({ readOnly = false }: { readOnly?: boolean }) {
                   onClick={() => setOpen(r)}
                 >
                   <td className="px-3 py-2">
-                    <div className="font-medium">{r.name}</div>
+                    <div className="font-medium">
+                      {r.name} <DoneTick show={r.assigned > 0 && r.passed === r.assigned} />
+                    </div>
                     <div className="text-xs text-muted-foreground">
                       {r.employee_code}
                       {r.designation ? ` · ${r.designation}` : ''}
@@ -371,7 +374,8 @@ export function LeaderboardTab({ readOnly = false }: { readOnly?: boolean }) {
       <div className="flex flex-wrap items-center justify-between gap-3">
         <p className="text-xs text-muted-foreground">
           Points per passed module: quiz score, +50 first try, +25 on time. Same board staff see in the app
-          (they see first name and initial only). Click a person to see how they scored.
+          (they see first name and initial only). Click a person to see how they scored. A green tick means
+          they have finished all their training.
         </p>
         <select
           className="h-10 rounded-lg border border-border bg-surface px-3 text-sm"
@@ -436,7 +440,9 @@ export function LeaderboardTab({ readOnly = false }: { readOnly?: boolean }) {
                       </span>
                     </td>
                     <td className="px-3 py-2">
-                      <div className="font-medium">{r.name}</div>
+                      <div className="font-medium">
+                        {r.name} <DoneTick show={r.assigned > 0 && r.passed === r.assigned} />
+                      </div>
                       <div className="text-xs text-muted-foreground">
                         {r.employee_code}
                         {r.designation ? ` · ${r.designation}` : ''}

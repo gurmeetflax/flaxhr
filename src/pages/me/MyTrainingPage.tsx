@@ -9,6 +9,7 @@ import PrizesCard from '@/components/training/PrizesCard'
 import BadgeArt from '@/components/training/BadgeArt'
 import OutletLeagueCard from '@/components/training/OutletLeagueCard'
 import ScoreBreakdown from '@/components/training/ScoreBreakdown'
+import DoneTick from '@/components/training/DoneTick'
 import {
   KIND_LABEL,
   STATUS_LABEL,
@@ -229,36 +230,43 @@ function Leaderboards({ p }: { p: MyProgress }) {
         </div>
         {rank && p.points > 0 ? <div className="text-sm text-muted-foreground">You are #{rank}</div> : null}
         {rows.length ? (
-          <ol className="flex flex-col divide-y divide-border rounded-lg border border-border">
-            {rows.map((r, i) => (
-              <li
-                key={`${r.name}-${i}`}
-                className={`flex items-center gap-3 px-3 py-2 text-sm ${r.me ? 'bg-primary/5 font-medium' : ''}`}
-              >
-                <span
-                  className={`flex h-6 w-6 items-center justify-center rounded-full text-xs font-semibold ${
-                    i === 0
-                      ? 'bg-amber-400 text-white'
-                      : i === 1
-                        ? 'bg-zinc-300'
-                        : i === 2
-                          ? 'bg-amber-700/70 text-white'
-                          : 'bg-muted'
-                  }`}
+          <>
+            <ol className="flex flex-col divide-y divide-border rounded-lg border border-border">
+              {rows.map((r, i) => (
+                <li
+                  key={`${r.name}-${i}`}
+                  className={`flex items-center gap-3 px-3 py-2 text-sm ${r.me ? 'bg-primary/5 font-medium' : ''}`}
                 >
-                  {i + 1}
-                </span>
-                <span className="flex-1">
-                  {r.name}
-                  {r.me ? ' (you)' : ''}
-                  {'outlet' in r && r.outlet ? (
-                    <span className="ml-1 text-xs text-muted-foreground">{r.outlet as string}</span>
-                  ) : null}
-                </span>
-                <span className="tabular-nums">{r.points}</span>
-              </li>
-            ))}
-          </ol>
+                  <span
+                    className={`flex h-6 w-6 items-center justify-center rounded-full text-xs font-semibold ${
+                      i === 0
+                        ? 'bg-amber-400 text-white'
+                        : i === 1
+                          ? 'bg-zinc-300'
+                          : i === 2
+                            ? 'bg-amber-700/70 text-white'
+                            : 'bg-muted'
+                    }`}
+                  >
+                    {i + 1}
+                  </span>
+                  <span className="flex-1">
+                    {r.name}
+                    {r.me ? ' (you)' : ''} <DoneTick show={r.done} />
+                    {'outlet' in r && r.outlet ? (
+                      <span className="ml-1 text-xs text-muted-foreground">{r.outlet as string}</span>
+                    ) : null}
+                  </span>
+                  <span className="tabular-nums">{r.points}</span>
+                </li>
+              ))}
+            </ol>
+            {rows.some((r) => r.done) ? (
+              <div className="flex items-center gap-1 text-xs text-muted-foreground">
+                <DoneTick show /> finished all their training
+              </div>
+            ) : null}
+          </>
         ) : (
           <CardDescription>No points yet. Pass a module to get on the board.</CardDescription>
         )}

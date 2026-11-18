@@ -2,6 +2,7 @@ import { differenceInCalendarDays, format, parseISO, startOfMonth, subMonths } f
 import { Gift, PartyPopper, Trophy } from 'lucide-react'
 import { Card, CardContent, CardDescription, CardTitle } from '@/components/ui/Card'
 import { useMonthPrizes } from '@/lib/training'
+import DoneTick from './DoneTick'
 
 const MEDAL = ['bg-amber-400 text-white', 'bg-zinc-300 text-zinc-800', 'bg-amber-700/80 text-white']
 const PLACE = ['1st', '2nd', '3rd']
@@ -96,7 +97,7 @@ export default function PrizesCard() {
                 </span>
                 <span className="flex-1 truncate">
                   {r.name}
-                  {r.me ? ' (you)' : ''}
+                  {r.me ? ' (you)' : ''} <DoneTick show={r.done} />
                   {r.outlet ? <span className="ml-1 text-xs text-muted-foreground">{r.outlet}</span> : null}
                 </span>
                 {r.rank <= 3 ? <Trophy className="h-3.5 w-3.5 text-amber-500" /> : null}
