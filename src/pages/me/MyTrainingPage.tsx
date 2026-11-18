@@ -1,12 +1,14 @@
 import { useState } from 'react'
 import { Link } from 'react-router-dom'
 import { format, parseISO } from 'date-fns'
-import { Award, CheckCircle2, Clock, Crown, GraduationCap, Lock, Medal, Trophy } from 'lucide-react'
+import { Award, CheckCircle2, Clock, Crown, GraduationCap, Medal, Trophy } from 'lucide-react'
 import { PageHeader } from '@/components/layout/AppShell'
 import { Card, CardContent, CardDescription, CardTitle } from '@/components/ui/Card'
-import { BADGE_ICON, KIND_ICON } from '@/components/training/icons'
+import { KIND_ICON } from '@/components/training/icons'
 import PrizesCard from '@/components/training/PrizesCard'
+import BadgeArt from '@/components/training/BadgeArt'
 import OutletLeagueCard from '@/components/training/OutletLeagueCard'
+import ScoreBreakdown from '@/components/training/ScoreBreakdown'
 import {
   KIND_LABEL,
   STATUS_LABEL,
@@ -60,6 +62,7 @@ export default function MyTrainingPage() {
 }
 
 function ProgressCard({ p }: { p: MyProgress }) {
+  const [open, setOpen] = useState(false)
   const span = p.next_level ? p.next_level - p.level_floor : 1
   const pct = p.next_level ? Math.min(100, Math.round((100 * (p.points - p.level_floor)) / span)) : 100
   const LevelIcon =
@@ -75,10 +78,10 @@ function ProgressCard({ p }: { p: MyProgress }) {
             <div className="text-xs uppercase tracking-wider text-muted-foreground">Level</div>
             <div className="text-xl font-semibold">{p.level}</div>
           </div>
-          <div className="text-right">
+          <button type="button" className="text-right" onClick={() => setOpen(true)}>
             <div className="text-2xl font-semibold tabular-nums">{p.points}</div>
-            <div className="text-xs text-muted-foreground">points</div>
-          </div>
+            <div className="text-xs text-primary underline-offset-2 hover:underline">points · see how</div>
+          </button>
         </div>
         <div>
           <div className="h-2 overflow-hidden rounded-full bg-muted">
@@ -95,35 +98,46 @@ function ProgressCard({ p }: { p: MyProgress }) {
             </span>
           </div>
         </div>
-        <div className="grid grid-cols-3 gap-2 sm:grid-cols-6">
-          {p.badges.map((b) => {
-            const Icon = BADGE_ICON[b.key] ?? Award
-            return (
+        <div>
+          <div className="mb-2 flex items-center justify-between text-sm">
+            <span className="font-medium">Badges</span>
+            <span className="text-xs text-muted-foreground">
+              {p.badges.filter((b) => b.earned).length} of {p.badges.length} collected
+            </span>
+          </div>
+          <div className="grid grid-cols-3 gap-2 sm:grid-cols-6">
+            {p.badges.map((b) => (
               <div
                 key={b.key}
                 title={b.hint}
-                className={`flex flex-col items-center gap-1 rounded-lg border p-2 text-center ${
-                  b.earned ? 'border-primary/40 bg-primary/5' : 'border-border opacity-60'
+                className={`flex flex-col items-center gap-1 rounded-xl border p-2 text-center ${
+                  b.earned ? 'border-primary/30 bg-primary/5' : 'border-border'
                 }`}
               >
+                <BadgeArt badge={b.key} earned={b.earned} size={56} />
                 <div
-                  className={`flex h-9 w-9 items-center justify-center rounded-full ${
-                    b.earned ? 'bg-primary text-primary-foreground' : 'bg-muted text-muted-foreground'
-                  }`}
+                  className={`text-[11px] font-semibold leading-tight ${b.earned ? '' : 'text-muted-foreground'}`}
                 >
-                  {b.earned ? <Icon className="h-4 w-4" /> : <Lock className="h-4 w-4" />}
+                  {b.name}
                 </div>
-                <div className="text-[11px] font-medium leading-tight">{b.name}</div>
                 <div className="text-[10px] leading-tight text-muted-foreground">{b.hint}</div>
               </div>
-            )
-          })}
+            ))}
+          </div>
         </div>
         <p className="text-xs text-muted-foreground">
           Points for each module you pass: your quiz score, +50 if you pass first time, +25 if you finish by
-          the due date.
+          the due date.{' '}
+          <button
+            type="button"
+            className="text-primary underline-offset-2 hover:underline"
+            onClick={() => setOpen(true)}
+          >
+            See how your points add up
+          </button>
         </p>
       </CardContent>
+      {open ? <ScoreBreakdown employeeId={null} title="Your points" onClose={() => setOpen(false)} /> : null}
     </Card>
   )
 }

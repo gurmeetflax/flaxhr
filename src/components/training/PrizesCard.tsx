@@ -1,5 +1,5 @@
-import { differenceInCalendarDays, format, parseISO } from 'date-fns'
-import { Gift, Trophy } from 'lucide-react'
+import { differenceInCalendarDays, format, parseISO, startOfMonth, subMonths } from 'date-fns'
+import { Gift, PartyPopper, Trophy } from 'lucide-react'
 import { Card, CardContent, CardDescription, CardTitle } from '@/components/ui/Card'
 import { useMonthPrizes } from '@/lib/training'
 
@@ -9,8 +9,10 @@ const PLACE = ['1st', '2nd', '3rd']
 // This month's prizes, the monthly board and where I stand.
 export default function PrizesCard() {
   const q = useMonthPrizes()
+  const last = useMonthPrizes(format(subMonths(startOfMonth(new Date()), 1), 'yyyy-MM-dd'))
   const d = q.data
   if (!d) return null
+  const winners = (last.data?.board ?? []).filter((r) => r.rank <= 3)
   const daysLeft = Math.max(0, differenceInCalendarDays(parseISO(d.ends), new Date()))
   return (
     <Card className="border-primary/30">
@@ -31,6 +33,38 @@ export default function PrizesCard() {
             </div>
           ) : null}
         </div>
+        {winners.length && last.data ? (
+          <div className="rounded-xl border border-amber-300/60 bg-amber-50 p-3 dark:bg-amber-500/10">
+            <div className="mb-2 flex items-center gap-2 text-sm font-semibold">
+              <PartyPopper className="h-4 w-4 text-amber-600" />
+              {format(parseISO(last.data.month), 'MMMM')} winners
+            </div>
+            <ol className="flex flex-col gap-1.5">
+              {winners.map((w) => (
+                <li key={w.rank} className="flex items-center gap-2 text-sm">
+                  <span
+                    className={`flex h-6 w-6 shrink-0 items-center justify-center rounded-full text-xs font-bold ${MEDAL[w.rank - 1]}`}
+                  >
+                    {w.rank}
+                  </span>
+                  <span className="flex-1 truncate font-medium">
+                    {w.name}
+                    {w.me ? ' (you)' : ''}
+                    {w.outlet ? (
+                      <span className="ml-1 text-xs font-normal text-muted-foreground">{w.outlet}</span>
+                    ) : null}
+                  </span>
+                  <span className="text-xs tabular-nums text-muted-foreground">{w.points} pts</span>
+                </li>
+              ))}
+            </ol>
+            {winners.some((w) => w.me) ? (
+              <div className="mt-2 text-xs font-medium text-amber-700 dark:text-amber-400">
+                Congratulations! HR will be in touch about your prize.
+              </div>
+            ) : null}
+          </div>
+        ) : null}
         <ol className="grid grid-cols-3 gap-2">
           {d.prizes.map((p, i) => (
             <li

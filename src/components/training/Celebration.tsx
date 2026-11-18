@@ -1,8 +1,8 @@
 import { useMemo } from 'react'
-import { Award, PartyPopper } from 'lucide-react'
+import { PartyPopper } from 'lucide-react'
 import { Button } from '@/components/ui/Button'
 import type { Badge } from '@/lib/training'
-import { BADGE_ICON } from './icons'
+import BadgeArt from './BadgeArt'
 
 export interface CelebrationData {
   score: number
@@ -81,17 +81,12 @@ export default function Celebration({ data, onClose }: { data: CelebrationData; 
               New badge{data.badges.length > 1 ? 's' : ''}
             </div>
             <div className="flex flex-wrap justify-center gap-2">
-              {data.badges.map((b) => {
-                const Icon = BADGE_ICON[b.key] ?? Award
-                return (
-                  <div
-                    key={b.key}
-                    className="flex items-center gap-2 rounded-full border border-primary/40 bg-primary/5 px-3 py-1 text-sm"
-                  >
-                    <Icon className="h-4 w-4 text-primary" /> {b.name}
-                  </div>
-                )
-              })}
+              {data.badges.map((b) => (
+                <div key={b.key} className="flex w-24 flex-col items-center gap-1 text-center">
+                  <BadgeArt badge={b.key} earned size={64} />
+                  <span className="text-xs font-semibold leading-tight">{b.name}</span>
+                </div>
+              ))}
             </div>
           </div>
         ) : null}
