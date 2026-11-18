@@ -6,7 +6,8 @@
 // overrides the group; the default is "Flax Core Managers Mumbai".
 // Body: {} send · {"dry_run": true} return the text only ·
 //       {"test_to": "<chat id>"} send to one chat instead ·
-//       {"list_groups": "hr"} find group ids by name.
+//       {"list_groups": "hr"} find group ids by name ·
+//       {"monthly_winners": true, "month"?: "2026-11-01"} announce a month's top 3 (default last month).
 
 import 'jsr:@supabase/functions-js/edge-runtime.d.ts'
 import { createClient } from 'jsr:@supabase/supabase-js@2'
@@ -122,6 +123,47 @@ function render(s: Summary): string {
   return L.join('\n')
 }
 
+type Winners = {
+  month: string
+  learners: number
+  passed: number
+  winners: {
+    rank: number
+    name: string
+    outlet: string | null
+    points: number
+    passed: number
+    prize: string | null
+  }[]
+}
+
+function renderWinners(w: Winners): string {
+  const medal = ['🥇', '🥈', '🥉']
+  const L: string[] = [`*Flax training · ${monthName(w.month)} winners* 🎉`, '']
+  if (!w.winners.length) {
+    L.push(`Nobody passed a training module in ${monthName(w.month)}, so there are no winners this time.`)
+  } else {
+    w.winners.forEach((p) =>
+      L.push(
+        `${medal[p.rank - 1] ?? p.rank + '.'} *${p.name}*${p.outlet ? ` (${short(p.outlet)})` : ''}: ${p.points} pts, ${plural(p.passed, 'module')}${p.prize ? ` · ${p.prize}` : ''}`,
+      ),
+    )
+    L.push('')
+    L.push(
+      `${plural(w.learners, 'person')} scored points and ${plural(w.passed, 'module')} were passed in ${monthName(w.month)}.`.replace(
+        'persons',
+        'people',
+      ),
+    )
+    L.push(
+      'Please congratulate them and share it with your teams. HR: mark the prizes paid in Admin › Training.',
+    )
+  }
+  L.push('')
+  L.push(`Leaderboard: ${APP}`)
+  return L.join('\n')
+}
+
 async function sendText(to: string, body: string) {
   const r = await fetch(WHAPI + '/messages/text', {
     method: 'POST',
@@ -158,9 +200,18 @@ Deno.serve(async (req) => {
     })
   }
 
-  const { data, error } = await admin.rpc('training_weekly_summary', { p_days: 7 })
-  if (error) return json({ ok: false, error: error.message }, 500)
-  const text = render(data as Summary)
+  let text: string
+  if (body.monthly_winners) {
+    const { data, error } = await admin.rpc('training_month_winners_announce', {
+      p_month: body.month ? String(body.month) : null,
+    })
+    if (error) return json({ ok: false, error: error.message }, 500)
+    text = renderWinners(data as Winners)
+  } else {
+    const { data, error } = await admin.rpc('training_weekly_summary', { p_days: 7 })
+    if (error) return json({ ok: false, error: error.message }, 500)
+    text = render(data as Summary)
+  }
   if (body.dry_run) return json({ ok: true, dry_run: true, text })
 
   const to = body.test_to ? String(body.test_to) : GROUP

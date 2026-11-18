@@ -4,7 +4,8 @@
 --    (quiz score + 50 first try + 25 on time), the attempts, and each badge
 --    with the reason it was or was not earned. Staff can open their own;
 --    admins, HR and viewers can open anyone's.
--- 2. training_weekly_summary(): the week's numbers for the Core Managers group
+-- 2. training_weekly_summary(): the week's numbers for the Core Managers group,
+--    and training_month_winners_announce(): last month's top 3, posted on the 1st
 --    (service role only; called by the training-weekly-whatsapp function).
 --    A Monday cron sends it.
 
@@ -158,23 +159,49 @@ $$;
 revoke all on function public.training_weekly_summary(int) from public, anon, authenticated;
 grant execute on function public.training_weekly_summary(int) to service_role;
 
+-- Monthly winners announcement (service role only): last month's top 3
+-- with full names, outlet, points and prize. Default = the previous month.
+create or replace function public.training_month_winners_announce(p_month date default null)
+returns jsonb language sql stable security definer set search_path to 'training', 'core', 'public' as $$
+  with m as (
+    select date_trunc('month', coalesce(p_month, ((now() at time zone 'Asia/Kolkata')::date - interval '1 month')::date))::date mo
+  )
+  select jsonb_build_object(
+    'month', (select mo from m),
+    'learners', (select count(*) from m, training.month_board(m.mo)),
+    'passed', (select coalesce(sum(b.passed), 0) from m, training.month_board(m.mo) b),
+    'winners', (select coalesce(jsonb_agg(jsonb_build_object('rank', b.rk, 'name', e.full_name,
+                  'outlet', coalesce(o.display_name, o.name), 'points', b.points, 'passed', b.passed,
+                  'prize', p.title) order by b.rk), '[]'::jsonb)
+                from m, training.month_board(m.mo) b
+                join core.employees e on e.id = b.employee_id
+                left join public.flax_outlets o on o.id = e.outlet_id
+                left join training.prizes p on p.rank = b.rk
+                where b.rk <= 3))
+$$;
+revoke all on function public.training_month_winners_announce(date) from public, anon, authenticated;
+grant execute on function public.training_month_winners_announce(date) to service_role;
+
 -- Monday 11:05 IST (05:35 UTC): post the summary to "Flax Core Managers Mumbai".
-create or replace function public.training_send_weekly_summary(p_dry boolean default false)
+-- On the 1st, 11:10 IST (05:40 UTC): announce last month's winners there too.
+create or replace function public.training_send_weekly_summary(p_dry boolean default false, p_winners boolean default false)
 returns void language plpgsql security definer set search_path = public as $$
 declare k text := (select decrypted_secret from vault.decrypted_secrets where name = 'fp_sync_service_role_key');
 begin
   perform net.http_post(
     url := 'https://fcrwxuyyixozudwyhkcz.supabase.co/functions/v1/training-weekly-whatsapp',
     headers := jsonb_build_object('Content-Type', 'application/json', 'Authorization', 'Bearer ' || k),
-    body := jsonb_build_object('dry_run', p_dry),
+    body := jsonb_build_object('dry_run', p_dry, 'monthly_winners', p_winners),
     timeout_milliseconds := 120000);
 end $$;
-revoke all on function public.training_send_weekly_summary(boolean) from public, anon, authenticated;
+revoke all on function public.training_send_weekly_summary(boolean, boolean) from public, anon, authenticated;
 
 do $$
 begin
   perform cron.unschedule('training-weekly-whatsapp') where exists (select 1 from cron.job where jobname = 'training-weekly-whatsapp');
   perform cron.schedule('training-weekly-whatsapp', '35 5 * * 1', $c$select public.training_send_weekly_summary()$c$);
+  perform cron.unschedule('training-monthly-winners') where exists (select 1 from cron.job where jobname = 'training-monthly-winners');
+  perform cron.schedule('training-monthly-winners', '40 5 1 * *', $c$select public.training_send_weekly_summary(false, true)$c$);
 end $$;
 
 notify pgrst, 'reload schema';

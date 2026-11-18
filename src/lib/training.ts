@@ -732,10 +732,11 @@ export interface MonthWinners {
   paid: { rank: number; name: string; points: number; prize: string; paid_at: string }[]
 }
 
-export function useMonthPrizes() {
+/** A month's prizes and board (first name + initial). month = 'yyyy-MM-01'; default this month. */
+export function useMonthPrizes(month?: string) {
   return useQuery({
-    queryKey: ['training', 'month-prizes'],
-    queryFn: () => rpc<MonthPrizes>('training_month_prizes'),
+    queryKey: ['training', 'month-prizes', month ?? 'current'],
+    queryFn: () => rpc<MonthPrizes>('training_month_prizes', month ? { p_month: month } : {}),
   })
 }
 
