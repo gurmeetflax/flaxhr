@@ -4,6 +4,8 @@
 //
 // Secrets: WHAPI_TOKEN (shared with complaint-whatsapp). WHAPI_HR_GROUP
 // overrides the group; the default is "Flax Core Managers Mumbai".
+// Messages go out as PNG cards (cards.js) with a short caption; if a card
+// can't be rendered the plain-text version is sent instead.
 // Body: {} send · {"dry_run": true} return the text only ·
 //       {"test_to": "<chat id>"} send to one chat instead ·
 //       {"list_groups": "hr"} find group ids by name ·
@@ -12,6 +14,10 @@
 
 import 'jsr:@supabase/functions-js/edge-runtime.d.ts'
 import { createClient } from 'jsr:@supabase/supabase-js@2'
+import { encodeBase64 } from 'jsr:@std/encoding@1/base64'
+import satori from 'npm:satori@0.10.14'
+import { initWasm, Resvg } from 'npm:@resvg/resvg-wasm@2.6.2'
+import { badgeCard, weeklyCard, winnersCard } from './cards.js'
 
 const WHAPI = 'https://gate.whapi.cloud'
 const TOKEN = Deno.env.get('WHAPI_TOKEN') ?? ''
@@ -80,7 +86,7 @@ function render(s: Summary): string {
   )
   L.push(
     `${s.active} of ${s.staff} staff active this week · ${s.not_started} not started yet` +
-      (s.all_done != null ? ` · ${s.all_done} finished everything ✅` : ''),
+      (s.all_done != null ? ` · ${s.all_done} finished everything ☑️` : ''),
   )
   L.push(
     `Company completion ${s.completion ?? 0}% · ${s.overdue_modules ? `${plural(s.overdue_modules, 'module')} overdue (${plural(s.overdue_people, 'person')})`.replace('persons', 'people') : 'nothing overdue'}`,
@@ -91,7 +97,7 @@ function render(s: Summary): string {
   if (s.top_week.length) {
     s.top_week.forEach((p, i) =>
       L.push(
-        `${i + 1}. ${p.name}${p.done ? ' ✅' : ''}${p.outlet ? ` (${short(p.outlet)})` : ''}: ${p.points} pts, ${plural(p.passed ?? 0, 'module')}`,
+        `${i + 1}. ${p.name}${p.done ? ' ☑️' : ''}${p.outlet ? ` (${short(p.outlet)})` : ''}: ${p.points} pts, ${plural(p.passed ?? 0, 'module')}`,
       ),
     )
   } else L.push('Nobody passed a module this week.')
@@ -102,7 +108,7 @@ function render(s: Summary): string {
   if (s.month_top.length) {
     s.month_top.forEach((p) =>
       L.push(
-        `${medal[p.rank - 1] ?? p.rank + '.'} ${p.name}${p.done ? ' ✅' : ''}${p.outlet ? ` (${short(p.outlet)})` : ''}: ${p.points} pts${p.prize ? ` · ${p.prize}` : ''}`,
+        `${medal[p.rank - 1] ?? p.rank + '.'} ${p.name}${p.done ? ' ☑️' : ''}${p.outlet ? ` (${short(p.outlet)})` : ''}: ${p.points} pts${p.prize ? ` · ${p.prize}` : ''}`,
       ),
     )
   } else L.push('No points yet this month.')
@@ -124,7 +130,7 @@ function render(s: Summary): string {
   }
 
   L.push('')
-  if (s.all_done != null) L.push('✅ = finished all their training')
+  if (s.all_done != null) L.push('☑️ = finished all their training')
   L.push(`Full scores: ${APP}`)
   return L.join('\n')
 }
@@ -177,7 +183,7 @@ const BADGES: Record<string, [string, string]> = {
   perfect: ['Perfect score', 'you scored 100% on a quiz'],
   on_time: ['On time', 'you finished 3 modules before they were due'],
   safety: ['Safety star', 'you passed every food safety and SOP module'],
-  all_done: ['All done ✅', 'you finished all your training'],
+  all_done: ['All done ☑️', 'you finished all your training'],
 }
 const LEVELS = ['Learner', 'Pro', 'Champion']
 const ME = 'https://hr.flaxfoods.in/me/training'
@@ -228,15 +234,22 @@ async function badgeMessages(body: Record<string, unknown>) {
   const { data, error } = await admin.rpc('training_badge_messages_pending', { p_limit: 30 })
   if (error) return json({ ok: false, error: error.message }, 500)
   const rows = (data ?? []) as Pending[]
-  const out: { employee: string; sent: boolean; error?: string; text?: string }[] = []
+  const out: { employee: string; sent: boolean; error?: string; text?: string; preview?: string }[] = []
   for (const p of rows) {
     const text = renderBadges(p)
+    const level = LEVELS.filter((l) => p.keys.includes('level:' + l)).pop() ?? null
+    const tree = () => badgeCard(p, level)
     if (body.dry_run) {
-      out.push({ employee: p.first_name, sent: false, text })
+      out.push({ employee: p.first_name, sent: false, text, preview: await preview('badge', tree()) })
       continue
     }
     try {
-      await sendText(body.test_to ? String(body.test_to) : toChat(p.phone), text)
+      await sendCard(
+        body.test_to ? String(body.test_to) : toChat(p.phone),
+        tree,
+        `Well done ${p.first_name}! 🏅 See your badges: ${ME}`,
+        text,
+      )
       // Test sends don't count as told.
       if (!body.test_to) {
         const { error: e } = await admin.rpc('training_badge_messages_mark', {
@@ -259,6 +272,96 @@ async function badgeMessages(body: Record<string, unknown>) {
   }
   return json({ ok: true, dry_run: !!body.dry_run, results: out })
 }
+
+// ---------- PNG cards ----------
+const FONT = 'https://cdn.jsdelivr.net/fontsource/fonts/'
+// deno-lint-ignore no-explicit-any
+let ready: Promise<any[]> | null = null
+function assets() {
+  ready ??= (async () => {
+    const wasm = await fetch('https://unpkg.com/@resvg/resvg-wasm@2.6.2/index_bg.wasm').then((r) =>
+      r.arrayBuffer(),
+    )
+    await initWasm(wasm)
+    const get = (p: string) =>
+      fetch(FONT + p).then((r) => {
+        if (!r.ok) throw new Error('font ' + p + ' ' + r.status)
+        return r.arrayBuffer()
+      })
+    return [
+      {
+        name: 'Barlow',
+        data: await get('barlow@5.0.13/latin-400-normal.woff'),
+        weight: 400,
+        style: 'normal',
+      },
+      {
+        name: 'Barlow',
+        data: await get('barlow@5.0.13/latin-600-normal.woff'),
+        weight: 600,
+        style: 'normal',
+      },
+      {
+        name: 'Barlow',
+        data: await get('barlow@5.0.13/latin-700-normal.woff'),
+        weight: 700,
+        style: 'normal',
+      },
+      {
+        name: 'Barlow Condensed',
+        data: await get('barlow-condensed@5.0.13/latin-700-normal.woff'),
+        weight: 700,
+        style: 'normal',
+      },
+    ]
+  })()
+  return ready
+}
+
+async function png(tree: unknown): Promise<Uint8Array> {
+  const fonts = await assets()
+  // deno-lint-ignore no-explicit-any
+  const svg = await satori(tree as any, { width: 1080, fonts })
+  return new Resvg(svg, { fitTo: { mode: 'width', value: 1080 } }).render().asPng()
+}
+
+async function sendImage(to: string, image: Uint8Array, caption: string) {
+  const r = await fetch(WHAPI + '/messages/image', {
+    method: 'POST',
+    headers: { Authorization: 'Bearer ' + TOKEN, 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      to,
+      media: 'data:image/png;name=training.png;base64,' + encodeBase64(image),
+      caption,
+    }),
+  })
+  if (!r.ok) throw new Error('Whapi ' + r.status + ': ' + (await r.text()).slice(0, 200))
+}
+
+/** Card + caption; plain text if the card can't be drawn. */
+async function sendCard(to: string, tree: () => unknown, caption: string, fallback: string) {
+  let image: Uint8Array | null = null
+  try {
+    image = await png(tree())
+  } catch (e) {
+    console.error('card render failed', e)
+  }
+  if (image) await sendImage(to, image, caption)
+  else await sendText(to, fallback)
+}
+
+/** Dry run: render the card and store it as a preview (public URL). */
+async function preview(name: string, tree: unknown) {
+  const image = await png(tree)
+  const path = `previews/${name}-${Date.now()}.png`
+  const { error } = await admin.storage
+    .from('training-media')
+    .upload(path, image, { contentType: 'image/png' })
+  if (error) throw new Error(error.message)
+  return admin.storage.from('training-media').getPublicUrl(path).data.publicUrl
+}
+
+const rangeOf = (s: Summary) => `${day(s.from)} – ${day(s.to)}`
 
 async function sendText(to: string, body: string) {
   const r = await fetch(WHAPI + '/messages/text', {
@@ -302,24 +405,32 @@ Deno.serve(async (req) => {
   }
 
   let text: string
+  let tree: () => unknown
+  let caption: string
   if (body.monthly_winners) {
     const { data, error } = await admin.rpc('training_month_winners_announce', {
       p_month: body.month ? String(body.month) : null,
     })
     if (error) return json({ ok: false, error: error.message }, 500)
-    text = renderWinners(data as Winners)
+    const w = data as Winners
+    text = renderWinners(w)
+    tree = () => winnersCard(w, monthName(w.month))
+    caption = `*${monthName(w.month)} training winners* 🎉 Please congratulate them! Leaderboard: ${APP}`
   } else {
     const { data, error } = await admin.rpc('training_weekly_summary', { p_days: 7 })
     if (error) return json({ ok: false, error: error.message }, 500)
-    text = render(data as Summary)
+    const s = data as Summary
+    text = render(s)
+    tree = () => weeklyCard({ ...s, monthName: monthName(s.month) }, rangeOf(s))
+    caption = `*Flax training · weekly summary* ${rangeOf(s)}. Full scores: ${APP}`
   }
-  if (body.dry_run) return json({ ok: true, dry_run: true, text })
+  if (body.dry_run) return json({ ok: true, dry_run: true, text, preview: await preview('summary', tree()) })
 
   const to = body.test_to ? String(body.test_to) : GROUP
   if (!TOKEN) return json({ ok: false, error: 'WHAPI_TOKEN secret not set' }, 500)
   if (!to) return json({ ok: false, error: 'WHAPI_HR_GROUP secret not set' }, 500)
   try {
-    await sendText(to, text)
+    await sendCard(to, tree, caption, text)
   } catch (e) {
     return json({ ok: false, error: e instanceof Error ? e.message : String(e) }, 502)
   }
