@@ -567,6 +567,52 @@ export function useAdminLeaderboard() {
   })
 }
 
+// ------------------------------------------------- score breakdown
+
+export interface BreakdownModule {
+  assignment_id: string
+  module_id: string
+  title: string
+  kind: ModuleKind
+  status: AssignmentStatus
+  pass_mark: number
+  due_on: string | null
+  passed_at: string | null
+  attempts: number
+  first_score: number | null
+  best_score: number | null
+  quiz_points: number
+  first_try_points: number
+  on_time_points: number
+  points: number
+  this_month: boolean
+  lessons: number
+  viewed: number
+  history: { at: string; score: number; correct: number; total: number; passed: boolean }[]
+}
+
+export interface ScoreBreakdown {
+  employee: { id: string; name: string; employee_code: string; outlet: string | null } | null
+  points: number
+  level: string
+  passed: number
+  assigned: number
+  month: string
+  month_points: number | null
+  month_rank: number | null
+  modules: BreakdownModule[]
+  badges: { key: string; name: string; earned: boolean; why: string }[]
+}
+
+/** How someone's points were made. Pass null for your own. */
+export function useScoreBreakdown(employeeId: string | null, enabled = true) {
+  return useQuery({
+    queryKey: ['training', 'breakdown', employeeId ?? 'me'],
+    enabled,
+    queryFn: () => rpc<ScoreBreakdown>('training_score_breakdown', { p_emp: employeeId }),
+  })
+}
+
 // ------------------------------------------------- viewers, leaders, photos
 
 export interface AdminPeople {

@@ -8,6 +8,7 @@ import { KIND_ICON } from '@/components/training/icons'
 import PrizesCard from '@/components/training/PrizesCard'
 import BadgeArt from '@/components/training/BadgeArt'
 import OutletLeagueCard from '@/components/training/OutletLeagueCard'
+import ScoreBreakdown from '@/components/training/ScoreBreakdown'
 import {
   KIND_LABEL,
   STATUS_LABEL,
@@ -61,6 +62,7 @@ export default function MyTrainingPage() {
 }
 
 function ProgressCard({ p }: { p: MyProgress }) {
+  const [open, setOpen] = useState(false)
   const span = p.next_level ? p.next_level - p.level_floor : 1
   const pct = p.next_level ? Math.min(100, Math.round((100 * (p.points - p.level_floor)) / span)) : 100
   const LevelIcon =
@@ -76,10 +78,10 @@ function ProgressCard({ p }: { p: MyProgress }) {
             <div className="text-xs uppercase tracking-wider text-muted-foreground">Level</div>
             <div className="text-xl font-semibold">{p.level}</div>
           </div>
-          <div className="text-right">
+          <button type="button" className="text-right" onClick={() => setOpen(true)}>
             <div className="text-2xl font-semibold tabular-nums">{p.points}</div>
-            <div className="text-xs text-muted-foreground">points</div>
-          </div>
+            <div className="text-xs text-primary underline-offset-2 hover:underline">points · see how</div>
+          </button>
         </div>
         <div>
           <div className="h-2 overflow-hidden rounded-full bg-muted">
@@ -125,9 +127,17 @@ function ProgressCard({ p }: { p: MyProgress }) {
         </div>
         <p className="text-xs text-muted-foreground">
           Points for each module you pass: your quiz score, +50 if you pass first time, +25 if you finish by
-          the due date.
+          the due date.{' '}
+          <button
+            type="button"
+            className="text-primary underline-offset-2 hover:underline"
+            onClick={() => setOpen(true)}
+          >
+            See how your points add up
+          </button>
         </p>
       </CardContent>
+      {open ? <ScoreBreakdown employeeId={null} title="Your points" onClose={() => setOpen(false)} /> : null}
     </Card>
   )
 }

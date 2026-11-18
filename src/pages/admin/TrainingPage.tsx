@@ -12,6 +12,7 @@ import { Tabs, TabsList, TabsTrigger } from '@/components/ui/Tabs'
 import { EmployeeSelect } from '@/components/ui/EmployeeSelect'
 import { Avatar } from '@/components/training/LessonView'
 import OutletLeagueCard from '@/components/training/OutletLeagueCard'
+import ScoreBreakdown from '@/components/training/ScoreBreakdown'
 import { supabase } from '@/lib/supabase'
 import { useDesignations } from '@/lib/designations'
 import {
@@ -361,15 +362,16 @@ export function LeaderboardTab({ readOnly = false }: { readOnly?: boolean }) {
   const q = useAdminLeaderboard()
   const outlets = useOutlets()
   const [outlet, setOutlet] = useState('')
+  const [open, setOpen] = useState<{ id: string; name: string } | null>(null)
   const rows = (q.data ?? []).filter((r) => !outlet || r.outlet_id === outlet)
   const anyPoints = rows.some((r) => r.points > 0)
   return (
     <div className="flex flex-col gap-3">
-      <MonthlyPrizes readOnly={readOnly} />
+      <MonthlyPrizes readOnly={readOnly} onOpen={(id, name) => setOpen({ id, name })} />
       <div className="flex flex-wrap items-center justify-between gap-3">
         <p className="text-xs text-muted-foreground">
           Points per passed module: quiz score, +50 first try, +25 on time. Same board staff see in the app
-          (they see first name and initial only).
+          (they see first name and initial only). Click a person to see how they scored.
         </p>
         <select
           className="h-10 rounded-lg border border-border bg-surface px-3 text-sm"
@@ -413,7 +415,11 @@ export function LeaderboardTab({ readOnly = false }: { readOnly?: boolean }) {
               {rows
                 .filter((r) => r.points > 0)
                 .map((r, i) => (
-                  <tr key={r.employee_id} className="border-t border-border">
+                  <tr
+                    key={r.employee_id}
+                    className="cursor-pointer border-t border-border hover:bg-muted/40"
+                    onClick={() => setOpen({ id: r.employee_id, name: r.name })}
+                  >
                     <td className="px-3 py-2">
                       <span
                         className={`inline-flex h-6 w-6 items-center justify-center rounded-full text-xs font-semibold ${
@@ -449,11 +455,18 @@ export function LeaderboardTab({ readOnly = false }: { readOnly?: boolean }) {
           </table>
         </div>
       )}
+      {open ? <ScoreBreakdown employeeId={open.id} title={open.name} onClose={() => setOpen(null)} /> : null}
     </div>
   )
 }
 
-function MonthlyPrizes({ readOnly }: { readOnly: boolean }) {
+function MonthlyPrizes({
+  readOnly,
+  onOpen,
+}: {
+  readOnly: boolean
+  onOpen: (employeeId: string, name: string) => void
+}) {
   const [month, setMonth] = useState(() => format(new Date(), 'yyyy-MM'))
   const q = useMonthWinners(month)
   const mark = useMarkPrizePaid()
@@ -533,13 +546,17 @@ function MonthlyPrizes({ readOnly }: { readOnly: boolean }) {
                 >
                   {w.rank}
                 </span>
-                <div className="min-w-[10rem] flex-1">
-                  <div className="font-semibold">{w.name}</div>
+                <button
+                  type="button"
+                  className="min-w-[10rem] flex-1 text-left"
+                  onClick={() => onOpen(w.employee_id, w.name)}
+                >
+                  <div className="font-semibold underline-offset-2 hover:underline">{w.name}</div>
                   <div className="text-xs text-muted-foreground">
                     {w.employee_code}
                     {w.outlet ? ` · ${w.outlet}` : ''} · {w.points} points · {w.passed} modules
                   </div>
-                </div>
+                </button>
                 <div className="text-sm font-medium">{w.prize ?? '—'}</div>
                 {w.paid_at ? (
                   <span className="rounded-full bg-emerald-500/10 px-2.5 py-1 text-xs font-medium text-emerald-700">
