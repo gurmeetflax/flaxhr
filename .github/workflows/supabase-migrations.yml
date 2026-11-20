@@ -42,10 +42,43 @@ jobs:
           echo "=== migration list (remote vs local) ==="
           supabase migration list || true
 
+      # We apply flaxhr's own migrations directly instead of `supabase db
+      # push`. The Operations database is shared: another product (nerve)
+      # writes its own migration versions into the same schema_migrations
+      # history, and `db push` aborts whenever it sees versions that aren't in
+      # this repo. This step ignores foreign versions — it applies only the
+      # files in supabase/migrations whose version isn't already recorded,
+      # each atomically (apply + record in one transaction), in order.
       - name: Push (apply pending)
+        env:
+          PGPASSWORD: ${{ env.SUPABASE_DB_PASSWORD }}
         run: |
-          # --include-all so out-of-order timestamps still apply
-          supabase db push --include-all --yes
+          set -euo pipefail
+          SUPABASE_DB_URL="$(cat supabase/.temp/pooler-url)"
+          command -v psql >/dev/null || { sudo apt-get update -qq && sudo apt-get install -y -qq postgresql-client; }
+
+          applied="$(psql "$SUPABASE_DB_URL" -At -c \
+            'select version from supabase_migrations.schema_migrations')"
+
+          any=0
+          for f in $(ls supabase/migrations/*.sql | sort); do
+            base="$(basename "$f")"
+            ver="${base%%_*}"                 # timestamp prefix before first _
+            name="${base#*_}"; name="${name%.sql}"
+            if grep -qxF "$ver" <<<"$applied"; then
+              continue
+            fi
+            echo "::group::apply $base"
+            # -f then -c run in one session; --single-transaction makes the
+            # migration and its history row commit together or not at all.
+            psql "$SUPABASE_DB_URL" -v ON_ERROR_STOP=1 --single-transaction \
+              -f "$f" \
+              -c "insert into supabase_migrations.schema_migrations (version, name)
+                  values ('$ver', \$\$${name}\$\$) on conflict (version) do nothing;"
+            echo "::endgroup::"
+            any=1
+          done
+          [ "$any" = 1 ] || echo "no pending flaxhr migrations"
 
       - name: Smoke test — every new table & view exists
         env:
