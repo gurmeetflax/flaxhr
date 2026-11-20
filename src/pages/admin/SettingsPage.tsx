@@ -1,6 +1,16 @@
 import { useState } from 'react'
 import { toast } from 'sonner'
-import { Bell, Briefcase, Camera, MapPin, MessageCircle, Pencil, Plus, Trash2 } from 'lucide-react'
+import {
+  Bell,
+  Briefcase,
+  Camera,
+  MapPin,
+  MessageCircle,
+  Pencil,
+  Plus,
+  ShieldCheck,
+  Trash2,
+} from 'lucide-react'
 import { useCities, useUpsertCity } from '@/lib/cities'
 import { PageHeader } from '@/components/layout/AppShell'
 import { Card, CardContent, CardDescription, CardTitle } from '@/components/ui/Card'
@@ -8,6 +18,7 @@ import { Input } from '@/components/ui/Input'
 import { Label } from '@/components/ui/Label'
 import { Button } from '@/components/ui/Button'
 import { useAppSetting, useSetAppSetting } from '@/lib/appSettings'
+import { useHasRole } from '@/lib/auth'
 import {
   useDesignations,
   useUpsertDesignation,
@@ -19,13 +30,11 @@ import { GROUP_LABEL, type RosterGroup } from '@/lib/autoRoster'
 export default function SettingsPage() {
   return (
     <>
-      <PageHeader
-        title="Settings"
-        description="App-wide toggles and master lists."
-      />
+      <PageHeader title="Settings" description="App-wide toggles and master lists." />
       <div className="flex flex-col gap-4">
         <SelfieRequiredCard />
         <PunchAccuracyCard />
+        <HrRegularisationCard />
         <NotificationEmailCard />
         <HrWhatsAppCard />
         <CitiesCard />
@@ -36,11 +45,50 @@ export default function SettingsPage() {
   )
 }
 
-function SelfieRequiredCard() {
-  const { data: required = true, isLoading } = useAppSetting<boolean>(
-    'selfie_required',
-    true,
+function HrRegularisationCard() {
+  const isAdmin = useHasRole('admin')
+  const { data: enabled = true, isLoading } = useAppSetting<boolean>('hr_can_approve_regularisations', true)
+  const setting = useSetAppSetting()
+
+  // Admin-only: this governs HR's own power, so HR can't see or change it.
+  if (!isAdmin) return null
+
+  const onToggle = async (next: boolean) => {
+    try {
+      await setting.mutateAsync({ key: 'hr_can_approve_regularisations', value: next })
+      toast.success(next ? 'HR can approve regularisations' : 'HR can no longer approve regularisations')
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : 'Could not save')
+    }
+  }
+
+  return (
+    <Card>
+      <CardContent className="flex items-start gap-4 p-6">
+        <span className="grid h-10 w-10 place-items-center rounded-lg bg-primary/10 text-primary">
+          <ShieldCheck className="h-5 w-5" />
+        </span>
+        <div className="flex-1">
+          <CardTitle>HR can approve regularisations</CardTitle>
+          <CardDescription className="mt-1">
+            When on, HR approves regularisations for regular staff. When off, only you and outlet managers
+            can. Either way, regularisations from senior-level employees (managers, chefs and leadership) can
+            only be approved by you.
+          </CardDescription>
+        </div>
+        <Toggle
+          checked={!!enabled}
+          disabled={isLoading || setting.isPending}
+          onChange={onToggle}
+          ariaLabel="Toggle HR regularisation approval"
+        />
+      </CardContent>
+    </Card>
   )
+}
+
+function SelfieRequiredCard() {
+  const { data: required = true, isLoading } = useAppSetting<boolean>('selfie_required', true)
   const setting = useSetAppSetting()
 
   const onToggle = async (next: boolean) => {
@@ -61,8 +109,7 @@ function SelfieRequiredCard() {
         <div className="flex-1">
           <CardTitle>Require selfie on punch in/out</CardTitle>
           <CardDescription className="mt-1">
-            When on, every punch must include a selfie. Turn off to let
-            employees punch with just location.
+            When on, every punch must include a selfie. Turn off to let employees punch with just location.
           </CardDescription>
         </div>
         <Toggle
@@ -77,10 +124,7 @@ function SelfieRequiredCard() {
 }
 
 function PunchAccuracyCard() {
-  const { data: current = 100, isLoading } = useAppSetting<number>(
-    'punch_max_accuracy_m',
-    100,
-  )
+  const { data: current = 100, isLoading } = useAppSetting<number>('punch_max_accuracy_m', 100)
   const setting = useSetAppSetting()
   const [draft, setDraft] = useState<string>('')
 
@@ -95,9 +139,7 @@ function PunchAccuracyCard() {
     try {
       await setting.mutateAsync({ key: 'punch_max_accuracy_m', value: Math.round(n) })
       toast.success(
-        n === 0
-          ? 'Accuracy check disabled'
-          : `Punches with worse than ±${Math.round(n)} m will be rejected`,
+        n === 0 ? 'Accuracy check disabled' : `Punches with worse than ±${Math.round(n)} m will be rejected`,
       )
       setDraft('')
     } catch (e) {
@@ -114,10 +156,9 @@ function PunchAccuracyCard() {
         <div className="flex-1">
           <CardTitle>Punch — max GPS accuracy</CardTitle>
           <CardDescription className="mt-1">
-            Reject punches whose GPS fix is wider than this threshold. Default
-            100 m. Set to <b>0</b> to disable the check (not recommended —
-            devices often report ±2000 m wifi-only fixes that let employees
-            punch from blocks away).
+            Reject punches whose GPS fix is wider than this threshold. Default 100 m. Set to <b>0</b> to
+            disable the check (not recommended — devices often report ±2000 m wifi-only fixes that let
+            employees punch from blocks away).
           </CardDescription>
           <div className="mt-3 flex items-center gap-2">
             <Input
@@ -147,10 +188,7 @@ function PunchAccuracyCard() {
 }
 
 function NotificationEmailCard() {
-  const { data: enabled = true, isLoading } = useAppSetting<boolean>(
-    'notif_email_enabled',
-    true,
-  )
+  const { data: enabled = true, isLoading } = useAppSetting<boolean>('notif_email_enabled', true)
   const setting = useSetAppSetting()
 
   const onToggle = async (next: boolean) => {
@@ -171,8 +209,8 @@ function NotificationEmailCard() {
         <div className="flex-1">
           <CardTitle>Send notification emails</CardTitle>
           <CardDescription className="mt-1">
-            Global kill-switch. Off = no outbound emails (in-app bell still
-            works). Each employee can also opt out individually.
+            Global kill-switch. Off = no outbound emails (in-app bell still works). Each employee can also opt
+            out individually.
           </CardDescription>
         </div>
         <Toggle
@@ -188,10 +226,7 @@ function NotificationEmailCard() {
 
 function HrWhatsAppCard() {
   const { data: number = '' } = useAppSetting<string>('hr_whatsapp_number', '')
-  const { data: prefill = 'Hi HR, ' } = useAppSetting<string>(
-    'hr_whatsapp_default_message',
-    'Hi HR, ',
-  )
+  const { data: prefill = 'Hi HR, ' } = useAppSetting<string>('hr_whatsapp_default_message', 'Hi HR, ')
   const setting = useSetAppSetting()
   const [num, setNum] = useState(number)
   const [pre, setPre] = useState(prefill)
@@ -220,28 +255,19 @@ function HrWhatsAppCard() {
           <div className="flex-1">
             <CardTitle>HR WhatsApp</CardTitle>
             <CardDescription className="mt-1">
-              Drives the floating chat button on /me. Use full international format,
-              e.g. <span className="font-mono">+919876543210</span>. Leave blank to hide the button.
+              Drives the floating chat button on /me. Use full international format, e.g.{' '}
+              <span className="font-mono">+919876543210</span>. Leave blank to hide the button.
             </CardDescription>
           </div>
         </div>
         <div className="grid gap-3 sm:grid-cols-2">
           <div>
             <Label className="mb-1 block text-xs">Number</Label>
-            <Input
-              type="tel"
-              value={num}
-              onChange={(e) => setNum(e.target.value)}
-              placeholder="+91…"
-            />
+            <Input type="tel" value={num} onChange={(e) => setNum(e.target.value)} placeholder="+91…" />
           </div>
           <div>
             <Label className="mb-1 block text-xs">Default message</Label>
-            <Input
-              value={pre}
-              onChange={(e) => setPre(e.target.value)}
-              placeholder="Hi HR, "
-            />
+            <Input value={pre} onChange={(e) => setPre(e.target.value)} placeholder="Hi HR, " />
           </div>
         </div>
         <div>
@@ -317,8 +343,8 @@ function CitiesCard() {
           <div className="flex-1">
             <CardTitle>Cities</CardTitle>
             <CardDescription className="mt-1">
-              Master list for outlet city dropdowns + dashboard filtering.
-              Outlet city values are normalised (lowercased, trimmed) automatically.
+              Master list for outlet city dropdowns + dashboard filtering. Outlet city values are normalised
+              (lowercased, trimmed) automatically.
             </CardDescription>
           </div>
           <Button size="sm" onClick={() => setAdding(true)}>
@@ -358,11 +384,7 @@ function CitiesCard() {
           <div className="grid gap-3 rounded-lg border border-border bg-muted/30 p-4 sm:grid-cols-[1fr_2fr_auto_auto]">
             <div>
               <Label className="mb-1 block text-xs">Slug</Label>
-              <Input
-                value={draftId}
-                onChange={(e) => setDraftId(e.target.value)}
-                placeholder="bangalore"
-              />
+              <Input value={draftId} onChange={(e) => setDraftId(e.target.value)} placeholder="bangalore" />
             </div>
             <div>
               <Label className="mb-1 block text-xs">Display name</Label>
@@ -416,10 +438,30 @@ function StatutoryCard() {
           </CardDescription>
         </div>
         <div className="grid gap-3 sm:grid-cols-2">
-          <NumRow label="PF rate (%)" value={pf} setValue={setPf} onSave={() => save('pf_rate_pct', Number(pf))} />
-          <NumRow label="PT amount (₹/month)" value={pt} setValue={setPt} onSave={() => save('pt_amount', Number(pt))} />
-          <NumRow label="ESIC rate (%)" value={esic} setValue={setEsic} onSave={() => save('esic_rate_pct', Number(esic))} />
-          <NumRow label="ESIC max gross (₹)" value={esicMaxStr} setValue={setEsicMaxStr} onSave={() => save('esic_max_gross', Number(esicMaxStr))} />
+          <NumRow
+            label="PF rate (%)"
+            value={pf}
+            setValue={setPf}
+            onSave={() => save('pf_rate_pct', Number(pf))}
+          />
+          <NumRow
+            label="PT amount (₹/month)"
+            value={pt}
+            setValue={setPt}
+            onSave={() => save('pt_amount', Number(pt))}
+          />
+          <NumRow
+            label="ESIC rate (%)"
+            value={esic}
+            setValue={setEsic}
+            onSave={() => save('esic_rate_pct', Number(esic))}
+          />
+          <NumRow
+            label="ESIC max gross (₹)"
+            value={esicMaxStr}
+            setValue={setEsicMaxStr}
+            onSave={() => save('esic_max_gross', Number(esicMaxStr))}
+          />
         </div>
       </CardContent>
     </Card>
@@ -427,8 +469,16 @@ function StatutoryCard() {
 }
 
 function NumRow({
-  label, value, setValue, onSave,
-}: { label: string; value: string; setValue: (s: string) => void; onSave: () => void }) {
+  label,
+  value,
+  setValue,
+  onSave,
+}: {
+  label: string
+  value: string
+  setValue: (s: string) => void
+  onSave: () => void
+}) {
   return (
     <div>
       <Label className="mb-1 block text-xs">{label}</Label>
@@ -440,7 +490,9 @@ function NumRow({
           value={value}
           onChange={(e) => setValue(e.target.value)}
         />
-        <Button size="sm" variant="outline" onClick={onSave}>Save</Button>
+        <Button size="sm" variant="outline" onClick={onSave}>
+          Save
+        </Button>
       </div>
     </div>
   )
@@ -549,9 +601,8 @@ function DesignationsCard() {
           <div className="flex-1">
             <CardTitle>Designations</CardTitle>
             <CardDescription className="mt-1">
-              Job titles. Used for the dropdown on every employee. Deactivating
-              hides a designation from the dropdown without breaking existing
-              assignments.
+              Job titles. Used for the dropdown on every employee. Deactivating hides a designation from the
+              dropdown without breaking existing assignments.
             </CardDescription>
           </div>
           <Button size="sm" onClick={startAdd}>
@@ -579,17 +630,14 @@ function DesignationsCard() {
                   </div>
                 </div>
                 <span className="hidden text-xs text-muted-foreground sm:inline">
-                  SC pts/day:{' '}
-                  <span className="font-mono">{Number(d.sc_points_per_day ?? 1).toFixed(2)}</span>
+                  SC pts/day: <span className="font-mono">{Number(d.sc_points_per_day ?? 1).toFixed(2)}</span>
                 </span>
                 <button
                   type="button"
                   onClick={() => toggleActive(d)}
                   className={
                     'rounded-full px-2 py-0.5 text-xs font-medium ' +
-                    (d.is_active
-                      ? 'bg-primary/10 text-primary'
-                      : 'bg-muted text-muted-foreground')
+                    (d.is_active ? 'bg-primary/10 text-primary' : 'bg-muted text-muted-foreground')
                   }
                 >
                   {d.is_active ? 'Active' : 'Inactive'}
@@ -610,7 +658,7 @@ function DesignationsCard() {
           </ul>
         )}
 
-        {(adding || editing) ? (
+        {adding || editing ? (
           <div className="grid gap-3 rounded-lg border border-border bg-muted/30 p-4 sm:grid-cols-[1fr_2fr_120px_140px_auto_auto_auto]">
             <div>
               <Label className="mb-1 block text-xs">Code</Label>
@@ -623,11 +671,7 @@ function DesignationsCard() {
             </div>
             <div>
               <Label className="mb-1 block text-xs">Name</Label>
-              <Input
-                value={draftName}
-                onChange={(e) => setDraftName(e.target.value)}
-                placeholder="Cashier"
-              />
+              <Input value={draftName} onChange={(e) => setDraftName(e.target.value)} placeholder="Cashier" />
             </div>
             <div>
               <Label className="mb-1 block text-xs">SC pts/day</Label>
@@ -657,8 +701,8 @@ function DesignationsCard() {
               </select>
             </div>
             <label className="flex h-10 items-center gap-2 self-end text-sm">
-              <input type="checkbox" checked={draftLead} onChange={(e) => setDraftLead(e.target.checked)} /> Can lead a
-              shift
+              <input type="checkbox" checked={draftLead} onChange={(e) => setDraftLead(e.target.checked)} />{' '}
+              Can lead a shift
             </label>
             <Button onClick={save} loading={upsert.isPending} className="self-end">
               {editing ? 'Save' : 'Add'}
