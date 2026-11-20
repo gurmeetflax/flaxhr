@@ -622,7 +622,12 @@ export function AutoFill({
               <ul className="list-disc pl-4">
                 {draft.shortfalls.map((s, i) => (
                   <li key={i} className={s.empty ? 'font-semibold' : undefined}>
-                    {format(new Date(`${s.date}T00:00:00`), 'EEE d')} · {hhmm(s.from)}–{hhmm(s.to)} ·{' '}
+                    {/* After-midnight gaps are filed under the evening before; show their own date. */}
+                    {format(
+                      new Date(new Date(`${s.date}T00:00:00`).getTime() + (s.from >= 1440 ? 86_400_000 : 0)),
+                      'EEE d',
+                    )}{' '}
+                    · {hhmm(s.from)}–{hhmm(s.to)} ·{' '}
                     {s.empty
                       ? `no ${GROUP_LABEL[s.group].toLowerCase()} staff on duty`
                       : `${s.short > 1 ? 'up to ' : ''}${s.short} ${GROUP_LABEL[s.group].toLowerCase()} short`}

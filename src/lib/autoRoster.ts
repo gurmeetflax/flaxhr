@@ -184,20 +184,40 @@ export function generateRoster(input: {
   const isNew = (p: StaffInput) => p.monthsAtFlax != null && p.monthsAtFlax < rules.newJoinerMonths
 
   // Hourly need per day and group: hour index 0..47 (overnight blocks run past 24).
+  //
+  // A block that starts after midnight and before 5am (e.g. Tue 00:00–04:00)
+  // is the tail of the night before: it is covered by a shift that started
+  // the previous evening (a 7pm–4am night shift belongs to the day it
+  // starts). So it is filed under the previous day at hours 24+, where those
+  // shifts' cover lands. The first day's own early block belongs to the
+  // night before this week and is left to last week's roster.
+  const OVERNIGHT_BEFORE = 5 * 60
   const needAt = new Map<string, number[]>() // `${dayIdx}|${group}` → per hour
   const groupsNeeded = new Set<RosterGroup>()
+  const addNeed = (di: number, n: NeedInput, offset: number) => {
+    const from = minutes(n.block_start)
+    let to = minutes(n.block_end)
+    if (to <= from) to += 1440
+    const k = `${di}|${n.roster_group}`
+    const arr = needAt.get(k) ?? Array<number>(48).fill(0)
+    for (let h = Math.floor((from + offset) / 60); h < Math.ceil((to + offset) / 60) && h < 48; h++)
+      arr[h] = Math.max(arr[h], n.headcount)
+    needAt.set(k, arr)
+    groupsNeeded.add(n.roster_group)
+  }
+  const nextWeekday = (date: string) => {
+    const d = new Date(`${date}T00:00:00`)
+    d.setDate(d.getDate() + 1)
+    return d.getDay()
+  }
   days.forEach((date, di) => {
     const wd = weekdayOf(date)
-    for (const n of needs.filter((x) => x.weekday === wd && x.headcount > 0)) {
-      const from = minutes(n.block_start)
-      let to = minutes(n.block_end)
-      if (to <= from) to += 1440
-      const k = `${di}|${n.roster_group}`
-      const arr = needAt.get(k) ?? Array<number>(48).fill(0)
-      for (let h = Math.floor(from / 60); h < Math.ceil(to / 60) && h < 48; h++)
-        arr[h] = Math.max(arr[h], n.headcount)
-      needAt.set(k, arr)
-      groupsNeeded.add(n.roster_group)
+    const nwd = nextWeekday(date)
+    for (const n of needs) {
+      if (n.headcount <= 0) continue
+      const early = minutes(n.block_start) < OVERNIGHT_BEFORE
+      if (n.weekday === wd && !early) addNeed(di, n, 0)
+      else if (n.weekday === nwd && early) addNeed(di, n, 1440)
     }
   })
   const dayDemand = (di: number, g: RosterGroup | null) =>
